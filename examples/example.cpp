@@ -1,5 +1,6 @@
 #include <action_server/server.h>
 #include "simple_action_factory.h"
+//#include <action_server/action.h>
 
 #include <set>
 
@@ -24,6 +25,7 @@ int main(int argc, char **argv)
     while(true)
     {
         server.tick();
+//        std::cout << action->status() << std::endl;
         usleep(100000);
     }
 
