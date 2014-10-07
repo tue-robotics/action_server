@@ -30,7 +30,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
         // Check for 'special' fields.
 
         std::string entity_id;
-        if (action_cfg.value("object", entity_id, tue::OPTIONAL))
+        if (action_cfg.value("entity", entity_id, tue::OPTIONAL))
         {
             // TODO: ask ED for entity information regarding given action, and add this to action_cfg
             ed::SimpleQuery srv;
@@ -41,6 +41,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                 if (srv.response.entities.empty())
                 {
                     res.error_msg = "No such entity: '" + entity_id + "'";
+                    std::cout << res.error_msg << std::endl;
                     return true;
                 }
 
@@ -58,6 +59,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                     else
                     {
                         res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
+                        std::cout << res.error_msg << std::endl;
                     }
                     e->config.endGroup();
                 }
@@ -65,6 +67,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
             else
             {
                 res.error_msg = "Could not call /ed/simple_query";
+                std::cout << res.error_msg << std::endl;
                 return true;
             }
         }
@@ -73,6 +76,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
         if (action_cfg.hasError())
         {
             res.error_msg = action_cfg.error();
+            std::cout << res.error_msg << std::endl;
         }
         else if (action)
         {
@@ -82,6 +86,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
     else
     {
         res.error_msg = action_cfg.error();
+        std::cout << res.error_msg << std::endl;
     }
 
     return true;
