@@ -10,4 +10,16 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
+  <build_depend>ed_object_models</build_depend>
+  <run_depend>ed_object_models</run_depend>
+
+  <build_depend>message_generation</build_depend>
+  <run_depend>message_runtime</run_depend>
+
+  <build_depend>tue_config</build_depend>
+  <run_depend>tue_config</run_depend>
+
+  <build_depend>cb_planner_msgs_srvs</build_depend>
+  <run_depend>cb_planner_msgs_srvs</run_depend>
+
 </package>

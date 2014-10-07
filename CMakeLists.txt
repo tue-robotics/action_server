@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 2.8.3)
 project(action_server)
 
 find_package(catkin REQUIRED COMPONENTS
+    roscpp
+    message_generation
     tue_config
+    cb_planner_msgs_srvs
 )
 
 # find_package(Boost REQUIRED COMPONENTS system program_options)
@@ -21,18 +24,18 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 # Generate services
-# add_service_files(
-#    FILES
-#    service1.srv
-#    ...
-# )
+add_service_files(
+   FILES
+   AddAction.srv
+   GetActionStatus.srv
+)
 
 # Generate added messages and services with any dependencies listed here
-# generate_messages(
-#    DEPENDENCIES
+generate_messages(
+#   DEPENDENCIES
 #    geometry_msgs
 #    ...
-# )
+)
 
 # ------------------------------------------------------------------------------------------------
 #                                          CATKIN EXPORT
@@ -51,6 +54,7 @@ catkin_package(
 
 include_directories(
     include
+	components
     ${catkin_INCLUDE_DIRS}
 )
 
@@ -59,14 +63,15 @@ add_library(action_server
     src/server.cpp
     src/action.cpp
     src/action_factory.cpp
-
 )
 target_link_libraries(action_server ${catkin_LIBRARIES})
 
 add_executable(action_server_main
 	src/main.cpp
+	components/navigate_to.cpp
 )
-target_link_libraries(action_server_main action_server)
+target_link_libraries(action_server_main action_server ${catkin_LIBRARIES})
+add_dependencies(action_server_main ${PROJECT_NAME}_generate_messages_cpp)
 
 # ------------------------------------------------------------------------------------------------
 #                                             EXAMPLES

@@ -59,7 +59,12 @@ ActionConstPtr Server::addAction(const std::string& type, tue::Configuration con
         ActionFactoryPtr af = it->second;
         action = af->createAction(type, config);
 
-        if (action)
+        if (config.hasError())
+        {
+            std::cout << "act::Server Error while creating an action of type '" << type << "':" << std::endl;
+            std::cout << config.error() << std::endl;
+        }
+        else if (action)
         {
             action->initialize(config);
             actions_[action->id()] = action;

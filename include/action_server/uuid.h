@@ -21,6 +21,8 @@ public:
         return out;
     }
 
+    const std::string& string() const { return id_; }
+
     static UUID generate();
 
 private:

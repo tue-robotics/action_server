@@ -23,11 +23,11 @@ public:
 
     virtual ~Action();
 
-    virtual void initialize(tue::Configuration config) = 0;
+    virtual void initialize(tue::Configuration config) {}
 
-    virtual void tick() = 0;
+    virtual void tick() {}
 
-    virtual void stop() = 0;
+    virtual void stop() {}
 
     const UUID& id() const { return id_; }
 
