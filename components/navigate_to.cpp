@@ -30,19 +30,24 @@ act::ActionPtr NavigateTo::createAction(const std::string& type, tue::Configurat
     if (config.readGroup("position_constraint", tue::REQUIRED))
     {
         config.value("constraint", pc.constraint);
-        config.value("frame", pc.frame);
+//        config.value("frame", pc.frame);
+
         config.endGroup();
     }
+    config.value("object", pc.frame);
 
     cb_planner_msgs_srvs::OrientationConstraint oc;
-    if (config.readGroup("orientation_constraint", tue::REQUIRED))
-    {
-        config.value("frame", oc.frame);
-        config.endGroup();
-    }
+//    if (config.readGroup("orientation_constraint", tue::REQUIRED))
+//    {
+//        config.value("frame", oc.frame);
+//        config.endGroup();
+//    }
+    config.value("object", oc.frame);
 
     if (config.hasError())
         return act::ActionPtr();
+
+    std::cout << config << std::endl;
 
     // Call for local plan
     cb_planner_msgs_srvs::GetPlan srv;
