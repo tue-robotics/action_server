@@ -73,8 +73,10 @@ ActionConstPtr Server::addAction(const std::string& type, tue::Configuration con
         {
             std::cout << "act::Server ERROR: action of type '" << type << "' could not be created." << std::endl;
         }
-
-
+    }
+    else
+    {
+        std::cout << "Unknown action type: " << type << std::endl;
     }
 
     return action;

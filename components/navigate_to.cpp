@@ -8,14 +8,14 @@
 
 void NavigationAction::tick()
 {
-    std::cout << "NavigationAction::tick " << id() << std::endl;
+//    std::cout << "NavigationAction::tick " << id() << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
 
 NavigateTo::NavigateTo()
 {
-    registerActionType("navigate_to");
+    registerActionType("navigate-to");
 
     ros::NodeHandle nh;
     client_global_plan_ = nh.serviceClient<cb_planner_msgs_srvs::GetPlan>("/cb_base_navigation/global_planner_interface/get_plan_srv");
@@ -34,7 +34,7 @@ act::ActionPtr NavigateTo::createAction(const std::string& type, tue::Configurat
 
         config.endGroup();
     }
-    config.value("object", pc.frame);
+    config.value("entity", pc.frame);
 
     cb_planner_msgs_srvs::OrientationConstraint oc;
 //    if (config.readGroup("orientation_constraint", tue::REQUIRED))
@@ -42,19 +42,23 @@ act::ActionPtr NavigateTo::createAction(const std::string& type, tue::Configurat
 //        config.value("frame", oc.frame);
 //        config.endGroup();
 //    }
-    config.value("object", oc.frame);
+    config.value("entity", oc.frame);
 
     if (config.hasError())
+    {
+        std::cout << "ERROR: " << config.error() << std::endl;
         return act::ActionPtr();
+    }
 
-    std::cout << config << std::endl;
+//    std::cout << config << std::endl;
 
     // Call for local plan
     cb_planner_msgs_srvs::GetPlan srv;
     srv.request.goal_position_constraints.push_back(pc);
     if (client_global_plan_.call(srv))
     {
-        std::cout << srv.response << std::endl;
+        std::cout << "[navigate-to] Found global plan." << std::endl;
+//        std::cout << srv.response << std::endl;
 
         cb_planner_msgs_srvs::LocalPlannerActionGoal msg;
         msg.goal.plan = srv.response.plan;
@@ -64,6 +68,7 @@ act::ActionPtr NavigateTo::createAction(const std::string& type, tue::Configurat
     else
     {
         std::cout << "Global plan service could not be called" << std::endl;
+        return act::ActionPtr();
     }
 
     return act::ActionPtr(new NavigationAction);

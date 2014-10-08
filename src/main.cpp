@@ -46,8 +46,6 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                 }
 
                 const ed::EntityInfo& e_info = srv.response.entities.front();
-                std::cout << e_info.type << std::endl;
-
                 ed::models::NewEntityPtr e = ed::models::create(e_info.type);
                 if (e->config.readGroup("affordances"))
                 {
@@ -59,18 +57,28 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                     else
                     {
                         res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
-                        std::cout << res.error_msg << std::endl;
                     }
                     e->config.endGroup();
+                }
+                else
+                {
+                    res.error_msg = "No affordances specified in model '" + e_info.type + "'.";
                 }
             }
             else
             {
                 res.error_msg = "Could not call /ed/simple_query";
-                std::cout << res.error_msg << std::endl;
-                return true;
             }
         }
+
+        if (!res.error_msg.empty())
+        {
+            std::cout << res.error_msg << std::endl;
+            return true;
+        }
+
+        std::cout << req.action << std::endl;
+        std::cout << action_cfg << std::endl;
 
         act::ActionConstPtr action = server.addAction(req.action, action_cfg);
         if (action_cfg.hasError())
@@ -81,7 +89,12 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
         else if (action)
         {
             res.action_uuid = action->id().string();
-        }        
+        }
+        else
+        {
+            res.error_msg = "Action of type '" + req.action +"' could not be created.";
+            std::cout << res.error_msg << std::endl;
+        }
     }
     else
     {
