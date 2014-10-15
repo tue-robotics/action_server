@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <action_server/AddAction.h>
 #include <action_server/GetActionStatus.h>
+#include <action_server/RegisterActionServer.h>
 
 #include <tue/config/configuration.h>
 #include <tue/config/loaders/yaml.h>
@@ -18,6 +19,9 @@
 
 act::Server server;
 ros::ServiceClient client_ed;
+
+// List of additional action servers (chained to this action server)
+std::map<std::string, ros::ServiceClient> action_server_clients;
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -93,8 +97,35 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
         }
         else
         {
-            res.error_msg = "Action of type '" + req.action +"' could not be created.";
-            std::cout << res.error_msg << std::endl;
+            std::cout << "Action type '" + req.action + "' is unknown, but I'm going to try other registered action servers" << std::endl;
+
+            action_server::AddAction srv;
+            srv.request = req;
+            bool succeeded = false;
+            for(std::map<std::string, ros::ServiceClient>::iterator it = action_server_clients.begin(); it != action_server_clients.end(); ++it)
+            {
+                if (it->second.call(srv))
+                {
+                    if (srv.response.error_msg.empty())
+                    {
+                        // Succeeded!
+                        succeeded = true;
+                        break;
+                    }
+                }
+                else
+                {
+                    std::cout << "Failed to call '" << it->second.getService() << "'." << std::endl;
+                }
+            }
+
+            if (!succeeded)
+            {
+                // None of the registered action servers could handle the action
+                res.error_msg = "Action of type '" + req.action +"' could not be created.";
+                std::cout << res.error_msg << std::endl;
+            }
+
         }
     }
     else
@@ -113,6 +144,13 @@ bool srvGetActionStatus(action_server::GetActionStatus::Request& req, action_ser
     return true;
 }
 
+// ----------------------------------------------------------------------------------------------------
+
+bool srvRegisterActionServer(action_server::RegisterActionServer::Request& req, action_server::RegisterActionServer::Response& res)
+{
+    ros::NodeHandle nh;
+    action_server_clients[req.add_action_service] = nh.serviceClient<action_server::AddAction>(req.add_action_service);
+}
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -122,15 +160,16 @@ int main(int argc, char **argv)
 
     // Create components
     act::ActionFactoryPtr navigate_to(new NavigateTo);
-    act::ActionFactoryPtr pick_up(new PickUp);
+//    act::ActionFactoryPtr pick_up(new PickUp);
 
     // Register components
     server.registerActionFactory(navigate_to);
-    server.registerActionFactory(pick_up);
+//    server.registerActionFactory(pick_up);
 
     ros::NodeHandle nh;
     ros::ServiceServer srv_add_action = nh.advertiseService("/action_server/add_action", srvAddAction);
     ros::ServiceServer srv_get_action_status = nh.advertiseService("/action_server/get_action_status", srvGetActionStatus);
+    ros::ServiceServer srv_register_action_server = nh.advertiseService("/action_server/register_action_server", srvRegisterActionServer);
 
     client_ed = nh.serviceClient<ed::SimpleQuery>("/ed/simple_query");
 

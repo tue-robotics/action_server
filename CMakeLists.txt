@@ -29,6 +29,7 @@ add_service_files(
    FILES
    AddAction.srv
    GetActionStatus.srv
+   RegisterActionServer.srv
 )
 
 # Generate added messages and services with any dependencies listed here

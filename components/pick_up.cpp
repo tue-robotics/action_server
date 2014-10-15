@@ -39,14 +39,29 @@ act::ActionPtr PickUp::createAction(const std::string& type, tue::Configuration 
     }
 
     // Prepare grasp safe
-
     JointTrajectory t;
     t.addPoint(-0.1, -0.6, 0.1, 1.2, 0.0, 0.1, 0.0);
     t.addPoint(-0.1, -0.8, 0.1, 1.6, 0.0, 0.2, 0.0);
     t.addPoint(-0.1, -1.0, 0.1, 2.0, 0.0, 0.3, 0.0);
     t.addPoint(-0.1, -0.5, 0.1, 2.0, 0.0, 0.3, 0.0);
-
     client->execute(t);
+
+    // SetGripper(open)
+
+    // PRE_GRASP: ArmToQueryPoint (to grab point, with pre-grasp, first joint pos only)
+
+    // GRASP: Grab (to grab point)
+
+    // SetGripper(close)
+
+    // LIFT: ArmToUserPose (cartesian: 0.0, 0.0, 0.1, 0.0, 0.0, 0.0)
+
+    // RETRACT: ArmToUserPose (cartesian: -0.1, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    // Carrying_pose
+
+    // SetGripper(close) (if picking up failed)
+
 
     action.reset(new PickUpAction);
 
