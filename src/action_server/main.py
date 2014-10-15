@@ -22,7 +22,11 @@ class PickUp:
         self._robot = Amigo(wait_services=False)  
 
     def create_action(self, action_type, config):
-        query = []
+        try:
+            entity_id = config["object"]
+        except KeyError:
+            print "No object given"
+            return False
 
         try:
             side = config["side"]
@@ -35,10 +39,10 @@ class PickUp:
             arm = self._robot.rightArm
 
         # goal in map frame
-        goal_map = msgs.Point(0.2, 0.4, 0.8)
+        goal_map = msgs.Point(0, 0, 0)
 
         # Transform to base link frame
-        goal_bl = transformations.tf_transform(goal_map, "/map", "/amigo/base_link", tf_listener=self._robot.tf_listener)
+        goal_bl = transformations.tf_transform(goal_map, entity_id, "/amigo/base_link", tf_listener=self._robot.tf_listener)
         if goal_bl == None:
             return 'failed'
 
@@ -58,12 +62,16 @@ class PickUp:
         # Pre-grasp
         if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=20, pre_grasp=True, first_joint_pos_only=True):
             print "Pre-grasp failed"
+            arm.reset_arm()
+            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
             return
 
         # Grasp
         if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=120, pre_grasp = True):
             self._robot.speech.speak("I am sorry but I cannot move my arm to the object position", block=False)
             print "Grasp failed"
+            arm.reset_arm()
+            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
             return
 
         # Close gripper
