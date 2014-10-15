@@ -23,7 +23,7 @@ class PickUp:
 
     def create_action(self, action_type, config):
         try:
-            entity_id = config["object"]
+            entity_id = config["entity"]
         except KeyError:
             print "No object given"
             return False
