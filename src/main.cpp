@@ -12,6 +12,7 @@
 
 // Modules
 #include "navigate_to.h"
+#include "pick_up.h"
 
 #include <ed/models/models.h>
 
@@ -115,15 +116,17 @@ bool srvGetActionStatus(action_server::GetActionStatus::Request& req, action_ser
 
 // ----------------------------------------------------------------------------------------------------
 
-
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "constraint_server");
 
+    // Create components
     act::ActionFactoryPtr navigate_to(new NavigateTo);
+    act::ActionFactoryPtr pick_up(new PickUp);
 
-    // Register component
+    // Register components
     server.registerActionFactory(navigate_to);
+    server.registerActionFactory(pick_up);
 
     ros::NodeHandle nh;
     ros::ServiceServer srv_add_action = nh.advertiseService("/action_server/add_action", srvAddAction);

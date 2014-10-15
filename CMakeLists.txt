@@ -68,14 +68,15 @@ add_library(action_server
 target_link_libraries(action_server ${catkin_LIBRARIES})
 
 add_executable(action_server_main
-	src/main.cpp
+    src/main.cpp
 
-        # Navigation
-	components/navigate_to.cpp
+    # Navigation
+    components/navigate_to.cpp
 
-        # Manipulation
-        components/manipulation/joint_trajectory.cpp
-        components/manipulation/amigo_joint_trajectory_client.cpp
+    # Manipulation
+    components/pick_up.cpp
+    components/manipulation/joint_trajectory.cpp
+    components/manipulation/amigo_joint_trajectory_client.cpp
 )
 
 target_link_libraries(action_server_main action_server ${catkin_LIBRARIES})

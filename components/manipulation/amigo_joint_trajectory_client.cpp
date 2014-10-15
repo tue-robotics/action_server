@@ -10,6 +10,7 @@ AmigoJointTrajectoryClient::AmigoJointTrajectoryClient() : client_(0)
 
 AmigoJointTrajectoryClient::~AmigoJointTrajectoryClient()
 {
+    delete client_;
 }
 
 // ----------------------------------------------------------------------------------------------------

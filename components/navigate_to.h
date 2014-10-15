@@ -1,5 +1,5 @@
-#ifndef ACTION_SERVER_EXAMPLES_SIMPLE_ACTION_FACTORY_H_
-#define ACTION_SERVER_EXAMPLES_SIMPLE_ACTION_FACTORY_H_
+#ifndef ACTION_SERVER_NAVIGATE_TO_H_
+#define ACTION_SERVER_NAVIGATE_TO_H_
 
 #include <action_server/action_factory.h>
 #include <action_server/action.h>
