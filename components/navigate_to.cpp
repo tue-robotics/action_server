@@ -37,11 +37,12 @@ act::ActionPtr NavigateTo::createAction(const std::string& type, tue::Configurat
     config.value("entity", pc.frame);
 
     cb_planner_msgs_srvs::OrientationConstraint oc;
-//    if (config.readGroup("orientation_constraint", tue::REQUIRED))
-//    {
+    if (config.readGroup("orientation_constraint", tue::OPTIONAL))
+    {
+        config.value("angle_offset", oc.angle_offset, tue::OPTIONAL);
 //        config.value("frame", oc.frame);
-//        config.endGroup();
-//    }
+        config.endGroup();
+    }
     config.value("entity", oc.frame);
 
     if (config.hasError())

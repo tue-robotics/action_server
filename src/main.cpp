@@ -67,7 +67,16 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                 }
                 else
                 {
-                    res.error_msg = "No affordances specified in model '" + e_info.type + "'.";
+                    // res.error_msg = "No affordances specified in model '" + e_info.type + "'.";
+
+                    // HACK: add navigation constraint for easy picking up. TODO: make nice
+                    action_cfg.writeGroup("position_constraint");
+                    action_cfg.setValue("constraint", "x^2 + y^2 < 0.59^2 and x^2 + y^2 > 0.30");
+                    action_cfg.endGroup();
+
+                    action_cfg.writeGroup("orientation_constraint");
+                    action_cfg.setValue("angle_offset", -0.3805063771123649);
+                    action_cfg.endGroup();
                 }
             }
             else
