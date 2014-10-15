@@ -19,7 +19,7 @@ import robot_skills.util.msg_constructors as msgs
 class PickUp:
 
     def __init__(self):
-        self._robot = Amigo(wait_services=False)  
+        self._robot = Amigo(dontInclude = ['head', 'base', 'base2', 'perception', 'ebutton', 'lights', 'reasoner'], wait_services=False)  
 
     def create_action(self, action_type, config):
         try:
