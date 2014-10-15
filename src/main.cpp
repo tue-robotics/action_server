@@ -52,7 +52,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
 
                 const ed::EntityInfo& e_info = srv.response.entities.front();
                 ed::models::NewEntityPtr e = ed::models::create(e_info.type);
-                if (e->config.readGroup("affordances"))
+                if (e && e->config.readGroup("affordances"))
                 {
                     if (e->config.readGroup(req.action))
                     {
@@ -75,7 +75,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                     action_cfg.endGroup();
 
                     action_cfg.writeGroup("orientation_constraint");
-                    action_cfg.setValue("angle_offset", -0.3805063771123649);
+                    action_cfg.setValue("angle_offset", 0.3805063771123649); // Default for right arm
                     action_cfg.endGroup();
                 }
             }

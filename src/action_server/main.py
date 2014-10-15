@@ -22,6 +22,8 @@ class PickUp:
         self._robot = Amigo(dontInclude = ['head', 'base', 'base2', 'perception', 'ebutton', 'lights', 'reasoner'], wait_services=False)  
 
     def create_action(self, action_type, config):
+        print "PickUp!"
+
         try:
             entity_id = config["entity"]
         except KeyError:
@@ -31,7 +33,7 @@ class PickUp:
         try:
             side = config["side"]
         except KeyError:
-            side = "left" # Default
+            side = "right" # Default
 
         if side == "left":
             arm = self._robot.leftArm
@@ -139,7 +141,7 @@ if __name__ == "__main__":
 
     # Register components
     pick_up = PickUp()
-    server.register_skill("pick_up", pick_up)
+    server.register_skill("pick-up", pick_up)
 
     # Register this server at the main (c++) action server
     print "Waiting for connection with '/action_server/register_action_server'..."
