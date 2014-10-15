@@ -51,7 +51,8 @@ act::ActionPtr NavigateTo::createAction(const std::string& type, tue::Configurat
         return act::ActionPtr();
     }
 
-//    std::cout << config << std::endl;
+    std::cout << pc << std::endl;
+    std::cout << oc << std::endl;
 
     // Call for local plan
     cb_planner_msgs_srvs::GetPlan srv;
