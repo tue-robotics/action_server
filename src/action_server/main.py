@@ -142,12 +142,12 @@ class Place:
 
         x = 0.2
         while x <= dx:
-            if not arm.send_goal(x, goal_y, height + 0.15, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+            if not arm.send_goal(x, goal_y, height + 0.2, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
                 print "Failed pre-drop"
                 return
             x += 0.1       
 
-        if not arm.send_goal(dx, goal_y, height + 0.05, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+        if not arm.send_goal(dx, goal_y, height + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
             print "drop"
             return   
 
@@ -155,8 +155,8 @@ class Place:
         arm.send_gripper_goal(ArmState.OPEN, timeout=5)
 
         x = dx
-        while x > 0.2:
-            if not arm.send_goal(x, goal_y, height + 0.15, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+        while x > 0.3:
+            if not arm.send_goal(x, goal_y, height + 0.2, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
                 print "Failed pre-drop"
                 return
             x -= 0.1       	
