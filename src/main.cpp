@@ -61,7 +61,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                     }
                     else
                     {
-                        res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
+//                        res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
                     }
                     e->config.endGroup();
                 }
