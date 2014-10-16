@@ -116,6 +116,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
 
             action_server::AddAction srv;
             srv.request = req;
+            srv.request.parameters = action_cfg.toYAMLString();
             bool succeeded = false;
             for(std::map<std::string, ros::ServiceClient>::iterator it = action_server_clients.begin(); it != action_server_clients.end(); ++it)
             {
