@@ -52,31 +52,37 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
 
                 const ed::EntityInfo& e_info = srv.response.entities.front();
                 ed::models::NewEntityPtr e = ed::models::create(e_info.type);
+
+                bool affordance_found = false;
+
                 if (e && e->config.readGroup("affordances"))
                 {
                     if (e->config.readGroup(req.action))
                     {
                         action_cfg.add(e->config);
                         e->config.endGroup();
+                        affordance_found = true;
+                    }
+                    e->config.endGroup();
+                }
+
+                if (!affordance_found)
+                {
+                    if (req.action == "navigate-to")
+                    {
+                        // HACK: add navigation constraint for easy picking up. TODO: make nice
+                        action_cfg.writeGroup("position_constraint");
+                        action_cfg.setValue("constraint", "x^2 + y^2 < 0.59^2 and x^2 + y^2 > 0.30");
+                        action_cfg.endGroup();
+
+                        action_cfg.writeGroup("orientation_constraint");
+                        action_cfg.setValue("angle_offset", 0.3805063771123649); // Default for right arm
+                        action_cfg.endGroup();
                     }
                     else
                     {
                         res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
                     }
-                    e->config.endGroup();
-                }
-                else
-                {
-                    // res.error_msg = "No affordances specified in model '" + e_info.type + "'.";
-
-                    // HACK: add navigation constraint for easy picking up. TODO: make nice
-                    action_cfg.writeGroup("position_constraint");
-                    action_cfg.setValue("constraint", "x^2 + y^2 < 0.59^2 and x^2 + y^2 > 0.30");
-                    action_cfg.endGroup();
-
-                    action_cfg.writeGroup("orientation_constraint");
-                    action_cfg.setValue("angle_offset", 0.3805063771123649); // Default for right arm
-                    action_cfg.endGroup();
                 }
             }
             else
