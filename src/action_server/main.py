@@ -16,10 +16,12 @@ import robot_skills.util.msg_constructors as msgs
 #import robot_smach_states
 # -------------------------------------
 
+# ----------------------------------------------------------------------------------------------------
+
 class PickUp:
 
-    def __init__(self):
-        self._robot = Amigo(dontInclude = ['head', 'base', 'base2', 'perception', 'ebutton', 'lights', 'reasoner'], wait_services=False)  
+    def __init__(self, robot):
+        self._robot = robot
 
     def create_action(self, action_type, config):
         print "PickUp!"
@@ -103,6 +105,74 @@ class PickUp:
         #machine = robot_smach_states.manipulation.GrabMachineWithoutBase(side=side, robot=self._robot, grabpoint_query=query)
         #machine.execute()
 
+# ----------------------------------------------------------------------------------------------------
+
+class Place:
+
+    def __init__(self, robot):
+        self._robot = robot
+
+    def create_action(self, action_type, config):
+        print "Place!"
+
+        try:
+            side = config["side"]
+        except KeyError:
+            side = "right" # Default
+
+        if side == "left":
+            arm = self._robot.leftArm
+        else:
+            arm = self._robot.rightArm
+
+        try:
+            height = config["height"]
+        except KeyError:
+            height = 0.8
+
+        # Torso to highest position
+        self._robot.spindle.high()
+
+        if side == "left":
+            goal_y = 0.2
+        else:
+            goal_y = -0.2
+
+        dx = 0.6
+
+        x = 0.2
+        while x <= dx:
+            if not arm.send_goal(x, goal_y, height + 0.15, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+                print "Failed pre-drop"
+                return
+            x += 0.1       
+
+        if not arm.send_goal(dx, goal_y, height + 0.05, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+            print "drop"
+            return   
+
+        # Open gripper
+        arm.send_gripper_goal(ArmState.OPEN, timeout=5)
+
+        if not arm.send_goal(dx, goal_y, height + 0.15, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+            print "Failed after-drop"
+            return
+
+        if not arm.send_goal(0.2, goal_y, height + 0.05, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+            print "Failed after-drop"
+            return
+
+        if not arm.send_goal(0.1, goal_y, 0.6, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+            print "Failed after-drop"
+            return            
+
+        # Close gripper
+        arm.send_gripper_goal(ArmState.CLOSE, timeout=5)
+
+        arm.reset_arm()
+
+# ----------------------------------------------------------------------------------------------------
+
 class Server:
 
     def __init__(self):
@@ -128,6 +198,7 @@ def srv_add_action(req):
 
     return action_server.srv.AddActionResponse("", "")
 
+# ----------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     node_name = 'action_server_py'
@@ -139,9 +210,15 @@ if __name__ == "__main__":
     global server
     server = Server()
 
+    # Create AMIGO object
+    amigo = Amigo(dontInclude = ['head', 'base', 'base2', 'perception', 'ebutton', 'lights', 'reasoner'], wait_services=False)  
+
     # Register components
-    pick_up = PickUp()
+    pick_up = PickUp(amigo)
     server.register_skill("pick-up", pick_up)
+
+    place = Place(amigo)
+    server.register_skill("place", place)
 
     # Register this server at the main (c++) action server
     print "Waiting for connection with '/action_server/register_action_server'..."
