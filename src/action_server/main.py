@@ -154,7 +154,7 @@ class Place:
         # Open gripper
         arm.send_gripper_goal(ArmState.OPEN, timeout=5)
 
-	    x = dx
+        x = dx
         while x > 0.2:
             if not arm.send_goal(x, goal_y, height + 0.15, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
                 print "Failed pre-drop"
