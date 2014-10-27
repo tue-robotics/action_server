@@ -79,6 +79,9 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                         action_cfg.setValue("angle_offset", 0.3805063771123649); // Default for right arm
                         action_cfg.endGroup();
                     }
+					else if (req.action == "pick-up")
+					{
+					}
                     else
                     {
                         res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
