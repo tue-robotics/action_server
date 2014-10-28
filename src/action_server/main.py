@@ -13,7 +13,9 @@ from robot_skills.amigo import Amigo
 from robot_skills.arms import State as ArmState
 from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
-#import robot_smach_states
+
+from robot_smach_states.navigation2 import NavigateWithConstraints
+from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
 # -------------------------------------
 
 # ----------------------------------------------------------------------------------------------------
@@ -186,7 +188,16 @@ class NavigateTo:
             print "No object given"
             return False
 
-        print config
+        p = PositionConstraint()
+        p.constraint = config["position_constraint"]["constraint"]
+        p.frame = config["entity"]
+
+        o = OrientationConstraint()
+        o.frame = config["entity"]
+
+
+        nwc = NavigateWithConstraints(self._robot, p, o)
+        nwc.execute()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -238,7 +249,7 @@ if __name__ == "__main__":
     server.register_skill("place", place)
 
     navigate_to = NavigateTo(amigo)
-    server.register_skill("navigate-to", pick_up)
+    server.register_skill("navigate-to", navigate_to)
 
     # Register this server at the main (c++) action server
     print "Waiting for connection with '/action_server/register_action_server'..."
