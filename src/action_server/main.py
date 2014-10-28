@@ -172,6 +172,24 @@ class Place:
 
 # ----------------------------------------------------------------------------------------------------
 
+class NavigateTo:
+
+    def __init__(self, robot):
+        self._robot = robot
+
+    def create_action(self, action_type, config):
+        print "NavigateTo!"
+
+        try:
+            entity_id = config["entity"]
+        except KeyError:
+            print "No object given"
+            return False
+
+        print config
+
+# ----------------------------------------------------------------------------------------------------
+
 class Server:
 
     def __init__(self):
@@ -218,6 +236,9 @@ if __name__ == "__main__":
 
     place = Place(amigo)
     server.register_skill("place", place)
+
+    navigate_to = NavigateTo(amigo)
+    server.register_skill("navigate-to", pick_up)
 
     # Register this server at the main (c++) action server
     print "Waiting for connection with '/action_server/register_action_server'..."

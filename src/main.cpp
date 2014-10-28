@@ -178,11 +178,11 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "constraint_server");
 
     // Create components
-    act::ActionFactoryPtr navigate_to(new NavigateTo);
+//    act::ActionFactoryPtr navigate_to(new NavigateTo);
 //    act::ActionFactoryPtr pick_up(new PickUp);
 
     // Register components
-    server.registerActionFactory(navigate_to);
+//    server.registerActionFactory(navigate_to);
 //    server.registerActionFactory(pick_up);
 
     ros::NodeHandle nh;
