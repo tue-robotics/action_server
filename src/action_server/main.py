@@ -194,7 +194,10 @@ class NavigateTo:
 
         o = OrientationConstraint()
         o.frame = config["entity"]
-
+        try:
+            o.angle_offset = config['orientation_constraint']['angle_offset']
+        except:
+            pass
 
         nwc = NavigateWithConstraints(self._robot, p, o)
         nwc.execute()
