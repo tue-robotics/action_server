@@ -8,7 +8,7 @@
 
 #include <tue/config/configuration.h>
 #include <tue/config/loaders/yaml.h>
-
+#include <tue/config/reader.h>
 #include <ed/SimpleQuery.h>
 
 // Modules
@@ -54,16 +54,20 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                 ed::models::NewEntityPtr e = ed::models::create(e_info.type);
 
                 bool affordance_found = false;
-
-                if (e && e->config.readGroup("affordances"))
+                if (e)
                 {
-                    if (e->config.readGroup(req.action))
+                    tue::config::Reader r(e->config);
+
+                    if (r.readGroup("affordances"))
                     {
-                        action_cfg.add(e->config);
-                        e->config.endGroup();
-                        affordance_found = true;
+                        if (r.readGroup(req.action))
+                        {
+                            action_cfg.data().add(r.data());
+                            affordance_found = true;
+                            r.endGroup();
+                        }
+                        r.endGroup();
                     }
-                    e->config.endGroup();
                 }
 
                 if (!affordance_found)
