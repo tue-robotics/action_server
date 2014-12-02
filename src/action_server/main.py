@@ -14,7 +14,7 @@ from robot_skills.arms import State as ArmState
 from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
-from robot_smach_states.navigation2 import NavigateWithConstraints
+from robot_smach_states.navigation import NavigateToObserve
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
 # -------------------------------------
 
@@ -188,18 +188,7 @@ class NavigateTo:
             print "No object given"
             return False
 
-        p = PositionConstraint()
-        p.constraint = config["position_constraint"]["constraint"]
-        p.frame = config["entity"]
-
-        o = OrientationConstraint()
-        o.frame = config["entity"]
-        try:
-            o.angle_offset = config['orientation_constraint']['angle_offset']
-        except:
-            pass
-
-        nwc = NavigateWithConstraints(self._robot, p, o)
+        nwc = NavigateToObserve(self._robot, entity_id=entity_id, radius=1)
         nwc.execute()
 
 # ----------------------------------------------------------------------------------------------------
