@@ -187,7 +187,7 @@ class NavigateTo:
             print "No object given"
             return False
 
-        nwc = NavigateToObserve(self._robot, entity_id=entity_id, radius=1)
+        nwc = NavigateToObserve(self._robot, entity_id=entity_id, radius=.5)
         nwc.execute()
 
 # ----------------------------------------------------------------------------------------------------
