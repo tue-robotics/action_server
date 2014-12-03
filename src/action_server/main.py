@@ -10,7 +10,6 @@ global server
 # -------------------------------------
 # For PickUp:
 from robot_skills.amigo import Amigo
-from robot_skills.arms import State as ArmState
 from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
