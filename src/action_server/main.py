@@ -10,11 +10,10 @@ global server
 # -------------------------------------
 # For PickUp:
 from robot_skills.amigo import Amigo
-from robot_skills.arms import State as ArmState
 from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
-from robot_smach_states.navigation2 import NavigateWithConstraints
+from robot_smach_states.navigation import NavigateToObserve
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
 # -------------------------------------
 
@@ -55,33 +54,30 @@ class PickUp:
         print goal_bl
 
         # Arm to position in a safe way
-        arm.send_joint_trajectory([
-            [-0.1,-0.6,0.1,1.2,0.0,0.1,0.0],
-            [-0.1,-0.8,0.1,1.6,0.0,0.2,0.0],
-            [-0.1,-1.0,0.1,2.0,0.0,0.3,0.0],
-            [-0.1,-0.5,0.1,2.0,0.0,0.3,0.0],
-            ], timeout=20)
+        arm.send_joint_trajectory('prepare_grasp')
 
         # Open gripper
-        arm.send_gripper_goal(ArmState.OPEN, timeout=5)
+        arm.send_gripper_goal('open')
 
         # Pre-grasp
-        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=20, pre_grasp=True, first_joint_pos_only=True):
+        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0,
+                             frame_id="/amigo/base_link", timeout=20, pre_grasp=True, first_joint_pos_only=True):
             print "Pre-grasp failed"
-            arm.reset_arm()
-            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
+            
+            arm.reset()
+            arm.send_gripper_goal('close', timeout=None)
             return
 
         # Grasp
         if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=120, pre_grasp = True):
             self._robot.speech.speak("I am sorry but I cannot move my arm to the object position", block=False)
             print "Grasp failed"
-            arm.reset_arm()
-            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
+            arm.reset()
+            arm.send_gripper_goal('close', timeout=None)
             return
 
         # Close gripper
-        arm.send_gripper_goal(ArmState.CLOSE, timeout=5)
+        arm.send_gripper_goal('close')
 
         # Lift
         if not arm.send_goal( goal_bl.x, goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
@@ -154,7 +150,7 @@ class Place:
             return   
 
         # Open gripper
-        arm.send_gripper_goal(ArmState.OPEN, timeout=5)
+        arm.send_gripper_goal('open')
 
         x = dx
         while x > 0.3:
@@ -168,9 +164,9 @@ class Place:
             return
 
         # Close gripper
-        arm.send_gripper_goal(ArmState.CLOSE, timeout=5)
+        arm.send_gripper_goal('close')
 
-        arm.reset_arm()
+        arm.reset()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -188,18 +184,7 @@ class NavigateTo:
             print "No object given"
             return False
 
-        p = PositionConstraint()
-        p.constraint = config["position_constraint"]["constraint"]
-        p.frame = config["entity"]
-
-        o = OrientationConstraint()
-        o.frame = config["entity"]
-        try:
-            o.angle_offset = config['orientation_constraint']['angle_offset']
-        except:
-            pass
-
-        nwc = NavigateWithConstraints(self._robot, p, o)
+        nwc = NavigateToObserve(self._robot, entity_id=entity_id, radius=.5)
         nwc.execute()
 
 # ----------------------------------------------------------------------------------------------------
