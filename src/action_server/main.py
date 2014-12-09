@@ -16,6 +16,8 @@ from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
 from robot_smach_states.navigation import NavigateToObserve
+from robot_smach_states.manip import Grab
+from robot_smach_states.designators.designator import VariableDesignator
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
 # -------------------------------------
 
@@ -27,83 +29,26 @@ class PickUp:
         self._robot = robot
 
     def create_action(self, action_type, config):
-        print "PickUp!"
+        print 'PickUp!'
 
         try:
-            entity_id = config["entity"]
+            entity_id = config['entity']
         except KeyError:
-            print "No object given"
+            print 'No object given'
             return False
 
-        try:
-            side = config["side"]
-        except KeyError:
-            side = "right" # Default
+        side = config['side'] if 'side' in config else 'right'
 
-        if side == "left":
+        entity = self._robot.ed.get_entity(id=entity_id)
+        designator = VariableDesignator(entity)
+
+        if side == 'left':
             arm = self._robot.leftArm
         else:
             arm = self._robot.rightArm
 
-        # goal in map frame
-        goal_map = msgs.Point(0, 0, 0)
-
-        # Transform to base link frame
-        goal_bl = transformations.tf_transform(goal_map, entity_id, "/amigo/base_link", tf_listener=self._robot.tf_listener)
-        if goal_bl == None:
-            return 'failed'
-
-        print goal_bl
-
-        # Arm to position in a safe way
-        arm.send_joint_trajectory('prepare_grasp')
-
-        # Open gripper
-        arm.send_gripper_goal('open')
-
-        # Pre-grasp
-        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0,
-                             frame_id="/amigo/base_link", timeout=20, pre_grasp=True, first_joint_pos_only=True):
-            print "Pre-grasp failed"
-            
-            arm.reset()
-            arm.send_gripper_goal('close', timeout=None)
-            return
-
-        # Grasp
-        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=120, pre_grasp = True):
-            self._robot.speech.speak("I am sorry but I cannot move my arm to the object position", block=False)
-            print "Grasp failed"
-            arm.reset()
-            arm.send_gripper_goal('close', timeout=None)
-            return
-
-        # Close gripper
-        arm.send_gripper_goal('close')
-
-        # Lift
-        if not arm.send_goal( goal_bl.x, goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-            print "Failed lift"
-
-        # Retract
-        if not arm.send_goal( goal_bl.x - 0.1, goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-            print "Failed retract"
-
-        # Carrying pose
-        if side == "left":
-            y_home = 0.2
-        else:
-            y_home = -0.2
-
-        print "y_home = " + str(y_home)
-        
-        rospy.loginfo("start moving to carrying pose")        
-        if not arm.send_goal(0.18, y_home, goal_bl.z + 0.1, 0, 0, 0, 60):            
-            print 'Failed carrying pose'                 
-
-
-        #machine = robot_smach_states.manipulation.GrabMachineWithoutBase(side=side, robot=self._robot, grabpoint_query=query)
-        #machine.execute()
+        grab = Grab(self._robot, arm=arm, designator=designator)
+        grab.execute()
 
 # ----------------------------------------------------------------------------------------------------
 
