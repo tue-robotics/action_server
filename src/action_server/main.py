@@ -7,6 +7,8 @@ import yaml
 
 global server
 
+from robot_smach_states.designators.designator import Designator
+
 # -------------------------------------
 # For PickUp:
 from robot_skills.amigo import Amigo
@@ -184,7 +186,7 @@ class NavigateTo:
             print "No object given"
             return False
 
-        nwc = NavigateToObserve(self._robot, entity_id=entity_id, radius=.5)
+        nwc = NavigateToObserve(self._robot, designator=Designator(entity_id), radius=.5)
         nwc.execute()
 
 # ----------------------------------------------------------------------------------------------------
