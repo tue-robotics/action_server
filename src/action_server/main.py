@@ -4,6 +4,7 @@ import rospy
 import action_server.srv
 
 import yaml
+import thread
 
 global server
 
@@ -17,9 +18,11 @@ import robot_skills.util.msg_constructors as msgs
 
 from robot_smach_states.navigation import NavigateToObserve
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
+from robot_smach_states.designators.designator import Designator, VariableDesignator
 # -------------------------------------
 
 # ----------------------------------------------------------------------------------------------------
+
 
 class PickUp:
 
@@ -176,6 +179,7 @@ class NavigateTo:
 
     def __init__(self, robot):
         self._robot = robot
+        self.nwc = None
 
     def create_action(self, action_type, config):
         print "NavigateTo!"
@@ -186,8 +190,12 @@ class NavigateTo:
             print "No object given"
             return False
 
-        nwc = NavigateToObserve(self._robot, designator=Designator(entity_id), radius=.5)
-        nwc.execute()
+        self.nwc = NavigateToObserve(self._robot, designator=Designator(entity_id), radius=.5)        
+        thread.start_new_thread(self.nwc.execute, ())
+
+    def cancel(self):
+        if self.nwc:
+            self.nwc.request_preempt()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -195,18 +203,25 @@ class Server:
 
     def __init__(self):
         self.action_type_to_skill = {}
+        self.last_action = None
 
     def register_skill(self, action_type, skill):
         self.action_type_to_skill[action_type] = skill
     
     def add_action(self, action_type, config):
         try:
-            self.action_type_to_skill[action_type].create_action(action_type, config)
+            action = self.action_type_to_skill[action_type]
+
+            if self.last_action:
+                self.last_action.cancel()
+
+            action.create_action(action_type, config)
+
+            self.last_action = action
         except KeyError:
             return False
 
         return True
-
 
 def srv_add_action(req):
     config = yaml.load(req.parameters)
