@@ -10,6 +10,9 @@ global server
 
 from robot_smach_states.designators.designator import Designator
 
+import time
+import threading
+
 # -------------------------------------
 # For PickUp:
 from robot_skills.amigo import Amigo
@@ -50,8 +53,16 @@ class PickUp:
         else:
             arm = self._robot.rightArm
 
-        grab = Grab(self._robot, arm=arm, designator=designator)
-        grab.execute()
+        self.grab = Grab(self._robot, arm=arm, designator=designator)    
+        self.thread = threading.Thread(name='grab', target=self.grab.execute)
+        self.thread.start()
+
+    def cancel(self):
+        if self.grab.is_running:
+            self.grab.request_preempt()
+
+        # Wait until canceled
+        self.thread.join()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -125,22 +136,26 @@ class NavigateTo:
     def __init__(self, robot):
         self._robot = robot
         self.nwc = None
+        self.goal_entity = None
 
     def create_action(self, action_type, config):
-        print "NavigateTo!"
 
         try:
-            entity_id = config["entity"]
+            self.goal_entity = config["entity"]
         except KeyError:
             print "No object given"
             return False
 
-        self.nwc = NavigateToObserve(self._robot, designator=Designator(entity_id), radius=.5)        
-        thread.start_new_thread(self.nwc.execute, ())
+        self.nwc = NavigateToObserve(self._robot, designator=Designator(self.goal_entity), radius=.5)        
+        self.thread = threading.Thread(name='navigate', target=self.nwc.execute)
+        self.thread.start()
 
     def cancel(self):
-        if self.nwc:
+        if self.nwc.is_running:
             self.nwc.request_preempt()
+
+        # Wait until canceled
+        self.thread.join()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -155,14 +170,14 @@ class Server:
     
     def add_action(self, action_type, config):
         try:
-            action = self.action_type_to_skill[action_type]
+            self.action = self.action_type_to_skill[action_type]
 
             if self.last_action:
-                self.last_action.cancel()
+               self.last_action.cancel()
 
-            action.create_action(action_type, config)
+            self.action.create_action(action_type, config)
 
-            self.last_action = action
+            self.last_action = self.action
         except KeyError:
             return False
 
