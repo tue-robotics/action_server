@@ -12,10 +12,10 @@ from robot_smach_states.designators.designator import Designator
 
 import time
 import threading
+import sys
 
 # -------------------------------------
 # For PickUp:
-from robot_skills.amigo import Amigo
 from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
@@ -31,10 +31,10 @@ from robot_smach_states.designators.designator import Designator, VariableDesign
 
 class PickUp:
 
-    def __init__(self, robot):
-        self._robot = robot
+    def __init__(self):
+        pass
 
-    def create_action(self, action_type, config):
+    def create_action(self, action_type, config, robot):
         print 'PickUp!'
 
         try:
@@ -45,15 +45,15 @@ class PickUp:
 
         side = config['side'] if 'side' in config else 'right'
 
-        entity = self._robot.ed.get_entity(id=entity_id)
+        entity = robo.ed.get_entity(id=entity_id)
         designator = VariableDesignator(entity)
 
         if side == 'left':
-            arm = self._robot.leftArm
+            arm = robot.leftArm
         else:
-            arm = self._robot.rightArm
+            arm = robot.rightArm
 
-        self.grab = Grab(self._robot, arm=arm, designator=designator)    
+        self.grab = Grab(robot, arm=arm, designator=designator)    
         self.thread = threading.Thread(name='grab', target=self.grab.execute)
         self.thread.start()
 
@@ -68,10 +68,10 @@ class PickUp:
 
 class Place:
 
-    def __init__(self, robot):
-        self._robot = robot
+    def __init__(self):
+        pass
 
-    def create_action(self, action_type, config):
+    def create_action(self, action_type, config, robot):
         print "Place!"
 
         try:
@@ -80,9 +80,9 @@ class Place:
             side = "right" # Default
 
         if side == "left":
-            arm = self._robot.leftArm
+            arm = robot.leftArm
         else:
-            arm = self._robot.rightArm
+            arm = robot.rightArm
 
         try:
             height = config["height"]
@@ -90,7 +90,7 @@ class Place:
             height = 0.8
 
         # Torso to highest position
-        self._robot.spindle.high()
+        robot.spindle.high()
 
         if side == "left":
             goal_y = 0.2
@@ -133,12 +133,11 @@ class Place:
 
 class NavigateTo:
 
-    def __init__(self, robot):
-        self._robot = robot
+    def __init__(self):
         self.nwc = None
         self.goal_entity = None
 
-    def create_action(self, action_type, config):
+    def create_action(self, action_type, config, robot):
 
         try:
             self.goal_entity = config["entity"]
@@ -146,7 +145,7 @@ class NavigateTo:
             print "No object given"
             return False
 
-        self.nwc = NavigateToObserve(self._robot, designator=Designator(self.goal_entity), radius=.5)        
+        self.nwc = NavigateToObserve(robot, designator=Designator(self.goal_entity), radius=.5)        
         self.thread = threading.Thread(name='navigate', target=self.nwc.execute)
         self.thread.start()
 
@@ -161,21 +160,22 @@ class NavigateTo:
 
 class Server:
 
-    def __init__(self):
+    def __init__(self, robot): # Robot should no be in the constructor but should be in the add_action -- REIN
         self.action_type_to_skill = {}
         self.last_action = None
+        self.robot = robot # Should be in the add action, not in the constructor -- REIN
 
     def register_skill(self, action_type, skill):
         self.action_type_to_skill[action_type] = skill
     
-    def add_action(self, action_type, config):
+    def add_action(self, action_type, config): # We should include the robot here as arguments, not pass it in the constructor if we want to use multiple robots, this is desired :) -- REIN
         try:
             self.action = self.action_type_to_skill[action_type]
 
             if self.last_action:
                self.last_action.cancel()
 
-            self.action.create_action(action_type, config)
+            self.action.create_action(action_type, config, self.robot)
 
             self.last_action = self.action
         except KeyError:
@@ -200,20 +200,33 @@ if __name__ == "__main__":
     add_action_service_name = '/' + node_name + '/add_action'
     srv = rospy.Service(add_action_service_name, action_server.srv.AddAction, srv_add_action)
 
-    global server
-    server = Server()
+    # Create Robot object based on argv[1]
+    if len(sys.argv) < 2:
+        print "Please specify a robot name 'amigo/sergio'"
+        sys.exit()
 
-    # Create AMIGO object
-    amigo = Amigo(dontInclude = ['head', 'base', 'base2', 'perception', 'ebutton', 'lights', 'reasoner'], wait_services=False)  
+    robot_name = sys.argv[1]
+    if robot_name == 'amigo':
+        from robot_skills.amigo import Amigo as Robot
+    elif robot_name == 'sergio':
+        from robot_skills.sergio import Sergio as Robot
+    else:
+        print "unknown robot"
+        sys.exit()
+
+    robot = Robot()
+
+    global server
+    server = Server(robot)
 
     # Register components
-    pick_up = PickUp(amigo)
+    pick_up = PickUp()
     server.register_skill("pick-up", pick_up)
 
-    place = Place(amigo)
+    place = Place()
     server.register_skill("place", place)
 
-    navigate_to = NavigateTo(amigo)
+    navigate_to = NavigateTo()
     server.register_skill("navigate-to", navigate_to)
 
     # Register this server at the main (c++) action server
