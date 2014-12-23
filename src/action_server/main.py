@@ -45,7 +45,7 @@ class PickUp:
 
         side = config['side'] if 'side' in config else 'right'
 
-        entity = robo.ed.get_entity(id=entity_id)
+        entity = robot.ed.get_entity(id=entity_id)
         designator = VariableDesignator(entity)
 
         if side == 'left':
