@@ -30,6 +30,8 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
     tue::Configuration action_cfg;
     tue::config::loadFromYAMLString(req.parameters, action_cfg);
 
+    std::string entity_type;
+
     if (!action_cfg.hasError())
     {
         // Check for 'special' fields.
@@ -52,6 +54,8 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
 
                 const ed::EntityInfo& e_info = srv.response.entities.front();
                 ed::models::NewEntityPtr e = ed::models::create(e_info.type);
+
+		entity_type = e_info.type;
 
                 bool affordance_found = false;
                 if (e)
@@ -124,6 +128,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
             action_server::AddAction srv;
             srv.request = req;
             srv.request.parameters = action_cfg.toYAMLString();
+            srv.request.parameters += "\nentity_type: " + entity_type; // DIRTY HACK, PLEASE FIX (Sjoerd)! (TODO)
             bool succeeded = false;
             for(std::map<std::string, ros::ServiceClient>::iterator it = action_server_clients.begin(); it != action_server_clients.end(); ++it)
             {
