@@ -15,7 +15,7 @@
 #include "navigate_to.h"
 #include "pick_up.h"
 
-#include <ed/models/models.h>
+//#include <ed/models/models.h>
 
 act::Server server;
 ros::ServiceClient client_ed;
@@ -52,26 +52,25 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                     return true;
                 }
 
-                const ed::EntityInfo& e_info = srv.response.entities.front();
-                ed::models::NewEntityPtr e = ed::models::create(e_info.type);
 
-		entity_type = e_info.type;
+                const ed::EntityInfo& e_info = srv.response.entities.front();
+
+                entity_type = e_info.type;
+
+                // Load entity configuration
+                tue::config::ReaderWriter r;
+                tue::config::loadFromYAMLString(e_info.data, r);
 
                 bool affordance_found = false;
-                if (e)
+                if (r.readGroup("affordances"))
                 {
-                    tue::config::Reader r(e->config);
-
-                    if (r.readGroup("affordances"))
+                    if (r.readGroup(req.action))
                     {
-                        if (r.readGroup(req.action))
-                        {
-                            action_cfg.data().add(r.data());
-                            affordance_found = true;
-                            r.endGroup();
-                        }
+                        action_cfg.data().add(r.data());
+                        affordance_found = true;
                         r.endGroup();
                     }
+                    r.endGroup();
                 }
 
                 if (!affordance_found)
@@ -87,9 +86,9 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                         action_cfg.setValue("angle_offset", 0.3805063771123649); // Default for right arm
                         action_cfg.endGroup();
                     }
-					else if (req.action == "pick-up")
-					{
-					}
+                    else if (req.action == "pick-up")
+                    {
+                    }
                     else
                     {
                         res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
@@ -187,12 +186,12 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "constraint_server");
 
     // Create components
-//    act::ActionFactoryPtr navigate_to(new NavigateTo);
-//    act::ActionFactoryPtr pick_up(new PickUp);
+    //    act::ActionFactoryPtr navigate_to(new NavigateTo);
+    //    act::ActionFactoryPtr pick_up(new PickUp);
 
     // Register components
-//    server.registerActionFactory(navigate_to);
-//    server.registerActionFactory(pick_up);
+    //    server.registerActionFactory(navigate_to);
+    //    server.registerActionFactory(pick_up);
 
     ros::NodeHandle nh;
     ros::ServiceServer srv_add_action = nh.advertiseService("/action_server/add_action", srvAddAction);

@@ -6,7 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
     message_generation
     tue_config
     cb_planner_msgs_srvs
-    ed_object_models
+    ed
 )
 
 # find_package(Boost REQUIRED COMPONENTS system program_options)
