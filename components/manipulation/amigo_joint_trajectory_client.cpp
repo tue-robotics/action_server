@@ -26,7 +26,7 @@ void AmigoJointTrajectoryClient::initialize(const std::string& side)
     joint_names_.push_back("wrist_pitch_joint_" + side);
     joint_names_.push_back("wrist_yaw_joint_" + side);
 
-    std::string server_name = "/joint_trajectory_action_" + side;
+    std::string server_name = "/amigo/" + side + "_arm/joint_trajectory_action";
 
     client_ = new actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>(server_name, true);
     while(ros::ok())
