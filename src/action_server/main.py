@@ -8,7 +8,7 @@ import thread
 
 global server
 
-from robot_smach_states.designators.designator import Designator
+from robot_smach_states.util.designators import Designator
 
 import time
 import threading
@@ -21,9 +21,9 @@ import robot_skills.util.msg_constructors as msgs
 
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint
 from robot_smach_states.manip import Grab
-from robot_smach_states.designators.designator import VariableDesignator
+from robot_smach_states.util.designator import VariableDesignator
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
-from robot_smach_states.designators.designator import Designator, VariableDesignator
+from robot_smach_states.util.designator import Designator, VariableDesignator
 # -------------------------------------
 
 # ----------------------------------------------------------------------------------------------------
