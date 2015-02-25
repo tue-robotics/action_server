@@ -5,11 +5,6 @@ import action_server.srv
 
 import yaml
 import thread
-
-global server
-
-from robot_smach_states.util.designators import Designator
-
 import time
 import threading
 import sys
@@ -20,13 +15,12 @@ from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint
-from robot_smach_states.manip import Grab
-from robot_smach_states.util.designator import VariableDesignator
+from robot_smach_states.manipulation import Grab
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
-from robot_smach_states.util.designator import Designator, VariableDesignator
+from robot_smach_states.util.designators import Designator, VariableDesignator
 # -------------------------------------
 
-# ----------------------------------------------------------------------------------------------------
+global server
 
 
 class PickUp:
