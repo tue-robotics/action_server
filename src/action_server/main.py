@@ -39,15 +39,12 @@ class PickUp:
 
         side = config['side'] if 'side' in config else 'right'
 
-        entity = robot.ed.get_entity(id=entity_id)
-        designator = VariableDesignator(entity)
-
         if side == 'left':
             arm = robot.leftArm
         else:
             arm = robot.rightArm
 
-        self.grab = Grab(robot, arm=arm, designator=designator)    
+        self.grab = Grab(robot, arm=UnoccupiedArmDesignator(robot.arms, arm), item=EdEntityDesignator(robot, id=entity_id))    
         self.thread = threading.Thread(name='grab', target=self.grab.execute)
         self.thread.start()
 
@@ -232,12 +229,12 @@ if __name__ == "__main__":
     server.register_skill("navigate-to", navigate_to)
 
     # Register this server at the main (c++) action server
-    print "Waiting for connection with '/action_server/register_action_server'..."
-    rospy.wait_for_service('/action_server/register_action_server')
+    print "Waiting for connection with 'action_server/register_action_server'..."
+    rospy.wait_for_service('action_server/register_action_server')
     print "... Connected."  
 
     try:
-        register_client = rospy.ServiceProxy('/action_server/register_action_server', action_server.srv.RegisterActionServer)
+        register_client = rospy.ServiceProxy('action_server/register_action_server', action_server.srv.RegisterActionServer)
         resp = register_client(add_action_service_name, '/' + node_name + '/get_action_status')
 
         if resp.error_msg:

@@ -183,6 +183,14 @@ bool srvRegisterActionServer(action_server::RegisterActionServer::Request& req, 
 
 int main(int argc, char **argv)
 {
+    if (argc <= 1)
+    {
+        std::cout << "Please specify which robot to use" << std::endl;
+        return 1;
+    }
+
+    std::string robot_name = argv[1];
+
     ros::init(argc, argv, "constraint_server");
 
     // Create components
@@ -193,13 +201,13 @@ int main(int argc, char **argv)
     //    server.registerActionFactory(navigate_to);
     //    server.registerActionFactory(pick_up);
 
+    ros::NodeHandle nh_private("~");
+    ros::ServiceServer srv_add_action = nh_private.advertiseService("add_action", srvAddAction);
+    ros::ServiceServer srv_get_action_status = nh_private.advertiseService("get_action_status", srvGetActionStatus);
+    ros::ServiceServer srv_register_action_server = nh_private.advertiseService("register_action_server", srvRegisterActionServer);
+
     ros::NodeHandle nh;
-    ros::ServiceServer srv_add_action = nh.advertiseService("/action_server/add_action", srvAddAction);
-    ros::ServiceServer srv_get_action_status = nh.advertiseService("/action_server/get_action_status", srvGetActionStatus);
-    ros::ServiceServer srv_register_action_server = nh.advertiseService("/action_server/register_action_server", srvRegisterActionServer);
-
-    client_ed = nh.serviceClient<ed::SimpleQuery>("/ed/simple_query");
-
+    client_ed = nh.serviceClient<ed::SimpleQuery>("ed/simple_query");
 
     ros::Rate r(20);
     while (ros::ok())
