@@ -17,7 +17,7 @@ import robot_skills.util.msg_constructors as msgs
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint
 from robot_smach_states.manipulation import Grab
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
-from robot_smach_states.util.designators import Designator, VariableDesignator
+from robot_smach_states.util.designators import *
 # -------------------------------------
 
 global server
@@ -142,10 +142,10 @@ class NavigateTo:
             return False
 
         if self.goal_type == "waypoint":
-            self.nwc = NavigateToWaypoint(robot, waypoint_designator=Designator(self.goal_entity), radius=0.1)
+            self.nwc = NavigateToWaypoint(robot, waypoint_designator=EdEntityDesignator(robot, id=self.goal_entity), radius=0.1)
             rospy.logwarn("ACTION_SERVER: Navigating to waypoint")
         else:
-            self.nwc = NavigateToObserve(robot, designator=Designator(self.goal_entity), radius=.5)
+            self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=self.goal_entity), radius=.5)
             rospy.logwarn("ACTION_SERVER: Navigating to observe")
 
         self.thread = threading.Thread(name='navigate', target=self.nwc.execute)
