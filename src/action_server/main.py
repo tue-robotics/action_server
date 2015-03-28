@@ -15,9 +15,11 @@ from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint
-from robot_smach_states.manipulation import Grab
+from robot_smach_states.manipulation import Grab, Place
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
-from robot_smach_states.util.designators import *
+from robot_smach_states.util.designators import Designator, UnoccupiedArmDesignator, EdEntityDesignator, ArmHoldingEntityDesignator
+import ed.msg
+from robot_skills.arms import Arm
 # -------------------------------------
 
 global server
@@ -26,7 +28,8 @@ global server
 class PickUp:
 
     def __init__(self):
-        pass
+        self.grab = None
+        self.thread = None
 
     def create_action(self, action_type, config, robot):
         print 'PickUp!'
@@ -57,10 +60,11 @@ class PickUp:
 
 # ----------------------------------------------------------------------------------------------------
 
-class Place:
+class Put:
 
     def __init__(self):
-        pass
+        self.place = None
+        self.thread = None
 
     def create_action(self, action_type, config, robot):
         print "Place!"
@@ -72,53 +76,34 @@ class Place:
 
         if side == "left":
             arm = robot.leftArm
+            goal_y = 0.2
         else:
             arm = robot.rightArm
+            goal_y = -0.2
 
         try:
             height = config["height"]
         except KeyError:
             height = 0.8
 
-        # Torso to highest position
-        robot.spindle.high()
-
-        if side == "left":
-            goal_y = 0.2
-        else:
-            goal_y = -0.2
-
-        dx = 0.5
-
         x = 0.2
-        while x <= dx:
-            if not arm.send_goal(x, goal_y, height + 0.2, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-                print "Failed pre-drop"
-                return
-            x += 0.1       
+        place_pos = msgs.PointStamped(x, goal_y, height + 0.2, 0.0, 0.0, 0.0, frame_id="/amigo/base_link")
 
-        if not arm.send_goal(dx, goal_y, height + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-            print "drop"
-            return   
+        item_to_place = Designator(arm.occupied_by, resolve_type=ed.msg.EntityInfo)  # Which item do we want to place? The object in the hand we indicated
+        arm_with_item_designator = Designator(arm,  resolve_type=Arm) #No need for ArmHoldingEntityDesignator, we already know that from the config
+        place_position = Designator(place_pos, resolve_type=msgs.PointStamped)
+        self.place = Place(robot, item_to_place, place_position, arm_with_item_designator)
+        
+        self.place = Place(robot, item_to_place, place_position, arm_with_item_designator)    
+        self.thread = threading.Thread(name='grab', target=self.place.execute)
+        self.thread.start()
 
-        # Open gripper
-        arm.send_gripper_goal('open')
+    def cancel(self):
+        if self.place.is_running:
+            self.place.request_preempt()
 
-        x = dx
-        while x > 0.3:
-            if not arm.send_goal(x, goal_y, height + 0.2, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-                print "Failed pre-drop"
-                return
-            x -= 0.1       	
-
-        if not arm.send_goal(0.2, goal_y, height + 0.05, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-            print "Failed after-drop"
-            return
-
-        # Close gripper
-        arm.send_gripper_goal('close')
-
-        arm.reset()
+        # Wait until canceled
+        self.thread.join()  
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -222,8 +207,8 @@ if __name__ == "__main__":
     pick_up = PickUp()
     server.register_skill("pick-up", pick_up)
 
-    place = Place()
-    server.register_skill("place", place)
+    put = Put()
+    server.register_skill("place", put) #The original state from robot_smach_states is also called Place so there we need a different name
 
     navigate_to = NavigateTo()
     server.register_skill("navigate-to", navigate_to)
