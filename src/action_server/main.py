@@ -152,8 +152,7 @@ class PlaceDesignator(Designator):
         y = base_position.y
 
         # ToDo: additional check to make sure we don't use the wrong edge
-        # ToDo: stay away from the other table edge
-        coords = []
+        poses  = []
         for i in xrange(len(ch) - 1):
                 dx = ch[i+1].x - ch[i].x
                 dy = ch[i+1].y - ch[i].y
@@ -161,21 +160,21 @@ class PlaceDesignator(Designator):
                 length = math.hypot(dx, dy)
                 distance = math.fabs(dy*x - dx*y + ch[i+1].x*ch[i].y - ch[i+1].y*ch[i].x)/length
 
+                ''' Possible constraints are within an threshold from the originally computed radius '''
                 if (distance > radius - self._eps and distance < radius + self._eps):
-                    coords += [(dx, dy, length, distance)]
+                    place_pose = msgs.PoseStamped()
+                    place_pose.header.frame_id = "/map"
+                    place_pose.pose.position.x = base_position.x - dy/length * (distance+self._edge_distance)
+                    place_pose.pose.position.y = base_position.y + dx/length * (distance+self._edge_distance)
+                    place_pose.pose.position.z = e.z_max   
+                    ''' Compute the distance of the place pose to the entity center '''
+                    place_pose_to_center = math.hypot((place_pose.pose.position.x - e.pose.position.x), (place_pose.pose.position.x - e.pose.position.x))
+                    poses  += [(place_pose, place_pose_to_center)]
 
-        best = min(coords, key=lambda coord: coord[2])
-        dx, dy, length, distance = best
-
-        place_pose = msgs.PoseStamped()
-        place_pose.header.frame_id = "/map"
-        place_pose.pose.position.x = base_position.x - dy/length * (distance+self._edge_distance)
-        place_pose.pose.position.y = base_position.y + dx/length * (distance+self._edge_distance)
-        place_pose.pose.position.z = e.z_max        
+        best = min(poses, key=lambda pose: pose[1])
+        place_pose, place_pose_to_center = best
 
         return place_pose
-
-        #return msgs.PoseStamped(1.0, 3.5, 0.8, roll=0, pitch=0, yaw=-1.57, frame_id="/map")
 
 
 class Put:
