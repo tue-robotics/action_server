@@ -20,6 +20,8 @@ from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
 from robot_smach_states.util.designators import Designator, UnoccupiedArmDesignator, EdEntityDesignator, ArmHoldingEntityDesignator
 import ed.msg
 from robot_skills.arms import Arm
+import geometry_msgs.msg as gm
+import math
 # -------------------------------------
 
 global server
@@ -60,14 +62,138 @@ class PickUp:
 
 # ----------------------------------------------------------------------------------------------------
 
+class PlaceDesignator(Designator):
+    def __init__(self, robot=None, goal_entity=None):
+        super(PlaceDesignator, self).__init__(resolve_type=gm.PoseStamped)
+
+        self._robot = robot
+        self._goal_entity = goal_entity
+        self._eps = 0.05 # Threshold for navigation constraint
+        self._edge_distance = 0.075
+
+    def resolve(self):
+
+        # Get entity
+        e = self._robot.ed.get_entity(self._goal_entity, parse=False)
+        if not e:
+            rospy.logerr("No such entity")
+            return None
+
+        ''' First, check if a place pose is defined in the entity model'''
+
+        ''' If not: derive one '''
+        place_pose = self.derivePlacePose(e)
+        rospy.loginfo("Place pose = {0}".format(place_pose))
+
+        return place_pose
+
+    def derivePlacePose(self, e):
+
+        # Determine radius
+        grasp_offset = self._robot.grasp_offset
+        radius = math.hypot(grasp_offset.x, grasp_offset.y)
+
+        # Get plan to constraint
+        ch = e.convex_hull
+
+        x = e.pose.position.x
+        y = e.pose.position.y
+
+        if len(ch) > 0:
+
+            ch.append(ch[0])
+
+            pci = ""
+
+            for i in xrange(len(ch) - 1):
+                dx = ch[i+1].x - ch[i].x
+                dy = ch[i+1].y - ch[i].y
+
+                length = math.hypot(dx, dy)
+
+                pci_cur = "("
+
+                # Parallel to the polygon
+                xs = ch[i].x + (dy/length)*(radius+self._eps)
+                ys = ch[i].y - (dx/length)*(radius+self._eps)
+                pci_cur = pci_cur + "-(x-%f)*%f+(y-%f)*%f > 0.0 "%(xs, dy, ys, dx)
+
+                xs = ch[i].x + (dy/length)*(radius-self._eps)
+                ys = ch[i].y - (dx/length)*(radius-self._eps)
+                pci_cur = pci_cur + ' and ' + "-(x-%f)*%f+(y-%f)*%f < 0.0 "%(xs, dy, ys, dx)
+
+                # Orthogonal to the polygon
+                pci_cur = pci_cur + ' and ' + "(y-%f)*%f+(x-%f)*%f > %f "%(ch[i].y, dy, ch[i].x, dx, self._edge_distance)
+                pci_cur = pci_cur + ' and ' + "(y-%f)*%f+(x-%f)*%f < -%f "%(ch[i+1].y, dy, ch[i+1].x, dx, self._edge_distance)
+
+                pci_cur = pci_cur + ")"
+
+                if i != 0:
+                    pci = pci + ' or '
+                pci = pci + pci_cur
+
+        else:
+            ro = "(x-%f)^2+(y-%f)^2 < %f^2"%(x, y, radius+0.05)
+            ri = "(x-%f)^2+(y-%f)^2 > %f^2"%(x, y, radius-0.05)
+            pci = ri+" and "+ro
+
+        pc = PositionConstraint(constraint=pci, frame="/map")
+        #oc = OrientationConstraint(look_at=Point(x, y, 0.0), frame="/map")
+        
+        plan = self._robot.base.global_planner.getPlan(pc)
+        import ipdb; ipdb.set_trace()
+        base_position = plan[-1].pose.position
+
+        #return pc, oc
+
+        ''' For all segments of the polyon, compute the distance to the computed base pose
+            Go along the line PERPENDICULAR to the segment, for distance + offset to edge. 
+            This is your pose '''
+        x = base_position.x
+        y = base_position.y
+
+        # ToDo: additional check to make sure we don't use the wrong edge
+        # ToDo: stay away from the other table edge
+        coords = []
+        for i in xrange(len(ch) - 1):
+                dx = ch[i+1].x - ch[i].x
+                dy = ch[i+1].y - ch[i].y
+
+                length = math.hypot(dx, dy)
+                distance = math.fabs(dy*x - dx*y + ch[i+1].x*ch[i].y - ch[i+1].y*ch[i].x)/length
+
+                if (distance > radius - self._eps and distance < radius + self._eps):
+                    coords += [(dx, dy, length, distance)]
+
+        best = min(coords, key=lambda coord: coord[2])
+        dx, dy, length, distance = best
+
+        place_pose = msgs.PoseStamped()
+        place_pose.header.frame_id = "/map"
+        place_pose.pose.position.x = base_position.x - dy/length * (distance+self._edge_distance)
+        place_pose.pose.position.y = base_position.y + dx/length * (distance+self._edge_distance)
+        place_pose.pose.position.z = e.z_max        
+
+        return place_pose
+
+        #return msgs.PoseStamped(1.0, 3.5, 0.8, roll=0, pitch=0, yaw=-1.57, frame_id="/map")
+
+
 class Put:
 
     def __init__(self):
         self.place = None
         self.thread = None
+        self.goal_entity = None
 
     def create_action(self, action_type, config, robot):
         print "Place!"
+
+        try:
+            self.goal_entity = config["entity"]
+        except KeyError:
+            print "No object given"
+            return False
 
         try:
             side = config["side"]
@@ -86,15 +212,12 @@ class Put:
         except KeyError:
             height = 0.8
 
-        x = 0.2
-        place_pos = msgs.PointStamped(x, goal_y, height + 0.2, 0.0, 0.0, 0.0, frame_id="/amigo/base_link")
-
         item_to_place = Designator(arm.occupied_by, resolve_type=ed.msg.EntityInfo)  # Which item do we want to place? The object in the hand we indicated
         arm_with_item_designator = Designator(arm,  resolve_type=Arm) #No need for ArmHoldingEntityDesignator, we already know that from the config
-        place_position = Designator(place_pos, resolve_type=msgs.PointStamped)
-        self.place = Place(robot, item_to_place, place_position, arm_with_item_designator)
+        place_position = PlaceDesignator(robot, self.goal_entity)
         
-        self.place = Place(robot, item_to_place, place_position, arm_with_item_designator)    
+        self.place = Place(robot, item_to_place, place_position, arm_with_item_designator)
+
         self.thread = threading.Thread(name='grab', target=self.place.execute)
         self.thread.start()
 
