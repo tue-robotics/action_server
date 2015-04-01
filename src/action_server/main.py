@@ -69,7 +69,7 @@ class PlaceDesignator(Designator):
         self._robot = robot
         self._goal_entity = goal_entity
         self._eps = 0.05 # Threshold for navigation constraint
-        self._edge_distance = 0.075
+        self._edge_distance = 0.1
 
     def resolve(self):
 
@@ -171,6 +171,7 @@ class PlaceDesignator(Designator):
                     place_pose_to_center = math.hypot((place_pose.pose.position.x - e.pose.position.x), (place_pose.pose.position.x - e.pose.position.x))
                     poses  += [(place_pose, place_pose_to_center)]
 
+        ''' Usually, there are one or two distances within the threshold. Typically, the one closest to the center is correct'''
         best = min(poses, key=lambda pose: pose[1])
         place_pose, place_pose_to_center = best
 
