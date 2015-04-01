@@ -83,7 +83,7 @@ class PlaceDesignator(Designator):
 
         ''' If not: derive one '''
         place_pose = self.derivePlacePose(e)
-        rospy.loginfo("Place pose = {0}".format(place_pose))
+        rospy.logdebug("Place pose = {0}".format(place_pose))
 
         return place_pose
 
@@ -141,7 +141,6 @@ class PlaceDesignator(Designator):
         #oc = OrientationConstraint(look_at=Point(x, y, 0.0), frame="/map")
         
         plan = self._robot.base.global_planner.getPlan(pc)
-        import ipdb; ipdb.set_trace()
         base_position = plan[-1].pose.position
 
         #return pc, oc
