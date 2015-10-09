@@ -76,7 +76,7 @@ ActionConstPtr Server::addAction(const std::string& type, tue::Configuration con
     }
     else
     {
-        std::cout << "Unknown action type: " << type << std::endl;
+//        std::cout << "Unknown action type: " << type << std::endl;
     }
 
     return action;

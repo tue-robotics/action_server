@@ -20,8 +20,11 @@
 act::Server server;
 ros::ServiceClient client_ed;
 
+// Mapping from action types (e.g. 'pick-up', 'navigate-to') to a client that serves it
+std::map<std::string, ros::ServiceClient*> action_type_to_client_;
+
 // List of additional action servers (chained to this action server)
-std::map<std::string, ros::ServiceClient> action_server_clients;
+std::map<std::string, ros::ServiceClient*> action_server_clients;
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -48,7 +51,7 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                 if (srv.response.entities.empty())
                 {
                     res.error_msg = "No such entity: '" + entity_id + "'";
-                    std::cout << res.error_msg << std::endl;
+                    ROS_ERROR_STREAM(res.error_msg);
                     return true;
                 }
 
@@ -91,30 +94,26 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
                     }
                     else
                     {
-                        res.error_msg = "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.";
+                        res.error_msg += "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.\n";
                     }
                 }
             }
             else
             {
-                res.error_msg = "Could not call /ed/simple_query";
+                res.error_msg += "Could not call /ed/simple_query\n";
             }
         }
 
         if (!res.error_msg.empty())
         {
-            std::cout << res.error_msg << std::endl;
+            ROS_ERROR_STREAM(res.error_msg);
             return true;
         }
-
-        std::cout << req.action << std::endl;
-        std::cout << action_cfg << std::endl;
 
         act::ActionConstPtr action = server.addAction(req.action, action_cfg);
         if (action_cfg.hasError())
         {
             res.error_msg = action_cfg.error();
-            std::cout << res.error_msg << std::endl;
         }
         else if (action)
         {
@@ -122,44 +121,42 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
         }
         else
         {
-            std::cout << "Action type '" + req.action + "' is unknown, but I'm going to try other registered action servers" << std::endl;
-
             action_server::AddAction srv;
             srv.request = req;
             srv.request.parameters = action_cfg.toYAMLString();
             srv.request.parameters += "\nentity_type: " + entity_type; // DIRTY HACK, PLEASE FIX (Sjoerd)! (TODO)
-            bool succeeded = false;
-            for(std::map<std::string, ros::ServiceClient>::iterator it = action_server_clients.begin(); it != action_server_clients.end(); ++it)
+
+            std::map<std::string, ros::ServiceClient*>::iterator it_client = action_type_to_client_.find(req.action);
+            if (it_client != action_type_to_client_.end())
             {
-                if (it->second.call(srv))
+                ros::ServiceClient* client = it_client->second;
+
+                if (client->call(srv))
                 {
-                    if (srv.response.error_msg.empty())
-                    {
-                        // Succeeded!
-                        succeeded = true;
-                        break;
-                    }
+                    if (!srv.response.error_msg.empty())
+                        res.error_msg += srv.response.error_msg + "\n";
+                    else
+                        res.action_uuid = srv.response.action_uuid;
                 }
                 else
                 {
-                    std::cout << "Failed to call '" << it->second.getService() << "'." << std::endl;
+                    res.error_msg += "Failed to call '" + client->getService() + "'\n";
                 }
             }
-
-            if (!succeeded)
+            else
             {
                 // None of the registered action servers could handle the action
-                res.error_msg = "Action of type '" + req.action +"' could not be created.";
-                std::cout << res.error_msg << std::endl;
+                res.error_msg = "No registered servers that serve action of type '" + req.action +"'.\n";
             }
-
         }
     }
     else
     {
         res.error_msg = action_cfg.error();
-        std::cout << res.error_msg << std::endl;
     }
+
+    if (!res.error_msg.empty())
+        ROS_ERROR_STREAM(res.error_msg);
 
     return true;
 }
@@ -176,7 +173,23 @@ bool srvGetActionStatus(action_server::GetActionStatus::Request& req, action_ser
 bool srvRegisterActionServer(action_server::RegisterActionServer::Request& req, action_server::RegisterActionServer::Response& res)
 {
     ros::NodeHandle nh;
-    action_server_clients[req.add_action_service] = nh.serviceClient<action_server::AddAction>(req.add_action_service);
+
+    ros::ServiceClient* client;
+    std::map<std::string, ros::ServiceClient*>::iterator it_client = action_server_clients.find(req.add_action_service);
+
+    if (it_client == action_server_clients.end())
+    {
+        client = new ros::ServiceClient(nh.serviceClient<action_server::AddAction>(req.add_action_service));
+        action_server_clients[req.add_action_service] = client;
+    }
+    else
+    {
+        client = it_client->second;
+    }
+
+    for(std::vector<std::string>::const_iterator it = req.action_types.begin(); it != req.action_types.end(); ++it)
+        action_type_to_client_[*it] = client;
+
     return true;
 }
 
@@ -186,7 +199,7 @@ int main(int argc, char **argv)
 {
     if (argc <= 1)
     {
-        std::cout << "Please specify which robot to use" << std::endl;
+        ROS_ERROR("Please specify which robot to use");
         return 1;
     }
 

@@ -25,20 +25,48 @@ import geometry_msgs.msg as gm
 import math
 # -------------------------------------
 
+# ----------------------------------------------------------------------------------------------------
+
+# Returns (e, error_msg)
+#     e         - entity (EntityInfo)
+#     error_msg - If something goes wrong, this contains the message
+def entity_from_description(entity_descr, robot):
+    if "id" in entity_descr:
+        e = robot.ed.get_entity(id=entity_descr["id"], parse=False)
+        if not e:
+            return (None, "No entity with id '%'" % entity_descr["id"])
+        entities = [e]
+    elif "type" in entity_descr:
+        entities = robot.ed.get_entities(type=entity_descr["type"], parse=False)
+    else:
+        return (None, "Invalid entity description")
+
+    if not entities:
+        return (None, "No such entity")
+
+    robot_pos = robot.base.get_location().pose.position
+
+    # Sort entities by distance
+    entities = sorted(entities, key=lambda entity: length_sq(robot_pos.x - entity.pose.position.x, robot_pos.y - entity.pose.position.y))
+    return (entities[0], "")
+
+# ----------------------------------------------------------------------------------------------------
+
 class PickUp:
 
     def __init__(self):
         self.grab = None
         self.thread = None
 
-    def create_action(self, action_type, config, robot):
-        print 'PickUp!'
+    def start(self, config, robot):
 
-        try:
-            entity_id = config['entity']
-        except KeyError:
-            print 'No object given'
-            return False
+        if not "entity" in config:
+            return "No entity given"
+
+        entity_descr = config["entity"]
+        (e, error_msg) = entity_from_description(entity_descr, robot)
+        if not e:
+            return error_msg
 
         side = config['side'] if 'side' in config else 'right'
 
@@ -47,7 +75,7 @@ class PickUp:
         else:
             arm = robot.rightArm
 
-        self.grab = Grab(robot, arm=UnoccupiedArmDesignator(robot.arms, arm), item=EdEntityDesignator(robot, id=entity_id))
+        self.grab = Grab(robot, arm=UnoccupiedArmDesignator(robot.arms, arm), item=EdEntityDesignator(robot, id=e.id))
         self.thread = threading.Thread(name='grab', target=self.grab.execute)
         self.thread.start()
 
@@ -186,7 +214,7 @@ class Put:
         self.thread = None
         self.goal_entity = None
 
-    def create_action(self, action_type, config, robot):
+    def start(self, config, robot):
         print "Place!"
 
         try:
@@ -230,27 +258,31 @@ class Put:
 
 # ----------------------------------------------------------------------------------------------------
 
+def length_sq(x, y):
+    return x * x + y * y
+
+# ----------------------------------------------------------------------------------------------------
+
 class NavigateTo:
 
     def __init__(self):
         self.nwc = None
-        self.goal_entity = None
-        self.goal_type = None
 
-    def create_action(self, action_type, config, robot):
+    def start(self, config, robot):
 
-        try:
-            self.goal_entity = config["entity"]
-            self.goal_type = config["entity_type"]
-        except KeyError:
-            print "No object given"
-            return False
+        if not "entity" in config:
+            return "No entity given"
 
-        if self.goal_type == "waypoint":
-            self.nwc = NavigateToWaypoint(robot, waypoint_designator=EdEntityDesignator(robot, id=self.goal_entity), radius=0.1)
+        entity_descr = config["entity"]
+        (e, error_msg) = entity_from_description(entity_descr, robot)
+        if not e:
+            return error_msg
+
+        if "waypoint" in e.types:
+            self.nwc = NavigateToWaypoint(robot, waypoint_designator=EdEntityDesignator(robot, id=e.id), radius=0.1)
             rospy.logwarn("ACTION_SERVER: Navigating to waypoint")
         else:
-            self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=self.goal_entity), radius=.5)
+            self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=e.id), radius=.5)
             rospy.logwarn("ACTION_SERVER: Navigating to observe")
 
         self.thread = threading.Thread(name='navigate', target=self.nwc.execute)
@@ -270,7 +302,7 @@ class Server:
     def __init__(self, name, robot): # Robot should no be in the constructor but should be in the add_action -- REIN
         self.name = name
         self.action_type_to_skill = {}
-        self.last_action = None
+        self.action = None
         self.robot = robot # Should be in the add action, not in the constructor -- REIN
         self.cl_register = None
 
@@ -306,21 +338,27 @@ class Server:
 
     def srv_add_action(self, req):
         try:
-            self.action = self.action_type_to_skill[req.action]
+            action_class = self.action_type_to_skill[req.action]
         except KeyError:
             return action_server.srv.AddActionResponse("", "Action type '%s' not found." % req.action)
 
         config = yaml.load(req.parameters)
 
-        if self.last_action:
-           self.last_action.cancel()
+        if self.action:
+           self.action.cancel()
 
-        if self.action.create_action(req.action, config, self.robot):
-            self.last_action = self.action
-            id = str(uuid.uuid1())
-            return action_server.srv.AddActionResponse(id, "")
-        else:
-            return action_server.srv.AddActionResponse("", "Could not construct action.")
+        action = action_class()
+
+        try:
+            err = action.start(config, robot)
+            if not err:
+                self.action = action
+                id = str(uuid.uuid1())
+                return action_server.srv.AddActionResponse(id, "")
+            else:
+                return action_server.srv.AddActionResponse("", "Could not construct action: %s" % err)
+        except Exception as err:
+            return action_server.srv.AddActionResponse("", "Error while starting action: %s" % err)
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -346,9 +384,9 @@ if __name__ == "__main__":
     server = Server("action_server_py", robot)
 
     # Register components
-    server.register_skill("pick-up", PickUp())
-    server.register_skill("place", Put()) #The original state from robot_smach_states is also called Place so there we need a different name
-    server.register_skill("navigate-to", NavigateTo())
+    server.register_skill("pick-up", PickUp)
+    server.register_skill("place", Put) #The original state from robot_smach_states is also called Place so there we need a different name
+    server.register_skill("navigate-to", NavigateTo)
 
     server.connect('action_server/register_action_server')
 
