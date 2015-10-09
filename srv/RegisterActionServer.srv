@@ -3,5 +3,8 @@ string add_action_service
 
 # The name of the get_action_state service
 string get_action_state_service
+
+# The action types this server serves
+string[] action_types
 ---
 string error_msg

@@ -8,6 +8,7 @@ import thread
 import time
 import threading
 import sys
+import uuid
 
 # -------------------------------------
 # For PickUp:
@@ -23,9 +24,6 @@ from robot_skills.arms import Arm
 import geometry_msgs.msg as gm
 import math
 # -------------------------------------
-
-global server
-
 
 class PickUp:
 
@@ -49,11 +47,14 @@ class PickUp:
         else:
             arm = robot.rightArm
 
-        self.grab = Grab(robot, arm=UnoccupiedArmDesignator(robot.arms, arm), item=EdEntityDesignator(robot, id=entity_id))    
+        self.grab = Grab(robot, arm=UnoccupiedArmDesignator(robot.arms, arm), item=EdEntityDesignator(robot, id=entity_id))
         self.thread = threading.Thread(name='grab', target=self.grab.execute)
         self.thread.start()
 
     def cancel(self):
+        if not self.grab:
+            return
+
         if self.grab.is_running:
             self.grab.request_preempt()
 
@@ -139,14 +140,14 @@ class PlaceDesignator(Designator):
 
         pc = PositionConstraint(constraint=pci, frame="/map")
         #oc = OrientationConstraint(look_at=Point(x, y, 0.0), frame="/map")
-        
+
         plan = self._robot.base.global_planner.getPlan(pc)
         base_position = plan[-1].pose.position
 
         #return pc, oc
 
         ''' For all segments of the polyon, compute the distance to the computed base pose
-            Go along the line PERPENDICULAR to the segment, for distance + offset to edge. 
+            Go along the line PERPENDICULAR to the segment, for distance + offset to edge.
             This is your pose '''
         x = base_position.x
         y = base_position.y
@@ -166,7 +167,7 @@ class PlaceDesignator(Designator):
                     place_pose.header.frame_id = "/map"
                     place_pose.pose.position.x = base_position.x - dy/length * (distance+self._edge_distance)
                     place_pose.pose.position.y = base_position.y + dx/length * (distance+self._edge_distance)
-                    place_pose.pose.position.z = e.z_max   
+                    place_pose.pose.position.z = e.z_max
                     ''' Compute the distance of the place pose to the entity center '''
                     place_pose_to_center = math.hypot((place_pose.pose.position.x - e.pose.position.x), (place_pose.pose.position.x - e.pose.position.x))
                     poses  += [(place_pose, place_pose_to_center)]
@@ -214,7 +215,7 @@ class Put:
         item_to_place = Designator(arm.occupied_by, resolve_type=ed.msg.EntityInfo)  # Which item do we want to place? The object in the hand we indicated
         arm_with_item_designator = Designator(arm,  resolve_type=Arm) #No need for ArmHoldingEntityDesignator, we already know that from the config
         place_position = PlaceDesignator(robot, self.goal_entity)
-        
+
         self.place = Place(robot, item_to_place, place_position, arm_with_item_designator)
 
         self.thread = threading.Thread(name='grab', target=self.place.execute)
@@ -225,7 +226,7 @@ class Put:
             self.place.request_preempt()
 
         # Wait until canceled
-        self.thread.join()  
+        self.thread.join()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -266,45 +267,65 @@ class NavigateTo:
 
 class Server:
 
-    def __init__(self, robot): # Robot should no be in the constructor but should be in the add_action -- REIN
+    def __init__(self, name, robot): # Robot should no be in the constructor but should be in the add_action -- REIN
+        self.name = name
         self.action_type_to_skill = {}
         self.last_action = None
         self.robot = robot # Should be in the add action, not in the constructor -- REIN
+        self.cl_register = None
+
+        self.add_action_service_name = self.name + '/add_action'
+        self.get_action_status_service_name = self.name + '/get_action_status'
+        self.srv_add_action = rospy.Service(self.add_action_service_name, action_server.srv.AddAction, self.srv_add_action)
 
     def register_skill(self, action_type, skill):
         self.action_type_to_skill[action_type] = skill
-    
-    def add_action(self, action_type, config): # We should include the robot here as arguments, not pass it in the constructor if we want to use multiple robots, this is desired :) -- REIN
+
+    def connect(self, register_service_name):
+        rospy.loginfo("Waiting for registration service ('%s') ..." % register_service_name)
+        rospy.wait_for_service(register_service_name)
+        rospy.loginfo("...found")
+
+        self.cl_register = rospy.ServiceProxy(register_service_name, action_server.srv.RegisterActionServer)
+
         try:
-            self.action = self.action_type_to_skill[action_type]
+            resp = self.cl_register(
+                        self.add_action_service_name,
+                        self.get_action_status_service_name,
+                        [k for k in self.action_type_to_skill.iterkeys()]
+                    )
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e
+            return False
 
-            if self.last_action:
-               self.last_action.cancel()
-
-            self.action.create_action(action_type, config, self.robot)
-
-            self.last_action = self.action
-        except KeyError:
+        if resp.error_msg:
+            rospy.logerr("Response from action server: " + resp.error_msg)
             return False
 
         return True
 
-def srv_add_action(req):
-    config = yaml.load(req.parameters)
+    def srv_add_action(self, req):
+        try:
+            self.action = self.action_type_to_skill[req.action]
+        except KeyError:
+            return action_server.srv.AddActionResponse("", "Action type '%s' not found." % req.action)
 
-    global server
-    server.add_action(req.action, config)
+        config = yaml.load(req.parameters)
 
-    return action_server.srv.AddActionResponse("", "")
+        if self.last_action:
+           self.last_action.cancel()
+
+        if self.action.create_action(req.action, config, self.robot):
+            self.last_action = self.action
+            id = str(uuid.uuid1())
+            return action_server.srv.AddActionResponse(id, "")
+        else:
+            return action_server.srv.AddActionResponse("", "Could not construct action.")
 
 # ----------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    node_name = 'action_server_py'
-    rospy.init_node(node_name)
-
-    add_action_service_name = '/' + node_name + '/add_action'
-    srv = rospy.Service(add_action_service_name, action_server.srv.AddAction, srv_add_action)
+    rospy.init_node('action_server_py')
 
     # Create Robot object based on argv[1]
     if len(sys.argv) < 2:
@@ -322,32 +343,13 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    global server
-    server = Server(robot)
+    server = Server("action_server_py", robot)
 
     # Register components
-    pick_up = PickUp()
-    server.register_skill("pick-up", pick_up)
+    server.register_skill("pick-up", PickUp())
+    server.register_skill("place", Put()) #The original state from robot_smach_states is also called Place so there we need a different name
+    server.register_skill("navigate-to", NavigateTo())
 
-    put = Put()
-    server.register_skill("place", put) #The original state from robot_smach_states is also called Place so there we need a different name
-
-    navigate_to = NavigateTo()
-    server.register_skill("navigate-to", navigate_to)
-
-    # Register this server at the main (c++) action server
-    print "Waiting for connection with 'action_server/register_action_server'..."
-    rospy.wait_for_service('action_server/register_action_server')
-    print "... Connected."  
-
-    try:
-        register_client = rospy.ServiceProxy('action_server/register_action_server', action_server.srv.RegisterActionServer)
-        resp = register_client(add_action_service_name, '/' + node_name + '/get_action_status')
-
-        if resp.error_msg:
-            print "ERROR: " + resp.error_msg
-            sys.exit(1)            
-    except rospy.ServiceException, e:
-        print "Service call failed: %s"%e
+    server.connect('action_server/register_action_server')
 
     rospy.spin()

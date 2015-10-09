@@ -177,6 +177,7 @@ bool srvRegisterActionServer(action_server::RegisterActionServer::Request& req, 
 {
     ros::NodeHandle nh;
     action_server_clients[req.add_action_service] = nh.serviceClient<action_server::AddAction>(req.add_action_service);
+    return true;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -191,7 +192,7 @@ int main(int argc, char **argv)
 
     std::string robot_name = argv[1];
 
-    ros::init(argc, argv, "constraint_server");
+    ros::init(argc, argv, "action_server");
 
     // Create components
     //    act::ActionFactoryPtr navigate_to(new NavigateTo);
