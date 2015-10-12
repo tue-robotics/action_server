@@ -27,28 +27,36 @@ import math
 
 # ----------------------------------------------------------------------------------------------------
 
+def length_sq(x, y):
+    return x * x + y * y
+
+# ----------------------------------------------------------------------------------------------------
+
 # Returns (e, error_msg)
-#     e         - entity (EntityInfo)
+#     entities  - list of entities that fulfill the description (each element has type EntityInfo)
 #     error_msg - If something goes wrong, this contains the message
-def entity_from_description(entity_descr, robot):
+def entities_from_description(entity_descr, robot):
     if "id" in entity_descr:
         e = robot.ed.get_entity(id=entity_descr["id"], parse=False)
         if not e:
-            return (None, "No entity with id '%'" % entity_descr["id"])
+            return ([], "No entity with id '%'" % entity_descr["id"])
         entities = [e]
     elif "type" in entity_descr:
         entities = robot.ed.get_entities(type=entity_descr["type"], parse=False)
     else:
-        return (None, "Invalid entity description")
+        entities = robot.ed.get_entities(parse=False)
 
     if not entities:
-        return (None, "No such entity")
+        return ([], "No such entity")
 
     robot_pos = robot.base.get_location().pose.position
 
     # Sort entities by distance
     entities = sorted(entities, key=lambda entity: length_sq(robot_pos.x - entity.pose.position.x, robot_pos.y - entity.pose.position.y))
-    return (entities[0], "")
+
+    print entities
+
+    return (entities, "")
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -64,9 +72,17 @@ class PickUp:
             return "No entity given"
 
         entity_descr = config["entity"]
-        (e, error_msg) = entity_from_description(entity_descr, robot)
-        if not e:
+        (entities, error_msg) = entities_from_description(entity_descr, robot)
+        if not entities:
             return error_msg
+
+        # Only filter to entities that do not have a shape but do have a convex hull
+        entities = [ e for e in entities if not e.has_shape and len(e.convex_hull) > 0]
+
+        if not entities:
+            return "Inpossible to grab that object"
+
+        e = entities[0]
 
         side = config['side'] if 'side' in config else 'right'
 
@@ -96,15 +112,17 @@ class Inspect:
     def __init__(self):
         self.nwc = None
 
-    def start(self, config, robot):        
+    def start(self, config, robot):
 
         if not "entity" in config:
             return "No entity given"
 
         entity_descr = config["entity"]
-        (self.entity, error_msg) = entity_from_description(entity_descr, robot)
-        if not self.entity:
+        (entities, error_msg) = entities_from_description(entity_descr, robot)
+        if not entities:
             return error_msg
+
+        self.entity = entities[0]
 
         self.robot = robot
 
@@ -113,9 +131,9 @@ class Inspect:
 
     def _run(self):
         # Navigate to the location
-        self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=self.entity.id), radius=.5)  
+        self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=self.entity.id), radius=.5)
         self.nwc.execute()
-        
+
         # Inspect 'on top of' the entity
         self.robot.ed.update_kinect("on_top_of %s" % self.entity.id)
 
@@ -295,11 +313,6 @@ class Put:
 
 # ----------------------------------------------------------------------------------------------------
 
-def length_sq(x, y):
-    return x * x + y * y
-
-# ----------------------------------------------------------------------------------------------------
-
 class NavigateTo:
 
     def __init__(self):
@@ -311,9 +324,11 @@ class NavigateTo:
             return "No entity given"
 
         entity_descr = config["entity"]
-        (e, error_msg) = entity_from_description(entity_descr, robot)
-        if not e:
+        (entities, error_msg) = entities_from_description(entity_descr, robot)
+        if not entities:
             return error_msg
+
+        e = entities[0]
 
         if "waypoint" in e.types:
             self.nwc = NavigateToWaypoint(robot, waypoint_designator=EdEntityDesignator(robot, id=e.id), radius=0.1)
@@ -395,7 +410,10 @@ class Server:
             else:
                 return action_server.srv.AddActionResponse("", "Could not construct action: %s" % err)
         except Exception as err:
-            return action_server.srv.AddActionResponse("", "Error while starting action: %s" % err)
+            error_msg = "%s\n\n" % err
+            import traceback
+            error_msg += traceback.format_exc()
+            return action_server.srv.AddActionResponse("", "Error while starting action: %s" % error_msg)
 
 # ----------------------------------------------------------------------------------------------------
 

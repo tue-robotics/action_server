@@ -39,70 +39,70 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
     {
         // Check for 'special' fields.
 
-        std::string entity_id;
-        if (action_cfg.value("entity", entity_id, tue::OPTIONAL))
-        {
-            // TODO: ask ED for entity information regarding given action, and add this to action_cfg
-            ed::SimpleQuery srv;
-            srv.request.id = entity_id;
+//        std::string entity_id;
+//        if (action_cfg.value("entity", entity_id, tue::OPTIONAL))
+//        {
+//            // TODO: ask ED for entity information regarding given action, and add this to action_cfg
+//            ed::SimpleQuery srv;
+//            srv.request.id = entity_id;
 
-            if (client_ed.call(srv))
-            {
-                if (srv.response.entities.empty())
-                {
-                    res.error_msg = "No such entity: '" + entity_id + "'";
-                    ROS_ERROR_STREAM(res.error_msg);
-                    return true;
-                }
+//            if (client_ed.call(srv))
+//            {
+//                if (srv.response.entities.empty())
+//                {
+//                    res.error_msg = "No such entity: '" + entity_id + "'";
+//                    ROS_ERROR_STREAM(res.error_msg);
+//                    return true;
+//                }
 
 
-                const ed::EntityInfo& e_info = srv.response.entities.front();
+//                const ed::EntityInfo& e_info = srv.response.entities.front();
 
-                entity_type = e_info.type;
+//                entity_type = e_info.type;
 
-                // Load entity configuration
-                tue::config::ReaderWriter r;
-                tue::config::loadFromYAMLString(e_info.data, r);
+//                // Load entity configuration
+//                tue::config::ReaderWriter r;
+//                tue::config::loadFromYAMLString(e_info.data, r);
 
-                bool affordance_found = false;
-                if (r.readGroup("affordances"))
-                {
-                    if (r.readGroup(req.action))
-                    {
-                        action_cfg.data().add(r.data());
-                        affordance_found = true;
-                        r.endGroup();
-                    }
-                    r.endGroup();
-                }
+//                bool affordance_found = false;
+//                if (r.readGroup("affordances"))
+//                {
+//                    if (r.readGroup(req.action))
+//                    {
+//                        action_cfg.data().add(r.data());
+//                        affordance_found = true;
+//                        r.endGroup();
+//                    }
+//                    r.endGroup();
+//                }
 
-                if (!affordance_found)
-                {
-                    if (req.action == "navigate-to")
-                    {
-                        // HACK: add navigation constraint for easy picking up. TODO: make nice
-                        action_cfg.writeGroup("position_constraint");
-                        action_cfg.setValue("constraint", "x^2 + y^2 < 0.59^2 and x^2 + y^2 > 0.30");
-                        action_cfg.endGroup();
+//                if (!affordance_found)
+//                {
+//                    if (req.action == "navigate-to")
+//                    {
+//                        // HACK: add navigation constraint for easy picking up. TODO: make nice
+//                        action_cfg.writeGroup("position_constraint");
+//                        action_cfg.setValue("constraint", "x^2 + y^2 < 0.59^2 and x^2 + y^2 > 0.30");
+//                        action_cfg.endGroup();
 
-                        action_cfg.writeGroup("orientation_constraint");
-                        action_cfg.setValue("angle_offset", 0.3805063771123649); // Default for right arm
-                        action_cfg.endGroup();
-                    }
-                    else if (req.action == "pick-up")
-                    {
-                    }
-                    else
-                    {
-                        res.error_msg += "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.\n";
-                    }
-                }
-            }
-            else
-            {
-                res.error_msg += "Could not call /ed/simple_query\n";
-            }
-        }
+//                        action_cfg.writeGroup("orientation_constraint");
+//                        action_cfg.setValue("angle_offset", 0.3805063771123649); // Default for right arm
+//                        action_cfg.endGroup();
+//                    }
+//                    else if (req.action == "pick-up")
+//                    {
+//                    }
+//                    else
+//                    {
+//                        res.error_msg += "No affordance '" + req.action + "' for entity type '" + e_info.type + "'.\n";
+//                    }
+//                }
+//            }
+//            else
+//            {
+//                res.error_msg += "Could not call /ed/simple_query\n";
+//            }
+//        }
 
         if (!res.error_msg.empty())
         {
@@ -123,8 +123,8 @@ bool srvAddAction(action_server::AddAction::Request& req, action_server::AddActi
         {
             action_server::AddAction srv;
             srv.request = req;
-            srv.request.parameters = action_cfg.toYAMLString();
-            srv.request.parameters += "\nentity_type: " + entity_type; // DIRTY HACK, PLEASE FIX (Sjoerd)! (TODO)
+//            srv.request.parameters = //action_cfg.toYAMLString();
+//            srv.request.parameters += "\nentity_type: " + entity_type; // DIRTY HACK, PLEASE FIX (Sjoerd)! (TODO)
 
             std::map<std::string, ros::ServiceClient*>::iterator it_client = action_type_to_client_.find(req.action);
             if (it_client != action_type_to_client_.end())
