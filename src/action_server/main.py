@@ -91,6 +91,43 @@ class PickUp:
 
 # ----------------------------------------------------------------------------------------------------
 
+class Inspect:
+
+    def __init__(self):
+        self.nwc = None
+
+    def start(self, config, robot):        
+
+        if not "entity" in config:
+            return "No entity given"
+
+        entity_descr = config["entity"]
+        (self.entity, error_msg) = entity_from_description(entity_descr, robot)
+        if not self.entity:
+            return error_msg
+
+        self.robot = robot
+
+        self.thread = threading.Thread(name='inspect', target=self._run)
+        self.thread.start()
+
+    def _run(self):
+        # Navigate to the location
+        self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=self.entity.id), radius=.5)  
+        self.nwc.execute()
+        
+        # Inspect 'on top of' the entity
+        self.robot.ed.update_kinect("on_top_of %s" % self.entity.id)
+
+    def cancel(self):
+        if self.nwc and self.nwc.is_running:
+            self.nwc.request_preempt()
+
+        # Wait until canceled
+        self.thread.join()
+
+# ----------------------------------------------------------------------------------------------------
+
 class PlaceDesignator(Designator):
     def __init__(self, robot=None, goal_entity=None):
         super(PlaceDesignator, self).__init__(resolve_type=gm.PoseStamped)
@@ -387,6 +424,7 @@ if __name__ == "__main__":
     server.register_skill("pick-up", PickUp)
     server.register_skill("place", Put) #The original state from robot_smach_states is also called Place so there we need a different name
     server.register_skill("navigate-to", NavigateTo)
+    server.register_skill("inspect", Inspect)
 
     server.connect('action_server/register_action_server')
 
