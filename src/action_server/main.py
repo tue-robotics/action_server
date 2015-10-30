@@ -136,7 +136,7 @@ class Inspect:
 
         # Make sure the head looks at the entity
         pos = self.entity.pose.position
-        self.robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, 0.5, "/map"), timeout=10)
+        self.robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, 0.8, "/map"), timeout=10)
 
         # Inspect 'on top of' the entity
         segm_res = self.robot.ed.update_kinect("on_top_of %s" % self.entity.id)
