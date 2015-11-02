@@ -1,41 +1,48 @@
 #!/usr/bin/env python
 
+'''
+A central place to dispatch actions received from various sources. These sources could come from
+GUIs, command line tools or natural language.
+'''
+
 import rospy
 import action_server.srv
 
 import yaml
-import thread
 import time
 import threading
 import sys
 import uuid
 
-# -------------------------------------
-# For PickUp:
-from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint
 from robot_smach_states.manipulation import Grab, Place
-from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
-from robot_smach_states.util.designators import Designator, UnoccupiedArmDesignator, EdEntityDesignator, ArmHoldingEntityDesignator
+from cb_planner_msgs_srvs.msg import PositionConstraint
+from robot_smach_states.util.designators import Designator, UnoccupiedArmDesignator
+from robot_smach_states.util.designators import EdEntityDesignator
 import ed.msg
 from robot_skills.arms import Arm
 import geometry_msgs.msg as gm
 import math
-# -------------------------------------
 
-# ----------------------------------------------------------------------------------------------------
 
 def length_sq(x, y):
     return x * x + y * y
 
-# ----------------------------------------------------------------------------------------------------
 
-# Returns (e, error_msg)
-#     entities  - list of entities that fulfill the description (each element has type EntityInfo)
-#     error_msg - If something goes wrong, this contains the message
 def entities_from_description(entity_descr, robot):
+    '''
+    Query entities with various methods
+
+    @param entity_descr: A dict that contains an 'id' or 'type' field
+    @param robot: The robot object
+
+    @return: (entities, error_msg)
+        entities  - list of entities that fulfill the description
+                    (each element has type EntityInfo)
+        error_msg - If something goes wrong, this contains the message
+    '''
     if "id" in entity_descr:
         e = robot.ed.get_entity(id=entity_descr["id"], parse=False)
         if not e:
@@ -52,15 +59,17 @@ def entities_from_description(entity_descr, robot):
     robot_pos = robot.base.get_location().pose.position
 
     # Sort entities by distance
-    entities = sorted(entities, key=lambda entity: length_sq(robot_pos.x - entity.pose.position.x, robot_pos.y - entity.pose.position.y))
+    entities = sorted(entities,
+                      key=lambda entity: length_sq(
+                          robot_pos.x - entity.pose.position.x,
+                          robot_pos.y - entity.pose.position.y))
 
     print entities
 
     return (entities, "")
 
-# ----------------------------------------------------------------------------------------------------
 
-class PickUp:
+class PickUp(object):
 
     def __init__(self):
         self.grab = None
@@ -68,7 +77,7 @@ class PickUp:
 
     def start(self, config, robot):
 
-        if not "entity" in config:
+        if "entity" not in config:
             return "No entity given"
 
         entity_descr = config["entity"]
@@ -77,7 +86,7 @@ class PickUp:
             return error_msg
 
         # Only filter to entities that do not have a shape but do have a convex hull
-        entities = [ e for e in entities if not e.has_shape and len(e.convex_hull) > 0]
+        entities = [e for e in entities if not e.has_shape and len(e.convex_hull) > 0]
 
         if not entities:
             return "Inpossible to grab that object"
@@ -91,7 +100,9 @@ class PickUp:
         else:
             arm = robot.rightArm
 
-        self.grab = Grab(robot, arm=UnoccupiedArmDesignator(robot.arms, arm), item=EdEntityDesignator(robot, id=e.id))
+        self.grab = Grab(robot,
+                         arm=UnoccupiedArmDesignator(robot.arms, arm),
+                         item=EdEntityDesignator(robot, id=e.id))
         self.thread = threading.Thread(name='grab', target=self.grab.execute)
         self.thread.start()
 
@@ -105,16 +116,15 @@ class PickUp:
         # Wait until canceled
         self.thread.join()
 
-# ----------------------------------------------------------------------------------------------------
 
-class Inspect:
+class Inspect(object):
 
     def __init__(self):
         self.nwc = None
 
     def start(self, config, robot):
 
-        if not "entity" in config:
+        if "entity" not in config:
             return "No entity given"
 
         entity_descr = config["entity"]
@@ -131,15 +141,20 @@ class Inspect:
 
     def _run(self):
         # Navigate to the location
-        self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=self.entity.id), radius=1.0)
+        self.nwc = NavigateToObserve(robot,
+                                     entity_designator=EdEntityDesignator(
+                                         robot,
+                                         id=self.entity.id),
+                                     radius=1.0)
         self.nwc.execute()
 
         # Make sure the head looks at the entity
         pos = self.entity.pose.position
         self.robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, 0.8, "/map"), timeout=10)
 
-        import time
-        time.sleep(1) # This is needed because the head is not entirely still when the look_at_point function finishes
+        # This is needed because the head is not entirely still when the
+        # look_at_point function finishes
+        time.sleep(1)
 
         # Inspect 'on top of' the entity
         segm_res = self.robot.ed.update_kinect("on_top_of %s" % self.entity.id)
@@ -149,7 +164,7 @@ class Inspect:
 
         # Classify
         ids = list(set(segm_res.new_ids) | set(segm_res.updated_ids))
-        print self.robot.ed.classify(ids = ids)
+        print self.robot.ed.classify(ids=ids)
 
     def cancel(self):
         if self.nwc and self.nwc.is_running:
@@ -158,7 +173,6 @@ class Inspect:
         # Wait until canceled
         self.thread.join()
 
-# ----------------------------------------------------------------------------------------------------
 
 class PlaceDesignator(Designator):
     def __init__(self, robot=None, goal_entity=None):
@@ -166,7 +180,7 @@ class PlaceDesignator(Designator):
 
         self._robot = robot
         self._goal_entity = goal_entity
-        self._eps = 0.05 # Threshold for navigation constraint
+        self._eps = 0.05  # Threshold for navigation constraint
         self._edge_distance = 0.1
 
     def resolve(self):
@@ -177,15 +191,14 @@ class PlaceDesignator(Designator):
             rospy.logerr("No such entity")
             return None
 
-        ''' First, check if a place pose is defined in the entity model'''
-
-        ''' If not: derive one '''
-        place_pose = self.derivePlacePose(e)
+        # First, check if a place pose is defined in the entity model
+        # If not: derive one
+        place_pose = self.derive_place_pose(e)
         rospy.logdebug("Place pose = {0}".format(place_pose))
 
         return place_pose
 
-    def derivePlacePose(self, e):
+    def derive_place_pose(self, e):
 
         # Determine radius
         grasp_offset = self._robot.grasp_offset
@@ -204,25 +217,25 @@ class PlaceDesignator(Designator):
             pci = ""
 
             for i in xrange(len(ch) - 1):
-                dx = ch[i+1].x - ch[i].x
-                dy = ch[i+1].y - ch[i].y
+                dx = ch[i + 1].x - ch[i].x
+                dy = ch[i + 1].y - ch[i].y
 
                 length = math.hypot(dx, dy)
 
                 pci_cur = "("
 
                 # Parallel to the polygon
-                xs = ch[i].x + (dy/length)*(radius+self._eps)
-                ys = ch[i].y - (dx/length)*(radius+self._eps)
-                pci_cur = pci_cur + "-(x-%f)*%f+(y-%f)*%f > 0.0 "%(xs, dy, ys, dx)
+                xs = ch[i].x + (dy / length) * (radius + self._eps)
+                ys = ch[i].y - (dx / length) * (radius + self._eps)
+                pci_cur = pci_cur + "-(x-%f)*%f+(y-%f)*%f > 0.0 " % (xs, dy, ys, dx)
 
-                xs = ch[i].x + (dy/length)*(radius-self._eps)
-                ys = ch[i].y - (dx/length)*(radius-self._eps)
-                pci_cur = pci_cur + ' and ' + "-(x-%f)*%f+(y-%f)*%f < 0.0 "%(xs, dy, ys, dx)
+                xs = ch[i].x + (dy / length) * (radius - self._eps)
+                ys = ch[i].y - (dx / length) * (radius - self._eps)
+                pci_cur = pci_cur + ' and ' + "-(x-%f)*%f+(y-%f)*%f < 0.0 " % (xs, dy, ys, dx)
 
                 # Orthogonal to the polygon
-                pci_cur = pci_cur + ' and ' + "(y-%f)*%f+(x-%f)*%f > %f "%(ch[i].y, dy, ch[i].x, dx, self._edge_distance)
-                pci_cur = pci_cur + ' and ' + "(y-%f)*%f+(x-%f)*%f < -%f "%(ch[i+1].y, dy, ch[i+1].x, dx, self._edge_distance)
+                pci_cur = pci_cur + ' and ' + "(y-%f)*%f+(x-%f)*%f > %f " % (ch[i].y, dy, ch[i].x, dx, self._edge_distance)
+                pci_cur = pci_cur + ' and ' + "(y-%f)*%f+(x-%f)*%f < -%f " % (ch[i + 1].y, dy, ch[i + 1].x, dx, self._edge_distance)
 
                 pci_cur = pci_cur + ")"
 
@@ -231,52 +244,63 @@ class PlaceDesignator(Designator):
                 pci = pci + pci_cur
 
         else:
-            ro = "(x-%f)^2+(y-%f)^2 < %f^2"%(x, y, radius+0.05)
-            ri = "(x-%f)^2+(y-%f)^2 > %f^2"%(x, y, radius-0.05)
-            pci = ri+" and "+ro
+            ro = "(x-%f)^2+(y-%f)^2 < %f^2" % (x, y, radius + 0.05)
+            ri = "(x-%f)^2+(y-%f)^2 > %f^2" % (x, y, radius - 0.05)
+            pci = ri + " and " + ro
 
         pc = PositionConstraint(constraint=pci, frame="/map")
-        #oc = OrientationConstraint(look_at=Point(x, y, 0.0), frame="/map")
+        # oc = OrientationConstraint(look_at=Point(x, y, 0.0), frame="/map")
 
         plan = self._robot.base.global_planner.getPlan(pc)
         base_position = plan[-1].pose.position
 
-        #return pc, oc
+        # return pc, oc
 
-        ''' For all segments of the polyon, compute the distance to the computed base pose
-            Go along the line PERPENDICULAR to the segment, for distance + offset to edge.
-            This is your pose '''
+        '''
+        For all segments of the polyon, compute the distance to the computed base pose
+        Go along the line PERPENDICULAR to the segment, for distance + offset to edge.
+        This is your pose
+        '''
         x = base_position.x
         y = base_position.y
 
         # ToDo: additional check to make sure we don't use the wrong edge
-        poses  = []
+        poses = []
         for i in xrange(len(ch) - 1):
-                dx = ch[i+1].x - ch[i].x
-                dy = ch[i+1].y - ch[i].y
+            dx = ch[i + 1].x - ch[i].x
+            dy = ch[i + 1].y - ch[i].y
 
-                length = math.hypot(dx, dy)
-                distance = math.fabs(dy*x - dx*y + ch[i+1].x*ch[i].y - ch[i+1].y*ch[i].x)/length
+            length = math.hypot(dx, dy)
+            distance = math.fabs(dy * x - dx * y + ch[i + 1].x * ch[i].y - ch[i + 1].y * ch[i].x) / length
 
-                ''' Possible constraints are within an threshold from the originally computed radius '''
-                if (distance > radius - self._eps and distance < radius + self._eps):
-                    place_pose = msgs.PoseStamped()
-                    place_pose.header.frame_id = "/map"
-                    place_pose.pose.position.x = base_position.x - dy/length * (distance+self._edge_distance)
-                    place_pose.pose.position.y = base_position.y + dx/length * (distance+self._edge_distance)
-                    place_pose.pose.position.z = e.z_max
-                    ''' Compute the distance of the place pose to the entity center '''
-                    place_pose_to_center = math.hypot((place_pose.pose.position.x - e.pose.position.x), (place_pose.pose.position.x - e.pose.position.x))
-                    poses  += [(place_pose, place_pose_to_center)]
+            '''
+            Possible constraints are within an threshold from the originally computed radius
+            '''
+            if distance > radius - self._eps and distance < radius + self._eps:
+                place_pose = msgs.PoseStamped()
+                place_pose.header.frame_id = "/map"
+                place_pose.pose.position.x = base_position.x - dy / length * (distance + self._edge_distance)
+                place_pose.pose.position.y = base_position.y + dx / length * (distance + self._edge_distance)
+                place_pose.pose.position.z = e.z_max
+                '''
+                Compute the distance of the place pose to the entity center
+                '''
+                place_pose_to_center = math.hypot(
+                    (place_pose.pose.position.x - e.pose.position.x),
+                    (place_pose.pose.position.x - e.pose.position.x))
+                poses += [(place_pose, place_pose_to_center)]
 
-        ''' Usually, there are one or two distances within the threshold. Typically, the one closest to the center is correct'''
+        '''
+        Usually, there are one or two distances within the threshold. Typically, the one closest to
+        the center is correct
+        '''
         best = min(poses, key=lambda pose: pose[1])
         place_pose, place_pose_to_center = best
 
         return place_pose
 
 
-class Put:
+class Put(object):
 
     def __init__(self):
         self.place = None
@@ -295,7 +319,7 @@ class Put:
         try:
             side = config["side"]
         except KeyError:
-            side = "right" # Default
+            side = "right"  # Default
 
         if side == "left":
             arm = robot.leftArm
@@ -310,7 +334,7 @@ class Put:
             height = 0.8
 
         item_to_place = Designator(arm.occupied_by, resolve_type=ed.msg.EntityInfo)  # Which item do we want to place? The object in the hand we indicated
-        arm_with_item_designator = Designator(arm,  resolve_type=Arm) #No need for ArmHoldingEntityDesignator, we already know that from the config
+        arm_with_item_designator = Designator(arm, resolve_type=Arm)  # No need for ArmHoldingEntityDesignator, we already know that from the config
         place_position = PlaceDesignator(robot, self.goal_entity)
 
         self.place = Place(robot, item_to_place, place_position, arm_with_item_designator)
@@ -325,16 +349,15 @@ class Put:
         # Wait until canceled
         self.thread.join()
 
-# ----------------------------------------------------------------------------------------------------
 
-class NavigateTo:
+class NavigateTo(object):
 
     def __init__(self):
         self.nwc = None
 
     def start(self, config, robot):
 
-        if not "entity" in config:
+        if "entity" not in config:
             return "No entity given"
 
         entity_descr = config["entity"]
@@ -345,10 +368,14 @@ class NavigateTo:
         e = entities[0]
 
         if "waypoint" in e.types:
-            self.nwc = NavigateToWaypoint(robot, waypoint_designator=EdEntityDesignator(robot, id=e.id), radius=0.1)
+            self.nwc = NavigateToWaypoint(robot,
+                                          waypoint_designator=EdEntityDesignator(robot, id=e.id),
+                                          radius=0.1)
             rospy.logwarn("ACTION_SERVER: Navigating to waypoint")
         else:
-            self.nwc = NavigateToObserve(robot, entity_designator=EdEntityDesignator(robot, id=e.id), radius=.5)
+            self.nwc = NavigateToObserve(robot,
+                                         entity_designator=EdEntityDesignator(robot, id=e.id),
+                                         radius=.5)
             rospy.logwarn("ACTION_SERVER: Navigating to observe")
 
         self.thread = threading.Thread(name='navigate', target=self.nwc.execute)
@@ -361,20 +388,21 @@ class NavigateTo:
         # Wait until canceled
         self.thread.join()
 
-# ----------------------------------------------------------------------------------------------------
 
-class Server:
+class Server(object):
 
-    def __init__(self, name, robot): # Robot should no be in the constructor but should be in the add_action -- REIN
+    def __init__(self, name, robot):  # Robot should no be in the constructor but should be in the add_action -- REIN
         self.name = name
         self.action_type_to_skill = {}
         self.action = None
-        self.robot = robot # Should be in the add action, not in the constructor -- REIN
+        self.robot = robot  # Should be in the add action, not in the constructor -- REIN
         self.cl_register = None
 
         self.add_action_service_name = self.name + '/add_action'
         self.get_action_status_service_name = self.name + '/get_action_status'
-        self.srv_add_action = rospy.Service(self.add_action_service_name, action_server.srv.AddAction, self.srv_add_action)
+        self.srv_add_action = rospy.Service(self.add_action_service_name,
+                                            action_server.srv.AddAction,
+                                            self.add_action_cb)
 
     def register_skill(self, action_type, skill):
         self.action_type_to_skill[action_type] = skill
@@ -384,16 +412,15 @@ class Server:
         rospy.wait_for_service(register_service_name)
         rospy.loginfo("...found")
 
-        self.cl_register = rospy.ServiceProxy(register_service_name, action_server.srv.RegisterActionServer)
+        self.cl_register = rospy.ServiceProxy(register_service_name,
+                                              action_server.srv.RegisterActionServer)
 
         try:
-            resp = self.cl_register(
-                        self.add_action_service_name,
-                        self.get_action_status_service_name,
-                        [k for k in self.action_type_to_skill.iterkeys()]
-                    )
+            resp = self.cl_register(self.add_action_service_name,
+                                    self.get_action_status_service_name,
+                                    [k for k in self.action_type_to_skill.iterkeys()])
         except rospy.ServiceException, e:
-            print "Service call failed: %s"%e
+            print "Service call failed: %s" % e
             return False
 
         if resp.error_msg:
@@ -402,7 +429,7 @@ class Server:
 
         return True
 
-    def srv_add_action(self, req):
+    def add_action_cb(self, req):
         try:
             action_class = self.action_type_to_skill[req.action]
         except KeyError:
@@ -411,7 +438,7 @@ class Server:
         config = yaml.load(req.parameters)
 
         if self.action:
-           self.action.cancel()
+            self.action.cancel()
 
         action = action_class()
 
@@ -429,7 +456,6 @@ class Server:
             error_msg += traceback.format_exc()
             return action_server.srv.AddActionResponse("", "Error while starting action: %s" % error_msg)
 
-# ----------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     rospy.init_node('action_server_py')
@@ -454,7 +480,9 @@ if __name__ == "__main__":
 
     # Register components
     server.register_skill("pick-up", PickUp)
-    server.register_skill("place", Put) #The original state from robot_smach_states is also called Place so there we need a different name
+    # The original state from robot_smach_states is also called Place
+    # so there we need a different name
+    server.register_skill("place", Put)
     server.register_skill("navigate-to", NavigateTo)
     server.register_skill("inspect", Inspect)
 
