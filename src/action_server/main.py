@@ -39,7 +39,7 @@ def entities_from_description(entity_descr, robot):
     if "id" in entity_descr:
         e = robot.ed.get_entity(id=entity_descr["id"], parse=False)
         if not e:
-            return ([], "No entity with id '%'" % entity_descr["id"])
+            return ([], "No entity with id '%s'" % entity_descr["id"])
         entities = [e]
     elif "type" in entity_descr:
         entities = robot.ed.get_entities(type=entity_descr["type"], parse=False)
