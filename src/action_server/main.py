@@ -15,12 +15,13 @@ import uuid
 from robot_skills.util import transformations
 import robot_skills.util.msg_constructors as msgs
 
-from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint
+from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToGrasp
 from robot_smach_states.manipulation import Grab, Place
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
-from robot_smach_states.util.designators import Designator, UnoccupiedArmDesignator, EdEntityDesignator, ArmHoldingEntityDesignator
+from robot_smach_states.util.designators import Designator, ArmDesignator, UnoccupiedArmDesignator, EdEntityDesignator, ArmHoldingEntityDesignator
 import ed.msg
 from robot_skills.arms import Arm
+from robot_skills.arms import ArmState
 import geometry_msgs.msg as gm
 import math
 # -------------------------------------
@@ -65,8 +66,11 @@ class PickUp:
     def __init__(self):
         self.grab = None
         self.thread = None
+        self.arm = None
 
     def start(self, config, robot):
+
+        self._robot = robot
 
         if not "entity" in config:
             return "No entity given"
@@ -83,17 +87,83 @@ class PickUp:
             return "Inpossible to grab that object"
 
         e = entities[0]
+        self.entity_id = e.id
 
-        side = config['side'] if 'side' in config else 'right'
+        self.side = config['side'] if 'side' in config else 'right'
 
-        if side == 'left':
-            arm = robot.leftArm
+        if self.side == 'left':
+            self.arm = robot.leftArm
         else:
-            arm = robot.rightArm
+            self.arm = robot.rightArm
 
-        self.grab = Grab(robot, arm=UnoccupiedArmDesignator(robot.arms, arm), item=EdEntityDesignator(robot, id=e.id))
-        self.thread = threading.Thread(name='grab', target=self.grab.execute)
+        self.thread = threading.Thread(name='grab', target=self.execute)
         self.thread.start()
+
+    def execute(self):
+
+        self.ntg = NavigateToGrasp(self._robot, EdEntityDesignator(self._robot, id=self.entity_id), ArmDesignator(robot.arms, robot.arms[self.side]))
+        self.ntg.execute()
+
+        arm = self.arm
+
+        # goal in map frame
+        goal_map = msgs.Point(0, 0, 0)
+
+        # Transform to base link frame
+        goal_bl = transformations.tf_transform(goal_map, self.entity_id, "/amigo/base_link", tf_listener=self._robot.tf_listener)
+        if goal_bl == None:
+            return 'failed'
+
+        print goal_bl
+
+        # Arm to position in a safe way
+        arm._send_joint_trajectory([
+            [-0.1,-0.6,0.1,1.2,0.0,0.1,0.0],
+            [-0.1,-0.8,0.1,1.6,0.0,0.2,0.0],
+            [-0.1,-1.0,0.1,2.0,0.0,0.3,0.0],
+            [-0.1,-0.5,0.1,2.0,0.0,0.3,0.0],
+            ])#, timeout=20)
+
+        # Open gripper
+        arm.send_gripper_goal(ArmState.OPEN, timeout=5)
+
+        # Pre-grasp
+        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=20, pre_grasp=True, first_joint_pos_only=True):
+            print "Pre-grasp failed"
+            arm.reset()
+            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
+            return
+
+        # Grasp
+        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=120, pre_grasp = True):
+            self._robot.speech.speak("I am sorry but I cannot move my arm to the object position", block=False)
+            print "Grasp failed"
+            arm.reset()
+            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
+            return
+
+        # Close gripper
+        arm.send_gripper_goal(ArmState.CLOSE, timeout=5)
+
+        # Lift
+        if not arm.send_goal( goal_bl.x, goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+            print "Failed lift"
+
+        # Retract
+        if not arm.send_goal( goal_bl.x - 0.1, goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+            print "Failed retract"
+
+        # Carrying pose
+        if self.side == "left":
+            y_home = 0.2
+        else:
+            y_home = -0.2
+
+        print "y_home = " + str(y_home)
+        
+        rospy.loginfo("start moving to carrying pose")        
+        if not arm.send_goal(0.18, y_home, goal_bl.z + 0.1, 0, 0, 0, 60):            
+            print 'Failed carrying pose'      
 
     def cancel(self):
         if not self.grab:
