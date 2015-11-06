@@ -29,10 +29,12 @@ from robot_skills.arms import ArmState
 import geometry_msgs.msg as gm
 import math
 
+# ----------------------------------------------------------------------------------------------------
 
 def length_sq(x, y):
     return x * x + y * y
 
+# ----------------------------------------------------------------------------------------------------
 
 def entities_from_description(entity_descr, robot):
     '''
@@ -71,6 +73,7 @@ def entities_from_description(entity_descr, robot):
 
     return (entities, "")
 
+# ----------------------------------------------------------------------------------------------------
 
 class PickUp(object):
 
@@ -208,6 +211,69 @@ class PickUp(object):
         # Wait until canceled
         self.thread.join()
 
+# ----------------------------------------------------------------------------------------------------
+
+class ArmGoal(object):
+
+    def __init__(self):
+        self.arm = None
+        self.symbolic_goal = None
+
+    def start(self, config, robot):
+        if not "side" in config:
+            return "Please provide 'side'"
+
+        if config['side'] == 'left':
+            self.arm = robot.leftArm
+        else:
+            self.arm = robot.rightArm
+
+        if not "symbolic" in config:          
+            return "Please provide 'symbolic' keyword."
+
+        self.thread = threading.Thread(name='arm-goal', target=self.execute)
+        self.thread.start()
+
+
+    def execute(self):
+        if self.symbolic_goal:
+            arm.send_joint_goal(self.symbolic_goal)
+
+    def cancel(self):
+        pass
+
+# ----------------------------------------------------------------------------------------------------
+
+class GripperGoal(object):
+
+    def __init__(self):
+        self.arm = None
+        self.goal = None
+
+    def start(self, config, robot):
+        if not "side" in config:
+            return "Please provide 'side'"
+
+        if config['side'] == 'left':
+            self.arm = robot.leftArm
+        else:
+            self.arm = robot.rightArm
+
+        if not "goal" in config:
+            return "Please specify 'goal'"
+
+        self.goal = config["goal"]
+
+        self.thread = threading.Thread(name='gripper-goal', target=self.execute)
+        self.thread.start()
+
+    def execute(self):
+        self.arm.send_gripper_goal(self.goal)
+
+    def cancel(self):
+        pass
+
+# ----------------------------------------------------------------------------------------------------
 
 class Inspect(object):
 
@@ -265,6 +331,20 @@ class Inspect(object):
         # Wait until canceled
         self.thread.join()
 
+# ----------------------------------------------------------------------------------------------------
+
+class ResetWM(object):
+
+    def __init__(self):
+        pass
+
+    def start(self, config, robot):
+        robot.ed.reset()
+
+    def cancel(self):
+        pass
+
+# ----------------------------------------------------------------------------------------------------
 
 class PlaceDesignator(Designator):
     def __init__(self, robot=None, goal_entity=None):
@@ -391,6 +471,7 @@ class PlaceDesignator(Designator):
 
         return place_pose
 
+# ----------------------------------------------------------------------------------------------------
 
 class Put(object):
 
@@ -441,6 +522,7 @@ class Put(object):
         # Wait until canceled
         self.thread.join()
 
+# ----------------------------------------------------------------------------------------------------
 
 class NavigateTo(object):
 
@@ -577,6 +659,9 @@ if __name__ == "__main__":
     server.register_skill("place", Put)
     server.register_skill("navigate-to", NavigateTo)
     server.register_skill("inspect", Inspect)
+    server.register_skill("reset-wm", ResetWM)
+    server.register_skill("send-arm-goal", ArmGoal)
+    server.register_skill("send-gripper-goal", GripperGoal)
 
     server.connect('action_server/register_action_server')
 
