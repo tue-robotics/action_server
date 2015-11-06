@@ -98,8 +98,7 @@ class PickUp(object):
         if not entities:
             return "Inpossible to grab that object"
 
-        e = entities[0]
-        self.entity_id = e.id
+        self.entity = entities[0]
 
         self.side = config['side'] if 'side' in config else 'right'
 
@@ -114,8 +113,27 @@ class PickUp(object):
 
     def execute(self):
 
-        self.ntg = NavigateToGrasp(self._robot, EdEntityDesignator(self._robot, id=self.entity_id), ArmDesignator(robot.arms, robot.arms[self.side]))
+        self.ntg = NavigateToGrasp(self._robot, EdEntityDesignator(self._robot, id=self.entity.id), ArmDesignator(robot.arms, robot.arms[self.side]))
         self.ntg.execute()
+
+        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        # Update the pose of the entity
+
+        # Make sure the head looks at the entity
+        pos = self.entity.pose.position
+        self._robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, pos.z, "/map"), timeout=10)
+
+        # This is needed because the head is not entirely still when the
+        # look_at_point function finishes
+        time.sleep(1)
+
+        # Inspect the entity
+        segm_res = self._robot.ed.update_kinect("%s" % self.entity.id)
+
+        # Cancel the head goal
+        self._robot.head.cancel_goal()
+
+        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
         arm = self.arm
 
@@ -123,7 +141,7 @@ class PickUp(object):
         goal_map = msgs.Point(0, 0, 0)
 
         # Transform to base link frame
-        goal_bl = transformations.tf_transform(goal_map, self.entity_id, "/amigo/base_link", tf_listener=self._robot.tf_listener)
+        goal_bl = transformations.tf_transform(goal_map, self.entity.id, "/amigo/base_link", tf_listener=self._robot.tf_listener)
         if goal_bl == None:
             return 'failed'
 
@@ -167,16 +185,18 @@ class PickUp(object):
             print "Failed retract"
 
         # Carrying pose
-        if self.side == "left":
-            y_home = 0.2
-        else:
-            y_home = -0.2
+        arm._send_joint_trajectory([[-0.1, -0.6, 0.2, 1.7, 0, 0.4, 0]])
 
-        print "y_home = " + str(y_home)
+        #if self.side == "left":
+        #    y_home = 0.2
+        #else:
+        #    y_home = -0.2
+
+        #print "y_home = " + str(y_home)
         
-        rospy.loginfo("start moving to carrying pose")        
-        if not arm.send_goal(0.18, y_home, goal_bl.z + 0.1, 0, 0, 0, 60):            
-            print 'Failed carrying pose'      
+        #rospy.loginfo("start moving to carrying pose")        
+        #if not arm.send_goal(0.18, y_home, goal_bl.z + 0.1, 0, 0, 0, 60):            
+        #    print 'Failed carrying pose'      
 
     def cancel(self):
         if not self.grab:
