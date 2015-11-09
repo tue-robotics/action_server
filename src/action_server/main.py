@@ -184,7 +184,7 @@ class PickUp(object):
             print "Failed lift"
 
         # Retract
-        if not arm.send_goal( goal_bl.x - 0.1, goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
+        if not arm.send_goal(max(0.18, goal_bl.x - 0.25), goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
             print "Failed retract"
 
         # Carrying pose
