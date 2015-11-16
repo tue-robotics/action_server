@@ -30,6 +30,10 @@ from robot_skills.arms import ArmState
 import geometry_msgs.msg as gm
 import math
 
+import smach
+
+from robot_smach_states.util.designators import VariableDesignator
+
 # ----------------------------------------------------------------------------------------------------
 
 def length_sq(x, y):
@@ -87,11 +91,15 @@ class FSMAction(object):
         if err:
             return err
 
-        self.thread = threading.Thread(name='fsm', target=self.fsm.execute)
+        self.thread = threading.Thread(name='fsm', target=self._run)
         self.thread.start()
 
+    def _run(self):
+        self.fsm.execute()
+        self.fsm = None
+
     def cancel(self):
-        if self.fsm and self.fsm.is_running:
+        if self.fsm and isinstance(self.fsm, smach.StateMachine) and self.fsm.is_running:
             self.fsm.request_preempt()
 
         # Wait until canceled
@@ -99,17 +107,9 @@ class FSMAction(object):
 
 # ----------------------------------------------------------------------------------------------------
 
-class PickUp(object):
+class PickUp(FSMAction):
 
-    def __init__(self):
-        self.grab = None
-        self.thread = None
-        self.arm = None
-
-    def start(self, config, robot):
-
-
-        self._robot = robot
+    def init_fsm(self, config, robot):
 
         if not "entity" in config:
             return "No entity given"
@@ -125,115 +125,14 @@ class PickUp(object):
         if not entities:
             return "Inpossible to grab that object"
 
-        self.entity = entities[0]
+        entity = entities[0]
 
-        self.side = config['side'] if 'side' in config else 'right'
+        side = config['side'] if 'side' in config else 'right'
 
-        if self.side == 'left':
-            self.arm = robot.leftArm
-        else:
-            self.arm = robot.rightArm
-
-        self.thread = threading.Thread(name='grab', target=self.execute)
-
-        self.thread.start()
-
-    def execute(self):
-
-        self.ntg = NavigateToGrasp(self._robot, EdEntityDesignator(self._robot, id=self.entity.id), ArmDesignator(robot.arms, robot.arms[self.side]))
-        self.ntg.execute()
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        # Update the pose of the entity
-
-        # Make sure the head looks at the entity
-        pos = self.entity.pose.position
-        self._robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, pos.z, "/map"), timeout=10)
-
-        # This is needed because the head is not entirely still when the
-        # look_at_point function finishes
-        time.sleep(1)
-
-        # Inspect the entity
-        segm_res = self._robot.ed.update_kinect("%s" % self.entity.id)
-
-        # Cancel the head goal
-        self._robot.head.cancel_goal()
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        arm = self.arm
-
-        # goal in map frame
-        goal_map = msgs.Point(0, 0, 0)
-
-        # Transform to base link frame
-        goal_bl = transformations.tf_transform(goal_map, self.entity.id, "/amigo/base_link", tf_listener=self._robot.tf_listener)
-        if goal_bl == None:
-            return 'failed'
-
-        print goal_bl
-
-        # Arm to position in a safe way
-        arm._send_joint_trajectory([
-            [-0.1,-0.6,0.1,1.2,0.0,0.1,0.0],
-            [-0.1,-0.8,0.1,1.6,0.0,0.2,0.0],
-            [-0.1,-1.0,0.1,2.0,0.0,0.3,0.0],
-            [-0.1,-0.5,0.1,2.0,0.0,0.3,0.0],
-            ])#, timeout=20)
-
-        # Open gripper
-        arm.send_gripper_goal(ArmState.OPEN, timeout=5)
-
-        # Pre-grasp
-        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=20, pre_grasp=True, first_joint_pos_only=True):
-            print "Pre-grasp failed"
-            arm.reset()
-            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
-            return
-
-        # Grasp
-        if not arm.send_goal(goal_bl.x, goal_bl.y, goal_bl.z, 0, 0, 0, frame_id="/amigo/base_link", timeout=120, pre_grasp = True):
-            self._robot.speech.speak("I am sorry but I cannot move my arm to the object position", block=False)
-            print "Grasp failed"
-            arm.reset()
-            arm.send_gripper_goal(ArmState.CLOSE, timeout=0.01)
-            return
-
-        # Close gripper
-        arm.send_gripper_goal(ArmState.CLOSE, timeout=5)
-
-        # Lift
-        if not arm.send_goal( goal_bl.x, goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-            print "Failed lift"
-
-        # Retract
-        if not arm.send_goal(max(0.18, goal_bl.x - 0.25), goal_bl.y, goal_bl.z + 0.1, 0.0, 0.0, 0.0, timeout=20, pre_grasp=False, frame_id="/amigo/base_link"):
-            print "Failed retract"
-
-        # Carrying pose
-        arm._send_joint_trajectory([[-0.1, -0.6, 0.2, 1.7, 0, 0.4, 0]])
-
-        #if self.side == "left":
-        #    y_home = 0.2
-        #else:
-        #    y_home = -0.2
-
-        #print "y_home = " + str(y_home)
-        
-        #rospy.loginfo("start moving to carrying pose")        
-        #if not arm.send_goal(0.18, y_home, goal_bl.z + 0.1, 0, 0, 0, 60):            
-        #    print 'Failed carrying pose'      
-
-    def cancel(self):
-        if not self.grab:
-            return
-
-        if self.grab.is_running:
-            self.grab.request_preempt()
-
-        # Wait until canceled
-        self.thread.join()
+        self.fsm = robot_smach_states.grab.SjoerdsGrab(
+                        robot,
+                        item_des = EdEntityDesignator(robot, id = entity.id),
+                        arm_des = UnoccupiedArmDesignator(robot.arms, robot.arms[side]))
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -313,6 +212,78 @@ class Inspect(FSMAction):
         entity = entities[0]
 
         self.fsm = robot_smach_states.world_model.Inspect(robot, entityDes = EdEntityDesignator(robot, id=entity.id))
+
+# ----------------------------------------------------------------------------------------------------
+
+class Bring(object):
+
+    def __init__(self):
+        self.fsm = None
+        self.thread = None
+
+        self.from_entity = None
+        self.to_entity = None
+        self.entity_description = None
+
+    def start(self, config, robot):
+        self._robot = robot
+
+        # Get 'from' location
+        (entities, error_msg) = entities_from_description(config["from"], robot)
+        if not entities:
+            return error_msg
+        self.from_entity = entities[0]
+
+        # Get 'to' location
+        (entities, error_msg) = entities_from_description(config["to"], robot)
+        if not entities:
+            return error_msg
+        self.to_entity = entities[0]
+
+        # Get type of entity that should be transported
+        self.entity_description = config["entity"]
+
+        self.thread = threading.Thread(name='bring', target=self.execute)
+        self.thread.start()
+
+    def execute(self):
+
+        found_entities_des = VariableDesignator([])
+
+        # Inspect to find the entities
+        self.fsm = robot_smach_states.world_model.Inspect(
+            robot,
+            entityDes = EdEntityDesignator(robot, id = self.from_entity.id),
+            objectIDsDes = found_entities_des)
+        self.fsm.execute()
+
+        found_ids = [e.id for e in found_entities_des.resolve()]
+
+        (entities, error_msg) = entities_from_description(self.entity_description, robot)
+
+        # Only filter to entities that where detected
+        entities = [e for e in entities if e.id in found_ids]        
+
+        if not entities:
+            rospy.logerr("I could not find the object you are looking for")
+
+        self.fsm = robot_smach_states.grab.SjoerdsGrab(
+                        robot,
+                        item_des = EdEntityDesignator(robot, id = entities[0].id),
+                        arm_des = UnoccupiedArmDesignator(robot.arms, robot.rightArm))
+        self.fsm.execute()
+
+        self.fsm = NavigateToObserve(
+            robot,
+            EdEntityDesignator(robot, id = self.to_entity.id))
+        self.fsm.execute()
+
+    def cancel(self):
+        if self.fsm and self.fsm.is_running:
+            self.fsm.request_preempt()
+
+        # Wait until canceled
+        self.thread.join()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -646,6 +617,7 @@ if __name__ == "__main__":
     server.register_skill("reset-wm", ResetWM)
     server.register_skill("send-arm-goal", ArmGoal)
     server.register_skill("send-gripper-goal", GripperGoal)
+    server.register_skill("bring", Bring)
 
     server.connect('action_server/register_action_server')
 
