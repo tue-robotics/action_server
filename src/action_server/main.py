@@ -19,6 +19,7 @@ from robot_skills.util import transformations
 
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToGrasp
 from robot_smach_states.manipulation import Grab, Place
+import robot_smach_states
 
 from cb_planner_msgs_srvs.msg import PositionConstraint, OrientationConstraint
 from robot_smach_states.util.designators import Designator, ArmDesignator, UnoccupiedArmDesignator, EdEntityDesignator, ArmHoldingEntityDesignator
@@ -69,9 +70,32 @@ def entities_from_description(entity_descr, robot):
                           robot_pos.x - entity.pose.position.x,
                           robot_pos.y - entity.pose.position.y))
 
-    print entities
-
     return (entities, "")
+
+# ----------------------------------------------------------------------------------------------------
+
+class FSMAction(object):
+
+    def __init__(self):
+        self.fsm = None
+
+    def init_fsm(self, config, robot):
+        return "No FSM created"
+
+    def start(self, config, robot):
+        err = self.init_fsm(config, robot)
+        if err:
+            return err
+
+        self.thread = threading.Thread(name='fsm', target=self.fsm.execute)
+        self.thread.start()
+
+    def cancel(self):
+        if self.fsm and self.fsm.is_running:
+            self.fsm.request_preempt()
+
+        # Wait until canceled
+        self.thread.join()
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -275,13 +299,9 @@ class GripperGoal(object):
 
 # ----------------------------------------------------------------------------------------------------
 
-class Inspect(object):
+class Inspect(FSMAction):
 
-    def __init__(self):
-        self.nwc = None
-
-    def start(self, config, robot):
-
+    def init_fsm(self, config, robot):
         if "entity" not in config:
             return "No entity given"
 
@@ -290,46 +310,9 @@ class Inspect(object):
         if not entities:
             return error_msg
 
-        self.entity = entities[0]
+        entity = entities[0]
 
-        self.robot = robot
-
-        self.thread = threading.Thread(name='inspect', target=self._run)
-        self.thread.start()
-
-    def _run(self):
-        # Navigate to the location
-        self.nwc = NavigateToObserve(robot,
-                                     entity_designator=EdEntityDesignator(
-                                         robot,
-                                         id=self.entity.id),
-                                     radius=1.0)
-        self.nwc.execute()
-
-        # Make sure the head looks at the entity
-        pos = self.entity.pose.position
-        self.robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, 0.8, "/map"), timeout=10)
-
-        # This is needed because the head is not entirely still when the
-        # look_at_point function finishes
-        time.sleep(1)
-
-        # Inspect 'on top of' the entity
-        segm_res = self.robot.ed.update_kinect("on_top_of %s" % self.entity.id)
-
-        # Cancel the head goal
-        self.robot.head.cancel_goal()
-
-        # Classify
-        ids = list(set(segm_res.new_ids) | set(segm_res.updated_ids))
-        print self.robot.ed.classify(ids=ids)
-
-    def cancel(self):
-        if self.nwc and self.nwc.is_running:
-            self.nwc.request_preempt()
-
-        # Wait until canceled
-        self.thread.join()
+        self.fsm = robot_smach_states.world_model.Inspect(robot, entityDes = EdEntityDesignator(robot, id=entity.id))
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -562,6 +545,7 @@ class NavigateTo(object):
         # Wait until canceled
         self.thread.join()
 
+# ----------------------------------------------------------------------------------------------------
 
 class Server(object):
 
