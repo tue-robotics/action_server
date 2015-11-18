@@ -20,6 +20,11 @@ if len(sys.argv) < 2:
     print "Please specify a robot name"
     sys.exit()
 
+speech_recognition = True
+if len(sys.argv) >= 3:
+    if sys.argv[2] == "--no-ears":
+        speech_recognition = False
+
 robot_name = sys.argv[1]
 
 rospy.init_node("action_server_speech_client")
@@ -49,31 +54,45 @@ def ask():
 
     s.speak("Hello! What can I do for you?")
 
-    while not rospy.is_shutdown():
-        spec = "Bring me the <drink> from the <place>"
-        choices = {"drink" : drinks, "place" : places}
-        r = e.recognize(spec, choices)
-        if not r:
-            s.speak("I didn't quite get that")
-            return
+    if speech_recognition:
+        while not rospy.is_shutdown():
+            spec = "Bring me the <drink> from the <place>"
+            choices = {"drink" : drinks, "place" : places}
+            r = e.recognize(spec, choices)
+            if not r:
+                s.speak("I didn't quite get that")
+                return
 
-        if r.choices["place"] == "cabinet":
-            from_id = "cabinet"
-            from_room = "kitchen"
-        if r.choices["place"] == "table":
-            from_id = "dinnertable"
-            from_room = "living_room"
+            if r.choices["place"] == "cabinet":
+                from_id = "cabinet"
+                from_room = "kitchen"
+            if r.choices["place"] == "table":
+                from_id = "dinnertable"
+                from_room = "living_room"
 
-        s.speak("Do you want me to bring you the %s from the %s?" % (r.choices["drink"], r.choices["place"]))
-        r = e.recognize("<yesno>", {"yesno": ["yes", "no"]})
-        if not r:
-            s.speak("I'll take that as a yes")
-            break
-        elif r.choices["yesno"] == "no":
-            s.speak("I'm sorry I didn't understand! Can you please tell me again?")
-        else:
-            s.speak("Alright!")
-            break
+            s.speak("Do you want me to bring you the %s from the %s?" % (r.choices["drink"], r.choices["place"]))
+            r = e.recognize("<yesno>", {"yesno": ["yes", "no"]})
+            if not r:
+                s.speak("I'll take that as a yes")
+                break
+            elif r.choices["yesno"] == "no":
+                s.speak("I'm sorry I didn't understand! Can you please tell me again?")
+            else:
+                s.speak("Alright!")
+                break
+
+    else:
+        # Default
+        from_id = "dinnertable"
+        from_room = "living_room"
+
+        time.sleep(4.0)
+
+        s.speak("Do you want me to bring you the %s from the %s?" % ("drink", "table"))
+
+        time.sleep(2.0)
+
+        s.speak("Alright!")
 
     # Cancel the head goal
     robot.head.cancel_goal()
