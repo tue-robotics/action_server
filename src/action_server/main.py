@@ -17,7 +17,7 @@ import uuid
 import robot_skills.util.msg_constructors as msgs
 from robot_skills.util import transformations
 
-from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToGrasp
+from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToGrasp, NavigateToSymbolic
 from robot_smach_states.manipulation import Grab, Place
 import robot_smach_states
 
@@ -215,6 +215,38 @@ class Inspect(FSMAction):
 
 # ----------------------------------------------------------------------------------------------------
 
+class LookAt(object):
+
+    def __init__(self):
+        self.robot = None
+        self.entity = None
+
+    def start(self, config, robot):
+        self.robot = robot
+
+        if "entity" in config:
+            (entities, error_msg) = entities_from_description(config["entity"], robot)
+            if not entities:
+                return error_msg
+
+            self.entity = entities[0]
+
+        self.thread = threading.Thread(name='arm-goal', target=self.execute)
+        self.thread.start()
+
+
+    def execute(self):
+        self.robot.head.cancel_goal()
+
+        if self.entity:
+            pos = self.entity.pose.position
+            self.robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, pos.z, "/map"), timeout=10)
+
+    def cancel(self):
+        self.robot.head.cancel_goal()
+
+# ----------------------------------------------------------------------------------------------------
+
 class Bring(object):
 
     def __init__(self):
@@ -240,6 +272,16 @@ class Bring(object):
             return error_msg
         self.to_entity = entities[0]
 
+        if "to_radius" in config:
+            self.to_radius = config["to_radius"]
+        else:
+            self.to_radius = 0.7
+
+        if "from_room" in config:
+            self.from_room = config["from_room"]
+        else:
+            self.from_room = None
+
         # Get type of entity that should be transported
         self.entity_description = config["entity"]
 
@@ -248,18 +290,30 @@ class Bring(object):
 
     def execute(self):
 
+        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+        # Navigate to the room
+
+        if self.from_room:
+            self.fsm = NavigateToSymbolic(
+                self._robot,
+                 { EdEntityDesignator(robot, id=self.from_room) : "in" },
+                 EdEntityDesignator(self._robot, id = self.from_entity.id))
+            self.fsm.execute()
+
+        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+        # Inspect to find the entities
+
         found_entities_des = VariableDesignator([])
 
-        # Inspect to find the entities
         self.fsm = robot_smach_states.world_model.Inspect(
-            robot,
-            entityDes = EdEntityDesignator(robot, id = self.from_entity.id),
+            self._robot,
+            entityDes = EdEntityDesignator(self._robot, id = self.from_entity.id),
             objectIDsDes = found_entities_des)
         self.fsm.execute()
 
         found_ids = [e.id for e in found_entities_des.resolve()]
 
-        (entities, error_msg) = entities_from_description(self.entity_description, robot)
+        (entities, error_msg) = entities_from_description(self.entity_description, self._robot)
 
         # Only filter to entities that where detected
         entities = [e for e in entities if e.id in found_ids]        
@@ -268,15 +322,44 @@ class Bring(object):
             rospy.logerr("I could not find the object you are looking for")
 
         self.fsm = robot_smach_states.grab.SjoerdsGrab(
-                        robot,
-                        item_des = EdEntityDesignator(robot, id = entities[0].id),
-                        arm_des = UnoccupiedArmDesignator(robot.arms, robot.rightArm))
+                        self._robot,
+                        item_des = EdEntityDesignator(self._robot, id = entities[0].id),
+                        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.rightArm))
         self.fsm.execute()
 
         self.fsm = NavigateToObserve(
-            robot,
-            EdEntityDesignator(robot, id = self.to_entity.id))
+            self._robot,
+            EdEntityDesignator(self._robot, id = self.to_entity.id),
+            radius = self.to_radius)
         self.fsm.execute()
+
+        # - - - - - - - - - - - - - - - - - - - -
+        # Make sure the head looks at the entity
+
+        pos = self.to_entity.pose.position
+        self._robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, pos.z, "/map"), timeout=0)
+
+        # - - - - - - - - - - - - - - - - - - - -
+        # Hand over
+
+        arm = self._robot.rightArm
+
+        arm._send_joint_trajectory([[-0.1, 0.4, 0, 1.8, 0, -0.4, 0],[-0.1, 0.8, 0, 1, 0, -0.2, 0]])
+        self._robot.speech.speak("Here you go!")
+        arm.send_gripper_goal('open', timeout=5)
+
+        import time
+        time.sleep(1)
+
+        # - - - - - - - - - - - - - - - - - - - -
+        # Reset arm
+
+        arm.send_gripper_goal('close', timeout=0)    
+        arm._send_joint_trajectory([[-0.1, 0.4, 0, 1.8, 0, -0.4, 0]])
+        arm.reset()
+
+        # Cancel the head goal
+        self._robot.head.cancel_goal()
 
     def cancel(self):
         if self.fsm and self.fsm.is_running:
@@ -618,6 +701,7 @@ if __name__ == "__main__":
     server.register_skill("send-arm-goal", ArmGoal)
     server.register_skill("send-gripper-goal", GripperGoal)
     server.register_skill("bring", Bring)
+    server.register_skill("look-at", LookAt)
 
     server.connect('action_server/register_action_server')
 
