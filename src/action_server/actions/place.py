@@ -1,5 +1,5 @@
 from action import Action
-from util import PlaceDesignator
+from util import entities_from_description
 
 from robot_skills.arms import Arm
 import robot_smach_states
@@ -7,8 +7,6 @@ from robot_smach_states.manipulation import Place as PlaceSmachState
 import ed.msg
 
 import threading
-
-from util import entities_from_description
 
 class Place(Action):
 
