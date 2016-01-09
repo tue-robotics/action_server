@@ -1,2 +1,1 @@
 from entities_from_description import entities_from_description
-from place_designator import PlaceDesignator
