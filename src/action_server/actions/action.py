@@ -1,6 +1,7 @@
 import rospy, threading
 
 from robot_skills.robot import Robot
+import smach
 
 class Action:
 
