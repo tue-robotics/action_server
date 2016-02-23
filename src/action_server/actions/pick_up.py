@@ -29,6 +29,9 @@ class PickUp(FSMAction):
 
         side = config['side'] if 'side' in config else 'right'
 
-        self._fsm = robot_smach_states.grab.SjoerdsGrab(robot,
-            item_des = EdEntityDesignator(robot, id = entity.id),
-            arm_des = UnoccupiedArmDesignator(robot.arms, robot.arms[side]))
+        # self._fsm = robot_smach_states.grab.SjoerdsGrab(robot,
+        #     item_des = EdEntityDesignator(robot, id = entity.id),
+        #     arm_des = UnoccupiedArmDesignator(robot.arms, robot.arms[side]))
+        self._fsm = robot_smach_states.grab.Grab(robot,
+            item=EdEntityDesignator(robot, id=entity.id),
+            arm=UnoccupiedArmDesignator(robot.arms, robot.arms[side]))
