@@ -49,12 +49,10 @@ Misc:
 
 Functions:
 
-    def set_grammar(grammar_file)
-
-    def set_knowledge(knowledge)
+    def set_grammar(grammar_file, knowledge)
 
     def request_command(ask_confirmation=True, ask_missing_info=False)
-        returns: if None, getting command failed, otherwise (command_sentence, command_semantics)
+        returns: None if getting command failed, otherwise (command_sentence, command_semantics)
 
     def parse_command(command_sentence)
         returns: command_semantics

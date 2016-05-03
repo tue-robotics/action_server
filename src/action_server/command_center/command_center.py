@@ -2,8 +2,12 @@
 
 # ------------------------------------------------------------------------------------------------------------------------
 # By Sjoerd van den Dries, 2016
-
 # ------------------------------------------------------------------------------------------------------------------------
+
+# TODO:
+# - correctly deal with resolving:
+#   - Always resolve 'it', etc
+#   - if ask_missing_info is True, also ask questions about object categories, etc
 
 import os
 import sys
@@ -29,8 +33,6 @@ import robot_smach_states.util.designators as ds
 from robot_smach_states import LookAtArea, StartChallengeRobust
 
 from robot_smach_states import FollowOperator
-
-challenge_knowledge = load_knowledge('challenge_eegpsr')
 
 speech_data = load_knowledge('challenge_speech_recognition')
 
@@ -452,108 +454,34 @@ class CommandCenter:
 
     # ------------------------------------------------------------------------------------------------------------------------
 
-    def execute_command(self, robot, command_recognizer, action_functions, mock_sentence=None):
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        # If sentence is given on command-line
-
-        if mock_sentence:
-            res = command_recognizer.parse(mock_sentence, robot)
-            if not res:
-                robot.speech.speak("Sorry, could not parse the given command")
-                return False
-
-            (sentence, semantics_str) = res
-            print "Sentence: %s" % sentence
-            print "Semantics: %s" % semantics_str
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        # When using text-to-speech
-
-        else:
-            def prompt_once():
-                robot.head.look_at_standing_person()
-                robot.head.wait_for_motion_done()
-
-                res = None
-                while not res:
-                    robot.speech.speak("Welkome to the Double E G P S R. . What can I do for you?", block=False)
-                    res = command_recognizer.recognize(robot)
-                    if not res:
-                        robot.speech.speak("Sorry, I could not understand", block=True)
-
-                print "Sentence: %s" % res[0]
-                print "Semantics: %s" % res[1]
-
-                return res
-
-            def ask_confirm(tries=3):
-                robot.speech.speak("You want me to %s" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
-                for i in range(0, tries):
-                    result = robot.ears.recognize("(yes|no)",{})
-                    if result and result.result != "":
-                        answer = result.result
-                        return answer == "yes"
-
-                    if i != tries - 1:
-                        robot.speech.speak("Please say yes or no")
-                return False
-
-            (sentence, semantics_str) = prompt_once()
-
-            # confirm
-            if not ask_confirm():
-                # we heared the wrong thing
-                (sentence, semantics_str) = prompt_once()
-
-                if not ask_confirm():
-                    # we heared the wrong thing twice
-                    robot.speech.speak("Sorry")
-                    return
-
-        semantics_str = command_recognizer.resolve(semantics_str, robot)
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        semantics = yaml.load(semantics_str)
-
-        actions = []
-        if "action1" in semantics:
-            actions += [semantics["action1"]]
-        if "action2" in semantics:
-            actions += [semantics["action2"]]
-        if "action3" in semantics:
-            actions += [semantics["action3"]]
-
-        for a in actions:
-            action_type = a["action"]
-
-            if action_type in action_functions:
-                action_functions[action_type](robot, a)
-            else:
-                print "Unknown action type: '%s'" % action_type
-
-    # ------------------------------------------------------------------------------------------------------------------------
-
-    def __init__(self):
+    def __init__(self, robot):
         self.entity_ids = []
         self.entity_type_to_id = {}
         self.object_to_location = {}
 
         self.last_location = None
-        self.last_entity = None    
+        self.last_entity = None
+        self.robot = robot
 
-
+        self.action_functions = {
+            "navigate" : self.navigate,
+            "find" : self.find,
+            "follow" : self.follow,
+            "answer-question" : self.answer_question,
+            "pick-up" : self.find_and_pick_up,
+            "bring" : self.bring,
+            "say" : self.say
+        }
 
     # ------------------------------------------------------------------------------------------------------------------------
 
-    def set_grammar(grammar_file, knowledge):
+    def set_grammar(self, grammar_file, knowledge):
         self.command_recognizer = CommandRecognizer(grammar_file, knowledge)
 
     # ------------------------------------------------------------------------------------------------------------------------
 
-    # returns: if None, getting command failed, otherwise (command_sentence, command_semantics)
-    def request_command(ask_confirmation=True, ask_missing_info=False):
+    # returns: None if getting command failed, otherwise (command_words, command_semantics)
+    def request_command(self, ask_confirmation=True, ask_missing_info=False):
 
         def prompt_once():
             self.robot.head.look_at_standing_person()
@@ -562,7 +490,7 @@ class CommandCenter:
             res = None
             while not res:
                 self.robot.speech.speak("Welkome to the Double E G P S R. . What can I do for you?", block=False)
-                res = command_recognizer.recognize(self.robot)
+                res = self.command_recognizer.recognize(self.robot)
                 if not res:
                     self.robot.speech.speak("Sorry, I could not understand", block=True)
 
@@ -572,6 +500,8 @@ class CommandCenter:
             return res
 
         def ask_confirm(tries=3):
+            sentence = " ".join(words)
+
             self.robot.speech.speak("You want me to %s" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
             for i in range(0, tries):
                 result = self.robot.ears.recognize("(yes|no)",{})
@@ -583,133 +513,43 @@ class CommandCenter:
                     self.robot.speech.speak("Please say yes or no")
             return False
 
-        (sentence, semantics_str) = prompt_once()
+        (words, semantics) = prompt_once()
 
         # confirm
         if ask_confirmation and not ask_confirm():
             # we heared the wrong thing
-            (sentence, semantics_str) = prompt_once()
+            (words, semantics) = prompt_once()
 
             if not ask_confirm():
                 # we heared the wrong thing twice
                 self.robot.speech.speak("Sorry")
-                return
+                return None
 
-        semantics_str = command_recognizer.resolve(semantics_str, self.robot)
+        semantics = self.command_recognizer.resolve(semantics, self.robot)
 
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        semantics = yaml.load(semantics_str)
-
-        actions = []
-        if "action1" in semantics:
-            actions += [semantics["action1"]]
-        if "action2" in semantics:
-            actions += [semantics["action2"]]
-        if "action3" in semantics:
-            actions += [semantics["action3"]]
-
-        for a in actions:
-            action_type = a["action"]
-
-            if action_type in action_functions:
-                action_functions[action_type](robot, a)
-            else:
-                print "Unknown action type: '%s'" % action_type      
+        return (words, semantics)
 
     # ------------------------------------------------------------------------------------------------------------------------
 
     # returns: command_semantics
-    def parse_command(command_sentence):
-        pass
+    def parse_command(self, command_sentence):
+        (words, semantics) = self.command_recognizer.parse(command_sentence, self.robot)
+        return semantics
         
     # ------------------------------------------------------------------------------------------------------------------------
 
-    def execute_command(command_semantics, blocking=True):
-        pass
+    def execute_command(self, command_semantics, blocking=True):
+        actions = command_semantics["actions"]
+
+        for a in actions:
+            action_type = a["action"]
+
+            if action_type in self.action_functions:
+                self.action_functions[action_type](self.robot, a)
+            else:
+                print "Unknown action type: '%s'" % action_type     
 
     # ------------------------------------------------------------------------------------------------------------------------
 
-    def wait_for_command():
+    def wait_for_command(self):
         pass
-
-    # ------------------------------------------------------------------------------------------------------------------------
-
-    def run(self, robot_name, skip_init, run_forever, mock_sentence):
-
-        if robot_name == 'amigo':
-            from robot_skills.amigo import Amigo as Robot
-        elif robot_name == 'sergio':
-            from robot_skills.sergio import Sergio as Robot
-        else:
-            raise ValueError('unknown robot')
-
-        robot = Robot()
-        # Sleep for 1 second to make sure everything is connected
-        time.sleep(1)
-
-        # wait for door etc.
-        if not skip_init:
-            self.start_challenge(robot)
-
-            # Move to the start location
-            nwc = NavigateToWaypoint(robot,
-                                     EntityByIdDesignator(robot, id=challenge_knowledge.starting_pose),
-                                     radius=0.3)
-            nwc.execute()
-
-        command_recognizer = CommandRecognizer(os.path.dirname(sys.argv[0]) + "/grammar.fcfg", challenge_knowledge)
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        action_functions = {}
-        action_functions["navigate"] = self.navigate
-        action_functions["find"] = self.find
-        action_functions["follow"] = self.follow
-        action_functions["answer-question"] = self.answer_question
-        action_functions["pick-up"] = self.find_and_pick_up
-        action_functions["bring"] = self.bring
-        action_functions["say"] =  self.say
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        while True:
-            self.hey_robot_wait_forever(robot)
-
-            try:
-                self.execute_command(robot, command_recognizer, action_functions, mock_sentence)
-            except KeyboardInterrupt as e:
-                rospy.logwarn('keyboard interupt')
-                return 0
-            except Exception as e:
-                rospy.logerr("execute_command failed: %s", str(e))
-
-            if not run_forever:
-                break
-
-            nwc = NavigateToWaypoint(robot, EntityByIdDesignator(robot, id=challenge_knowledge.starting_pose), radius = 0.3)
-            nwc.execute()
-
-# ------------------------------------------------------------------------------------------------------------------------
-
-def main():
-    rospy.init_node("eegpsr")
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('robot', help='Robot name')
-    parser.add_argument('--once', action='store_true', help='Turn on infinite loop')
-    parser.add_argument('--skip', action='store_true', help='Skip enter/exit')
-    parser.add_argument('sentence', nargs='*', help='Optional sentence')
-    args = parser.parse_args()
-    rospy.loginfo('args: %s', args)
-
-    mock_sentence = " ".join([word for word in args.sentence if word[0] != '_'])
-
-    gpsr = GPSR()
-    gpsr.run(robot_name=args.robot, skip_init=args.skip, run_forever=not args.once, mock_sentence=mock_sentence)
-
-# ------------------------------------------------------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    gpsr = GPSR()
-    sys.exit(main())

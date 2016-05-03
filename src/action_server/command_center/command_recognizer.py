@@ -202,19 +202,12 @@ class CommandRecognizer:
 
         # print len(self.grammar_string)
 
-    def resolve(self, semantics_str, robot):
-        if not semantics_str:
+    # Returns: semantics
+    def resolve(self, semantics, robot):
+        if not semantics:
             return None
 
-        semantics = yaml.load(semantics_str)
-
-        actions = []
-        if "action1" in semantics:
-            actions += [semantics["action1"]]
-        if "action2" in semantics:
-            actions += [semantics["action2"]]
-        if "action3" in semantics:
-            actions += [semantics["action3"]]
+        actions = semantics["actions"]
 
         print actions
 
@@ -234,16 +227,30 @@ class CommandRecognizer:
                 last_location = ll
                 last_entity = le
                
-        return yaml.dump(semantics)
+        return { "actions" : actions }
 
+    # Returns (words, semantics)
     def parse(self, sentence, robot):
-        semantics_str = self.parser.parse("T", sentence.lower().strip().split(" "))               
+        if isinstance(sentence, str):
+            words = sentence.lower().strip().split(" ")
+        else:
+            words = sentence  
+
+        semantics_str = self.parser.parse("T", words)               
 
         if not semantics_str:
             return None
 
-        return (sentence, semantics_str)
+        semantics_str = semantics_str.replace("<", "[")
+        semantics_str = semantics_str.replace(">", "]")
 
+        print semantics_str
+
+        semantics = yaml.load(semantics_str)
+
+        return (words, semantics)
+
+    # Returns (words, semantics)
     def recognize(self, robot):
         sentence = robot.ears.recognize(self.grammar_string).result
 
