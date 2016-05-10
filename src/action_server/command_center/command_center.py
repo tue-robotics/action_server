@@ -55,11 +55,11 @@ class World:
     def objects(self):
         return self.knowledge.common.objects
 
-    def get_inspect_areas(location):
+    def get_inspect_areas(self, location):
         return self.knowledge.common.get_inspect_areas(location)
 
     # Returns (location, area_name)
-    def get_object_category_location(obj_cat):
+    def get_object_category_location(self, obj_cat):
         location = self.knowledge.common.category_locations[obj_cat].keys()[0]
         area_name = self.knowledge.common.category_locations[obj_cat].values()[0]
         return (location, area_name)
