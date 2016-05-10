@@ -17,6 +17,7 @@ import rospy
 import random
 import argparse
 import time
+import traceback
 
 import robot_smach_states
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToSymbolic
@@ -81,7 +82,7 @@ class CommandCenter:
 
     def move_robot(self, robot, id=None, type=None, nav_area=None, room=None):
 
-        if id in challenge_knowledge.rooms:
+        if id in self.knowledge.rooms:
             # Driving to a room
 
             nwc =  NavigateToSymbolic(robot,
@@ -104,14 +105,14 @@ class CommandCenter:
             else:
                 robot.speech.speak("I don't know where I can find the person")
 
-        elif challenge_knowledge.is_location(id):
+        elif self.knowledge.is_location(id):
             # Driving to a location
 
             if not nav_area:
-                nav_area = challenge_knowledge.common.get_inspect_position(id)
+                nav_area = self.knowledge.common.get_inspect_position(id)
 
             location_des = ds.EntityByIdDesignator(robot, id=id)
-            room_des = ds.EntityByIdDesignator(robot, id=challenge_knowledge.common.get_room(id))
+            room_des = ds.EntityByIdDesignator(robot, id=self.knowledge.common.get_room(id))
 
             nwc = NavigateToSymbolic( robot,
                   {location_des : nav_area, room_des : "in"},
@@ -249,10 +250,10 @@ class CommandCenter:
 
         if entity_descr.type == "person":
 
-            if entity_descr.location.id in challenge_knowledge.rooms:
+            if entity_descr.location.id in self.knowledge.rooms:
                 room = entity_descr.location.id
             else:
-                room = challenge_knowledge.common.get_room(entity_descr.location.id)
+                room = self.knowledge.common.get_room(entity_descr.location.id)
 
             self.move_robot(robot, id=entity_descr.id, type=entity_descr.type, room=room)
             return
@@ -264,23 +265,23 @@ class CommandCenter:
         if entity_descr.location:
             room_or_location = entity_descr.location.id
 
-            if room_or_location in challenge_knowledge.rooms:
-                locations = [loc["name"] for loc in challenge_knowledge.common.locations
+            if room_or_location in self.knowledge.rooms:
+                locations = [loc["name"] for loc in self.knowledge.common.locations
                              if loc["room"] == room_or_location and loc["manipulation"] == "yes"]
             else:
                 locations = [room_or_location]
 
             locations_with_areas = []
             for location in locations:
-                locations_with_areas += [(location, challenge_knowledge.common.get_inspect_areas(location))]
+                locations_with_areas += [(location, self.knowledge.common.get_inspect_areas(location))]
         else:
             obj_cat = None
-            for obj in challenge_knowledge.common.objects:
+            for obj in self.knowledge.common.objects:
                 if obj["name"] == entity_descr.type:
                     obj_cat = obj["category"]
 
-            location = challenge_knowledge.common.category_locations[obj_cat].keys()[0]
-            area_name = challenge_knowledge.common.category_locations[obj_cat].values()[0]
+            location = self.knowledge.common.category_locations[obj_cat].keys()[0]
+            area_name = self.knowledge.common.category_locations[obj_cat].values()[0]
 
             locations_with_areas = [(location, [area_name])]
 
@@ -302,7 +303,7 @@ class CommandCenter:
 
             for area_name in area_names:
 
-                nav_area = challenge_knowledge.common.get_inspect_position(location, area_name)
+                nav_area = self.knowledge.common.get_inspect_position(location, area_name)
 
                 if nav_area != last_nav_area:
 
@@ -334,7 +335,7 @@ class CommandCenter:
                 # Classify
 
                 entity_types_and_probs = robot.ed.classify(ids=found_entity_ids,
-                                                           types=challenge_knowledge.common.objects)
+                                                           types=self.knowledge.common.objects)
 
                 best_prob = 0
                 for det in entity_types_and_probs:
@@ -449,7 +450,7 @@ class CommandCenter:
     # ------------------------------------------------------------------------------------------------------------------------
 
     def start_challenge(self, robot):
-        s = StartChallengeRobust(robot, challenge_knowledge.initial_pose)
+        s = StartChallengeRobust(robot, self.knowledge.initial_pose)
         s.execute()
 
     # ------------------------------------------------------------------------------------------------------------------------
@@ -462,6 +463,7 @@ class CommandCenter:
         self.last_location = None
         self.last_entity = None
         self.robot = robot
+        self.knowledge = None
 
         self.action_functions = {
             "navigate" : self.navigate,
@@ -476,6 +478,7 @@ class CommandCenter:
     # ------------------------------------------------------------------------------------------------------------------------
 
     def set_grammar(self, grammar_file, knowledge):
+        self.knowledge = knowledge        
         self.command_recognizer = CommandRecognizer(grammar_file, knowledge)
 
     # ------------------------------------------------------------------------------------------------------------------------
@@ -531,24 +534,36 @@ class CommandCenter:
 
     # ------------------------------------------------------------------------------------------------------------------------
 
-    # returns: command_semantics
+    # returns: command_semantics, or None if sentence could not be parsed
     def parse_command(self, command_sentence):
-        (words, semantics) = self.command_recognizer.parse(command_sentence, self.robot)
+        res = self.command_recognizer.parse(command_sentence, self.robot)
+        if not res:
+            return None
+
+        (words, semantics) = res    
         return semantics
         
     # ------------------------------------------------------------------------------------------------------------------------
 
     def execute_command(self, command_semantics, blocking=True):
-        actions = command_semantics["actions"]
+        try:
+            actions = command_semantics["actions"]
+            for a in actions:
+                action_type = a["action"]
 
-        for a in actions:
-            action_type = a["action"]
+                if action_type in self.action_functions:
+                    self.action_functions[action_type](self.robot, a)
+                else:
+                    print "Unknown action type: '%s'" % action_type   
 
-            if action_type in self.action_functions:
-                self.action_functions[action_type](self.robot, a)
-            else:
-                print "Unknown action type: '%s'" % action_type     
+            return True  
+        except KeyboardInterrupt as e:
+            rospy.logwarn('keyboard interupt')
+        except Exception as e:
+            rospy.logerr("{0}".format(e.message))
+            rospy.logerr("%s", traceback.format_exc(sys.exc_info()))
 
+        return False
     # ------------------------------------------------------------------------------------------------------------------------
 
     def wait_for_command(self):
