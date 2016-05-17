@@ -227,8 +227,7 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
         room_or_location = entity_descr.location.id
 
         if world.is_room(room_or_location):
-            locations = [loc["name"] for loc in world.locations()
-                         if loc["room"] == room_or_location and loc["manipulation"] == "yes"]
+            locations = world.get_locations(room=room_or_location, pick_location=True)
         else:
             locations = [room_or_location]
 
@@ -236,12 +235,9 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
         for location in locations:
             locations_with_areas += [(location, world.get_inspect_areas(location))]
     else:
-        obj_cat = None
-        for obj in world.objects():
-            if obj["name"] == entity_descr.type:
-                obj_cat = obj["category"]
+        obj_cat = world.get_object_category(entity_descr.type)
 
-        (location, area_name) = get_object_category_location(obj_cat)
+        (location, area_name) = world.get_object_category_location(obj_cat)
 
         locations_with_areas = [(location, [area_name])]
 
@@ -295,7 +291,7 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
             # Classify
 
             entity_types_and_probs = robot.ed.classify(ids=found_entity_ids,
-                                                       types=world.objects())
+                                                       types=world.get_objects())
 
             best_prob = 0
             for det in entity_types_and_probs:

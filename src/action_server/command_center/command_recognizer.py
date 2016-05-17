@@ -167,9 +167,7 @@ class CommandRecognizer:
         for obj in challenge_knowledge.common.object_names:
             self.parser.add_rule("SMALL_OBJECT[\"%s\"] -> %s" % (obj, resolve_name(obj, challenge_knowledge)))
 
-        location_names = list(set([o["name"] for o in challenge_knowledge.common.locations]))          
-
-        for loc in location_names:
+        for loc in challenge_knowledge.common.get_locations():
             #parser.add_rule("FURNITURE[\"%s\"] -> %s" % (furniture, furniture))
             self.parser.add_rule("FURNITURE[\"%s\"] -> %s" % (loc, resolve_name(loc, challenge_knowledge)))
 
@@ -188,7 +186,7 @@ class CommandRecognizer:
         for obj_cat in challenge_knowledge.common.object_categories:
             self.parser.add_rule("OBJ_CAT[\"%s\"] -> %s" % (obj_cat, obj_cat)) 
 
-        for container in challenge_knowledge.common.get_object_names(category="container"):
+        for container in challenge_knowledge.common.get_objects(category="container"):
             self.parser.add_rule("CONTAINER[\"%s\"] -> %s" % (container, container))            
 
         # for (alias, obj) in challenge_knowledge.object_aliases.iteritems():

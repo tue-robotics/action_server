@@ -49,21 +49,21 @@ class World:
     def get_inspect_position(self, location, area=""):
         return self.knowledge.common.get_inspect_position(id, area)
 
-    def locations(self):
-        return self.knowledge.common.locations
+    def get_locations(self, room=None, pick_location=None, place_location=None):
+        return self.knowledge.common.get_locations(room=room, pick_location=pick_location, place_location=place_location)
 
-    def objects(self):
-        return self.knowledge.common.objects
+    def get_objects(self, category=None):
+        return self.knowledge.common.get_objects(category=category)
 
     def get_inspect_areas(self, location):
         return self.knowledge.common.get_inspect_areas(location)
 
     # Returns (location, area_name)
     def get_object_category_location(self, obj_cat):
-        location = self.knowledge.common.category_locations[obj_cat].keys()[0]
-        area_name = self.knowledge.common.category_locations[obj_cat].values()[0]
-        return (location, area_name)
+        return self.knowledge.get_object_category_location(obj_cat)
 
+    def get_object_category(self, obj):
+        return self.knowledge.get_object_category(obj)
 
 # ------------------------------------------------------------------------------------------------------------------------
 
