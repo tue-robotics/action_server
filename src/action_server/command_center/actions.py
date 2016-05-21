@@ -96,11 +96,14 @@ def move_robot(robot, world, id=None, type=None, nav_area=None, room=None):
             nav_area = world.get_inspect_position(id)
 
         location_des = ds.EntityByIdDesignator(robot, id=id)
-        room_des = ds.EntityByIdDesignator(robot, id=world.get_room(id))
 
-        nwc = NavigateToSymbolic( robot,
-              {location_des : nav_area, room_des : "in"},
-              location_des)
+        room_id = world.get_room(id)
+
+        if room_id:
+            room_des = ds.EntityByIdDesignator(robot, id=room_id)
+            nwc = NavigateToSymbolic(robot, {location_des : nav_area, room_des : "in"}, location_des)
+        else:
+            nwc = NavigateToSymbolic(robot, {location_des : nav_area}, location_des)            
         nwc.execute()
     else:
         # Driving to anything else (e.g. a waypoint)

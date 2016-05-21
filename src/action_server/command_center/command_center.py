@@ -121,7 +121,7 @@ class CommandCenter:
         def ask_confirm(tries=3):
             sentence = " ".join(words)
 
-            self.robot.speech.speak("You want me to %s" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
+            self.robot.speech.speak("Do you want me to %s?" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
             for i in range(0, tries):
                 result = self.robot.ears.recognize("(yes|no)",{})
                 if result and result.result != "":
