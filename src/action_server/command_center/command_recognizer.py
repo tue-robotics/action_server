@@ -25,14 +25,14 @@ class EntityDescription(object):
         if self.id:
             d["id"] = self.id
         if self.type:
-            d["type"] = self.type         
+            d["type"] = self.type
         if self.location:
-            d["loc"] = self.location.serialize()   
+            d["loc"] = self.location.serialize()
         if self.category:
-            d["cat"] = self.category    
+            d["cat"] = self.category
 
-        return d  
-  
+        return d
+
     def __repr__(self):
         return "(id={}, type={}, location={}, category={})".format(self.id, self.type,
                                                              self.location, self.category)
@@ -132,19 +132,26 @@ def unwrap_grammar(lname, parser):
     for opt in rule.options:
         conj_strings = []
 
+        ok = True
         for conj in opt.conjuncts:
             if conj.is_variable:
                 unwrapped_string = unwrap_grammar(conj.name, parser)
                 if unwrapped_string:
                     conj_strings.append(unwrapped_string)
+                else:
+                    ok = False
             else:
                 conj_strings.append(conj.name)
 
-        opt_strings.append(" ".join(conj_strings))
+        if ok:
+            opt_strings.append(" ".join(conj_strings))
+
+    if not opt_strings:
+        return ""
 
     s = "|".join(opt_strings)
 
-    if len(rule.options) > 1:
+    if len(opt_strings) > 1:
         s = "(" + s + ")"
 
     return s
@@ -184,10 +191,10 @@ class CommandRecognizer:
             self.parser.add_rule("ROOM[\"%s\"] -> %s" % (room, resolve_name(room, challenge_knowledge)))
 
         for obj_cat in challenge_knowledge.common.object_categories:
-            self.parser.add_rule("OBJ_CAT[\"%s\"] -> %s" % (obj_cat, obj_cat)) 
+            self.parser.add_rule("OBJ_CAT[\"%s\"] -> %s" % (obj_cat, obj_cat))
 
         for container in challenge_knowledge.common.get_objects(category="container"):
-            self.parser.add_rule("CONTAINER[\"%s\"] -> %s" % (container, container))            
+            self.parser.add_rule("CONTAINER[\"%s\"] -> %s" % (container, container))
 
         # for (alias, obj) in challenge_knowledge.object_aliases.iteritems():
         #     #parser.add_rule("NP[\"%s\"] -> %s" % (obj, alias))
@@ -218,13 +225,13 @@ class CommandRecognizer:
                 (e_new, le, ll) = fill_in_gaps(robot, a["entity"], last_entity, last_location, a)
                 a["entity"] = e_new
                 last_location = ll
-                last_entity = le                
+                last_entity = le
             if "to" in a:
                 (e_new, le, ll) = fill_in_gaps(robot, a["to"], last_entity, last_location, a)
                 a["to"] = e_new
                 last_location = ll
                 last_entity = le
-               
+
         return { "actions" : actions }
 
     # Returns (words, semantics)
@@ -232,17 +239,15 @@ class CommandRecognizer:
         if isinstance(sentence, str):
             words = sentence.lower().strip().split(" ")
         else:
-            words = sentence  
+            words = sentence
 
-        semantics_str = self.parser.parse("T", words)               
+        semantics_str = self.parser.parse("T", words)
 
         if not semantics_str:
             return None
 
         semantics_str = semantics_str.replace("<", "[")
         semantics_str = semantics_str.replace(">", "]")
-
-        print semantics_str
 
         semantics = yaml.load(semantics_str)
 
