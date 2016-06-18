@@ -69,7 +69,7 @@ class World:
 
 class CommandCenter:
 
-    def __init__(self, robot):
+    def __init__(self, robot=None):
 
         self.robot = robot
         self.world = World()
@@ -94,7 +94,7 @@ class CommandCenter:
     # ------------------------------------------------------------------------------------------------------------------------
 
     def set_grammar(self, grammar_file, knowledge):
-        self.world.knowledge = knowledge        
+        self.world.knowledge = knowledge
         self.command_recognizer = CommandRecognizer(grammar_file, knowledge)
 
     # ------------------------------------------------------------------------------------------------------------------------
@@ -113,8 +113,8 @@ class CommandCenter:
                 if not res:
                     self.robot.speech.speak("Sorry, I could not understand", block=True)
 
-            print "Sentence: %s" % res[0]
-            print "Semantics: %s" % res[1]
+            # print "Sentence: %s" % res[0]
+            # print "Semantics: %s" % res[1]
 
             return res
 
@@ -156,13 +156,14 @@ class CommandCenter:
         if not res:
             return None
 
-        (words, semantics) = res    
+        (words, semantics) = res
         return semantics
-        
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     def execute_command(self, command_semantics, blocking=True):
         try:
+            # print "command_semantics = {}".format(command_semantics)
             actions = command_semantics["actions"]
             for a in actions:
                 action_type = a["action"]
@@ -170,9 +171,9 @@ class CommandCenter:
                 if action_type in self.action_functions:
                     self.action_functions[action_type](self.robot, self.world, a)
                 else:
-                    print "Unknown action type: '%s'" % action_type   
+                    print "Unknown action type: '%s'" % action_type
 
-            return True  
+            return True
         except KeyboardInterrupt as e:
             rospy.logwarn('keyboard interupt')
         except Exception as e:
