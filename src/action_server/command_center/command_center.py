@@ -108,7 +108,7 @@ class CommandCenter:
 
             res = None
             while not res:
-                self.robot.speech.speak("Welkome to the Double E G P S R. . What can I do for you?", block=False)
+                self.robot.speech.speak("Welkome to a challenge, Still loading grammar. Ok I am done. . What can I do for you?", block=False)
                 res = self.command_recognizer.recognize(self.robot)
                 if not res:
                     self.robot.speech.speak("Sorry, I could not understand", block=True)
