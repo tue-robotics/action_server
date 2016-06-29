@@ -20,6 +20,8 @@ import time
 import traceback
 import actions
 
+import hmi_server.api
+
 from command_recognizer import CommandRecognizer
 
 # ------------------------------------------------------------------------------------------------------------------------
@@ -100,7 +102,7 @@ class CommandCenter:
     # ------------------------------------------------------------------------------------------------------------------------
 
     # returns: None if getting command failed, otherwise (command_words, command_semantics)
-    def request_command(self, ask_confirmation=True, ask_missing_info=False):
+    def request_command(self, ask_confirmation=True, ask_missing_info=False, timeout=600):
 
         def prompt_once():
             self.robot.head.look_at_standing_person()
@@ -109,7 +111,7 @@ class CommandCenter:
             res = None
             while not res:
                 self.robot.speech.speak("Welkome to a challenge, Still loading grammar. Ok I am done. . What can I do for you?", block=False)
-                res = self.command_recognizer.recognize(self.robot)
+                res = self.command_recognizer.recognize(self.robot, timeout=timeout)
                 if not res:
                     self.robot.speech.speak("Sorry, I could not understand", block=True)
 
@@ -123,13 +125,12 @@ class CommandCenter:
 
             self.robot.speech.speak("Do you want me to %s?" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
             for i in range(0, tries):
-                result = self.robot.ears.recognize("(yes|no)",{})
-                if result and result.result != "":
-                    answer = result.result
-                    return answer == "yes"
-
-                if i != tries - 1:
+                try:
+                    result = self.robot.hmi.query("", "<choice>", {"choice":["yes","no"]}, timeout=10)
+                    return result["choice"] == "yes"
+                except hmi_server.api.TimeoutException:
                     self.robot.speech.speak("Please say yes or no")
+
             return False
 
         (words, semantics) = prompt_once()

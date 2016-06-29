@@ -7,6 +7,8 @@ import rospy
 
 import yaml
 
+import hmi_server.api
+
 from robocup_knowledge import load_knowledge
 challenge_knowledge = load_knowledge('challenge_gpsr')
 
@@ -66,17 +68,19 @@ def resolve_entity_description(parameters):
 # ----------------------------------------------------------------------------------------------------
 
 def hear(robot, sentence, options):
-    while True:
+    for i in range(0, 3):
         robot.speech.speak(sentence)
-        res = robot.ears.recognize("<loc>", {"loc": options})
-        if not res or not res.result:
+
+        try:
+            result = robot.hmi.query(sentence, "<choice>", {"choice":options}, timeout=10)
+            choice = result["choice"]
+            robot.speech.speak("OK, {}".format(choice))
+            return choice
+        except hmi_server.api.TimeoutException:
             robot.speech.speak("Sorry, I could not understand")
-        else:
-            break
 
-    robot.speech.speak("OK, {}".format(res.result))
-
-    return res.result
+    robot.speech.speak("I will just assume {}".format(options[0]))
+    return options[0]
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -162,7 +166,7 @@ def resolve_name(name, challenge_knowledge):
     if name in challenge_knowledge.translations:
         return challenge_knowledge.translations[name]
     else:
-        return name
+        return name.replace("_", " ")
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -254,8 +258,13 @@ class CommandRecognizer:
         return (words, semantics)
 
     # Returns (words, semantics)
-    def recognize(self, robot):
-        sentence = robot.ears.recognize(self.grammar_string).result
+    def recognize(self, robot, timeout):
+        result = robot.ears.recognize(self.grammar_string, time_out=rospy.Duration(timeout))
+
+        if not result:
+            return None
+
+        sentence = result.result
 
         if not sentence:
             return None
