@@ -116,7 +116,7 @@ def fill_in_gaps(robot, parameters, last_entity, last_location, context):
                           list(set([o["room"] for o in challenge_knowledge.common.locations])))
                 entity.location = EntityDescription(id=loc)
     elif entity.category:
-        entity.type = hear(robot, "What kind of {}?".format(entity.category), object_names)
+        entity.type = hear(robot, "What kind of {}?".format(entity.category), challenge_knowledge.common.object_names)
 
     print entity.serialize()
 
