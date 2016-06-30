@@ -110,6 +110,9 @@ class CommandCenter:
 
             res = None
             while not res:
+                if rospy.is_shutdown():
+                    return None
+
                 self.robot.speech.speak("Welkome to a challenge, Still loading grammar. Ok I am done. . What can I do for you?", block=False)
                 res = self.command_recognizer.recognize(self.robot, timeout=timeout)
                 if not res:
@@ -125,6 +128,9 @@ class CommandCenter:
 
             self.robot.speech.speak("Do you want me to %s?" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
             for i in range(0, tries):
+                if rospy.is_shutdown():
+                    return None
+
                 try:
                     result = self.robot.hmi.query("", "<choice>", {"choice":["yes","no"]}, timeout=10)
                     return result["choice"] == "yes"
