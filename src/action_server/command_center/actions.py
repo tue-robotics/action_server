@@ -76,11 +76,11 @@ def move_robot(robot, world, id=None, type=None, nav_area=None, room=None):
     elif type == "person":
         # Driving to a person
 
-        if id:
-            nwc =  NavigateToSymbolic(robot,
-                                            { EntityByIdDesignator(robot, id=id) : "in" },
-                                              EntityByIdDesignator(robot, id=id))
-        elif room:
+        #if id:
+        #    nwc =  NavigateToSymbolic(robot,
+        #                                    { EntityByIdDesignator(robot, id=id) : "in" },
+        #                                      EntityByIdDesignator(robot, id=id))
+        if room:
             room_des = EdEntityDesignator(robot, id=room)
             f = FindPerson(robot, room_des)
             result = f.execute()

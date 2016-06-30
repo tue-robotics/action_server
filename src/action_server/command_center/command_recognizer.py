@@ -106,7 +106,7 @@ def fill_in_gaps(robot, parameters, last_entity, last_location, context):
                           challenge_knowledge.common.rooms)
                 entity.location = EntityDescription(id=loc)
         else:
-            new_last_loc = entity.id
+            new_last_loc = EntityDescription(id=entity.id)
 
     elif entity.type:
         if not entity.location:
@@ -118,7 +118,7 @@ def fill_in_gaps(robot, parameters, last_entity, last_location, context):
     elif entity.category:
         entity.type = hear(robot, "What kind of {}?".format(entity.category), challenge_knowledge.common.object_names)
 
-    print entity.serialize()
+    # print entity.serialize()
 
     return (entity.serialize(), entity, new_last_loc)
 
@@ -218,8 +218,6 @@ class CommandRecognizer:
 
         actions = semantics["actions"]
 
-        print actions
-
         last_location = None
         last_entity = None
 
@@ -235,6 +233,8 @@ class CommandRecognizer:
                 a["to"] = e_new
                 last_location = ll
                 last_entity = le
+
+        print "RESOLVED ACTIONS = {}".format(actions)
 
         return { "actions" : actions }
 
