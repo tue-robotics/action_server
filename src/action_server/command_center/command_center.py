@@ -102,9 +102,13 @@ class CommandCenter:
     # ------------------------------------------------------------------------------------------------------------------------
 
     # returns: None if getting command failed, otherwise (command_words, command_semantics)
-    def request_command(self, ask_confirmation=True, ask_missing_info=False, timeout=600):
+    def request_command(self, ask_confirmation=True, ask_missing_info=False, timeout=600, sentences=None, n_tries=100):
 
-        def prompt_once():
+        if not sentences or len(sentences) < 2:
+            sentences = ["Welcome to this challenge, Still loading grammar. Ok I am done. . What can I do for you?",
+                         "I am so so sorry. Can you please speak louder and more slowly? Wait for the ping!"]
+
+        def prompt_once(sentence):
             self.robot.head.look_at_standing_person()
             self.robot.head.wait_for_motion_done()
 
@@ -113,10 +117,11 @@ class CommandCenter:
                 if rospy.is_shutdown():
                     return None
 
-                self.robot.speech.speak("Welkome to a challenge, Still loading grammar. Ok I am done. . What can I do for you?", block=False)
+                self.robot.speech.speak(sentence, block=False)
                 res = self.command_recognizer.recognize(self.robot, timeout=timeout)
                 if not res:
-                    self.robot.speech.speak("Sorry, I could not understand", block=True)
+                    pass
+                    #self.robot.speech.speak("Sorry, I could not understand", block=True)                    
 
             # print "Sentence: %s" % res[0]
             # print "Semantics: %s" % res[1]
@@ -139,15 +144,25 @@ class CommandCenter:
 
             return False
 
-        (words, semantics) = prompt_once()
+        n_current_tries = 0
 
-        # confirm
-        if ask_confirmation and not ask_confirm():
-            # we heared the wrong thing
-            (words, semantics) = prompt_once()
+        while True:
+            i_sentence = n_current_tries
 
-            if not ask_confirm():
-                # we heared the wrong thing twice
+            if i_sentence >= len(sentences):
+                i_sentence = (i_sentence - 1) % (len(sentences) - 1) + 1
+
+            (words, semantics) = prompt_once(sentences[i_sentence])
+            n_current_tries += 1
+
+            if not ask_confirmation:
+                return None
+
+            if ask_confirm():
+                # We heard correctly
+                break
+
+            if n_current_tries >= n_tries:
                 self.robot.speech.speak("Sorry")
                 return None
 
