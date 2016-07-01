@@ -252,7 +252,7 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    possible_entities = []
+    all_classification_results = []
 
     for loc_and_areas in locations_with_areas:
 
@@ -295,20 +295,25 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
             found_entity_ids = segmented_entities.new_ids + segmented_entities.updated_ids
 
+            print "FOUND {} ENTITIES".format(len(found_entity_ids))
+
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             # Classify
 
-            entity_types_and_probs = robot.ed.classify(ids=found_entity_ids,
-                                                       types=world.get_objects())
+            classification_results = robot.ed.classify(ids=found_entity_ids,
+                                                       types=["cloth"])#world.get_objects())
+
+            print "CLASSIFIED {} ENTITIES".format(len(classification_results))
 
             best_prob = 0
-            for det in entity_types_and_probs:
+            for det in classification_results:
+                print "DET = {}".format(det)
                 if det.type == entity_descr.type and det.probability > best_prob:
                     entity_descr.id = det.id
                     best_prob = det.probability
 
             if not entity_descr.id:
-                possible_entities += found_entity_ids
+                all_classification_results += classification_results
             else:
                 robot.speech.speak("Found the {}!".format(entity_descr.type), block=False)
 
@@ -323,26 +328,46 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
             break
 
     if not entity_descr.id:
-        if not possible_entities:
+        if not all_classification_results:
             robot.speech.speak("I really can't find the {}!".format(entity_descr.type), block=False)
         else:
-            closest_entity_id = None
-            closest_distance = None
-            for entity_id in possible_entities:
-                entity = robot.ed.get_entity(id=entity_id, parse=False)
-                if not entity:
-                    continue
+            # We have seen objects and classified them, but none of them had the type we
+            # are looking for. Now, again go through the classification results, and check
+            # which entity has the highest probability for the type we are looking for. Then
+            # we just assume that this must be the correct entity.
 
-                p = transformations.tf_transform(entity.pose.position, "/map",
-                                             robot.robot_name+"/base_link",
-                                             robot.tf_listener)
-                distance = p.x*p.x + p.y*p.y
+            best_prob = 0
 
-                if not closest_entity_id or distance < closest_distance:
-                    closest_entity_id = entity_id
-                    closest_distance = distance
+            for det in all_classification_results:
+                if entity_descr.type in det.distribution:
+                    prob = det.distribution[entity_descr.type]
+                    if prob > best_prob:
+                        best_prob = prob
+                        entity_descr.id = det.id
 
-            entity_descr.id = closest_entity_id
+            if not entity_descr.id:         
+                # If we are here, no classification result had a probability > 0 for the
+                # type we are looking for. Now simply get the closest entity
+
+                closest_entity_id = None
+                closest_distance = None
+                for det in all_classification_results:
+                    entity_id = det.id
+
+                    entity = robot.ed.get_entity(id=entity_id, parse=False)
+                    if not entity:
+                        continue
+
+                    p = transformations.tf_transform(entity.pose.position, "/map",
+                                                 robot.robot_name+"/base_link",
+                                                 robot.tf_listener)
+                    distance = p.x*p.x + p.y*p.y
+
+                    if not closest_entity_id or distance < closest_distance:
+                        closest_entity_id = entity_id
+                        closest_distance = distance
+
+                entity_descr.id = closest_entity_id
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
