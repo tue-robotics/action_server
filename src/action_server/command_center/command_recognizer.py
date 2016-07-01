@@ -9,8 +9,8 @@ import yaml
 
 import hmi_server.api
 
-from robocup_knowledge import load_knowledge
-challenge_knowledge = load_knowledge('challenge_gpsr')
+# from robocup_knowledge import load_knowledge
+# challenge_knowledge = load_knowledge('challenge_gpsr')
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -85,7 +85,7 @@ def hear(robot, sentence, options):
 # ----------------------------------------------------------------------------------------------------
 
 
-def fill_in_gaps(robot, parameters, last_entity, last_location, context):
+def fill_in_gaps(robot, knowledge, parameters, last_entity, last_location, context):
     new_last_loc = None
 
     entity = resolve_entity_description(parameters)
@@ -93,7 +93,7 @@ def fill_in_gaps(robot, parameters, last_entity, last_location, context):
     if entity.is_undefined:
         if not last_entity:
             entity.id = hear(robot, "What do you want me to {}?".format(context["action"]),
-                              challenge_knowledge.common.object_names)
+                              knowledge.object_names)
         else:
             entity = last_entity
 
@@ -103,7 +103,7 @@ def fill_in_gaps(robot, parameters, last_entity, last_location, context):
                 entity.location = last_location
             if not entity.location:
                 loc =hear(robot, "Where can I find {}?".format(entity.id),
-                          challenge_knowledge.common.rooms)
+                          knowledge.rooms)
                 entity.location = EntityDescription(id=loc)
         else:
             new_last_loc = EntityDescription(id=entity.id)
@@ -113,10 +113,10 @@ def fill_in_gaps(robot, parameters, last_entity, last_location, context):
             entity.location = last_location
         if not entity.location:
                 loc = hear(robot, "Where can I find {}?".format(entity.id),
-                          list(set([o["room"] for o in challenge_knowledge.common.locations])))
+                          list(set([o["room"] for o in knowledge.locations])))
                 entity.location = EntityDescription(id=loc)
     elif entity.category:
-        entity.type = hear(robot, "What kind of {}?".format(entity.category), challenge_knowledge.common.object_names)
+        entity.type = hear(robot, "What kind of {}?".format(entity.category), knowledge.object_names)
 
     # print entity.serialize()
 
@@ -162,9 +162,9 @@ def unwrap_grammar(lname, parser):
 
 # ----------------------------------------------------------------------------------------------------
 
-def resolve_name(name, challenge_knowledge):
-    if name in challenge_knowledge.translations:
-        return challenge_knowledge.translations[name]
+def resolve_name(name, knowledge):
+    if name in knowledge.translations:
+        return knowledge.translations[name]
     else:
         return name.replace("_", " ")
 
@@ -175,14 +175,15 @@ class CommandRecognizer:
     def __init__(self, grammar_file, challenge_knowledge):
         self.parser = cfgparser.CFGParser.fromfile(grammar_file)
 
-        for obj in challenge_knowledge.common.object_names:
+        for obj in challenge_knowledge.object_names:
             self.parser.add_rule("SMALL_OBJECT[\"%s\"] -> %s" % (obj, resolve_name(obj, challenge_knowledge)))
 
-        for loc in challenge_knowledge.common.get_locations():
+        for loc in challenge_knowledge.get_locations():
+            print loc
             #parser.add_rule("FURNITURE[\"%s\"] -> %s" % (furniture, furniture))
             self.parser.add_rule("FURNITURE[\"%s\"] -> %s" % (loc, resolve_name(loc, challenge_knowledge)))
 
-        for name in challenge_knowledge.common.names:
+        for name in challenge_knowledge.names:
             self.parser.add_rule("NAME[\"%s\"] -> %s" % (name.lower(), name.lower()))
 
             # for obj in objects:
@@ -194,10 +195,10 @@ class CommandRecognizer:
             #parser.add_rule("ROOM[\"%s\"] -> %s" % (rooms, rooms))
             self.parser.add_rule("ROOM[\"%s\"] -> %s" % (room, resolve_name(room, challenge_knowledge)))
 
-        for obj_cat in challenge_knowledge.common.object_categories:
+        for obj_cat in challenge_knowledge.object_categories:
             self.parser.add_rule("OBJ_CAT[\"%s\"] -> %s" % (obj_cat, obj_cat))
 
-        for container in challenge_knowledge.common.get_objects(category="container"):
+        for container in challenge_knowledge.get_objects(category="container"):
             self.parser.add_rule("CONTAINER[\"%s\"] -> %s" % (container, container))
 
         # for (alias, obj) in challenge_knowledge.object_aliases.iteritems():
@@ -224,12 +225,12 @@ class CommandRecognizer:
         actions_resolved = []
         for a in actions:
             if "entity" in a:
-                (e_new, le, ll) = fill_in_gaps(robot, a["entity"], last_entity, last_location, a)
+                (e_new, le, ll) = fill_in_gaps(robot, self.knowledge, a["entity"], last_entity, last_location, a)
                 a["entity"] = e_new
                 last_location = ll
                 last_entity = le
             if "to" in a:
-                (e_new, le, ll) = fill_in_gaps(robot, a["to"], last_entity, last_location, a)
+                (e_new, le, ll) = fill_in_gaps(robot, self.knowledge, a["to"], last_entity, last_location, a)
                 a["to"] = e_new
                 last_location = ll
                 last_entity = le

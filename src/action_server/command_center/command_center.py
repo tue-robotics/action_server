@@ -46,19 +46,19 @@ class World:
 
     # Returns the room 'id' is in
     def get_room(self, id):
-        return self.knowledge.common.get_room(id)
+        return self.knowledge.get_room(id)
 
     def get_inspect_position(self, location, area=""):
-        return self.knowledge.common.get_inspect_position(id, area)
+        return self.knowledge.get_inspect_position(id, area)
 
     def get_locations(self, room=None, pick_location=None, place_location=None):
-        return self.knowledge.common.get_locations(room=room, pick_location=pick_location, place_location=place_location)
+        return self.knowledge.get_locations(room=room, pick_location=pick_location, place_location=place_location)
 
     def get_objects(self, category=None):
-        return self.knowledge.common.get_objects(category=category)
+        return self.knowledge.get_objects(category=category)
 
     def get_inspect_areas(self, location):
-        return self.knowledge.common.get_inspect_areas(location)
+        return self.knowledge.get_inspect_areas(location)
 
     # Returns (location, area_name)
     def get_object_category_location(self, obj_cat):

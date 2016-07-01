@@ -127,6 +127,10 @@ def navigate(robot, world, parameters):
         not_implemented(robot, parameters)
 
     else:
+        if not robot.ed.get_entity(entity_descr.id):
+            robot.speech.speak("Sorry, I do not know here the %s is" % entity_descr.id, block=False)
+            return
+
         robot.speech.speak("I am going to the %s" % entity_descr.id, block=False)
         move_robot(robot, world, entity_descr.id, entity_descr.type)
         world.last_location = entity_descr
