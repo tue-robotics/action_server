@@ -9,7 +9,7 @@ import time
 import robot_smach_states
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToSymbolic
 from robot_smach_states import SegmentObjects, Grab, Place, HandoverToHuman
-from robot_smach_states.util.designators import EdEntityDesignator, EntityByIdDesignator, VariableDesignator, DeferToRuntime, analyse_designators, UnoccupiedArmDesignator, EmptySpotDesignator, OccupiedArmDesignator
+from robot_smach_states.util.designators import EdEntityDesignator, EntityByIdDesignator, VariableDesignator, DeferToRuntime, analyse_designators, UnoccupiedArmDesignator, EmptySpotDesignator, OccupiedArmDesignator, ArmDesignator
 from robot_skills.util import transformations
 from robot_skills.classification_result import ClassificationResult
 from robocup_knowledge import load_knowledge
@@ -65,6 +65,8 @@ def resolve_entity_description(world, parameters):
 # ------------------------------------------------------------------------------------------------------------------------
 
 def move_robot(robot, world, id=None, type=None, nav_area=None, room=None):
+
+    rospy.loginfo("ROBOT MOVING TO: ( id = {}, type = {}, nav_area = {}, room = {} )".format(id, type, nav_area, room))
 
     if world.is_room(id):
         # Driving to a room
@@ -275,10 +277,13 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             # Look at the area
 
-            look_sm = LookAtArea(robot,
-                                 EdEntityDesignator(robot, id=location),
-                                 area_name)
-            look_sm.execute()
+            # look_sm = LookAtArea(robot,
+            #                      EdEntityDesignator(robot, id=location),
+            #                      area_name)
+            # look_sm.execute()
+
+            robot.head.look_down()
+            robot.head.wait_for_motion_done()
 
             import time
             time.sleep(1)
@@ -308,6 +313,8 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
                 robot.speech.speak("Found the {}!".format(entity_descr.type), block=False)
 
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+            robot.head.cancel_goal()
 
             if entity_descr.id:
                 break
@@ -345,7 +352,8 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
         # grab it
         grab = Grab(robot, EdEntityDesignator(robot, id=entity_descr.id),
-             UnoccupiedArmDesignator(robot.arms, robot.leftArm, name="empty_arm_designator"))
+             ArmDesignator(robot.arms, robot.arms['left']))
+             # UnoccupiedArmDesignator(robot.arms, robot.leftArm, name="empty_arm_designator"))
         result = grab.execute()
 
 # ------------------------------------------------------------------------------------------------------------------------
