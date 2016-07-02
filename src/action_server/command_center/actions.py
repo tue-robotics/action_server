@@ -273,7 +273,7 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    all_classification_results = []
+    all_classification_results = {}
 
     for loc_and_areas in locations_with_areas:
 
@@ -316,6 +316,10 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
             found_entity_ids = segmented_entities.new_ids + segmented_entities.updated_ids
 
+            for id in found_entity_ids:
+                if not id in all_classification_results:
+                    all_classification_results[id] = None
+
             print "FOUND {} ENTITIES".format(len(found_entity_ids))
 
             # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -334,7 +338,8 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
                     best_prob = det.probability
 
             if not entity_descr.id:
-                all_classification_results += classification_results
+                for det in classification_results:
+                    all_classification_results[det.id] = det
             else:
                 robot.speech.speak("Found the {}!".format(entity_descr.type), block=False)
 
@@ -359,12 +364,12 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
             best_prob = 0
 
-            for det in all_classification_results:
-                if entity_descr.type in det.distribution:
+            for (entity_id, det) in all_classification_results.iteritems():
+                if det and entity_descr.type in det.distribution:
                     prob = det.distribution[entity_descr.type]
                     if prob > best_prob:
                         best_prob = prob
-                        entity_descr.id = det.id
+                        entity_descr.id = entity_id
 
             if not entity_descr.id:
                 # If we are here, no classification result had a probability > 0 for the
@@ -372,8 +377,7 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
                 closest_entity_id = None
                 closest_distance = None
-                for det in all_classification_results:
-                    entity_id = det.id
+                for (entity_id, det) in all_classification_results.iteritems():
 
                     entity = robot.ed.get_entity(id=entity_id, parse=False)
                     if not entity:
