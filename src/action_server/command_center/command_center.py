@@ -106,7 +106,7 @@ class CommandCenter:
 
         if not sentences or len(sentences) < 2:
             sentences = ["Welcome to this challenge, Still loading grammar. Ok I am done. . What can I do for you?",
-                         "I am so so sorry. Can you please speak louder and more slowly? Wait for the ping!"]
+                         "I am so so sorry. Can you please speak louder? Wait for the ping!"]
 
         def prompt_once(sentence):
             self.robot.head.look_at_standing_person()
@@ -121,7 +121,7 @@ class CommandCenter:
                 res = self.command_recognizer.recognize(self.robot, timeout=timeout)
                 if not res:
                     pass
-                    #self.robot.speech.speak("Sorry, I could not understand", block=True)                    
+                    #self.robot.speech.speak("Sorry, I could not understand", block=True)
 
             # print "Sentence: %s" % res[0]
             # print "Semantics: %s" % res[1]
