@@ -203,6 +203,8 @@ def say(robot, world, parameters):
         line = datetime.now().strftime('It is day %d of the month')
     elif sentence == 'DAY_OF_WEEK':
         line = datetime.today().strftime('Today is a %A')
+    elif sentence == 'DARK_SIDE':
+        line = " I'll never join you! "
     elif sentence == 'JOKE':
         line = random.choice([
             "What do you call a fish with no eyes? A fsh.",
