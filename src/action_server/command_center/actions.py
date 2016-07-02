@@ -101,6 +101,10 @@ def move_robot(robot, world, id=None, type=None, nav_area=None, loc=None):
     elif world.is_location(id):
         # Driving to a location
 
+        if not robot.ed.get_entity(id):
+            robot.speech.speak("I don't know where the {} is".format(id))
+            return
+
         if not nav_area:
             nav_area = world.get_inspect_position(id)
 
@@ -115,6 +119,11 @@ def move_robot(robot, world, id=None, type=None, nav_area=None, loc=None):
             nwc = NavigateToSymbolic(robot, {location_des : nav_area}, location_des)
         nwc.execute()
     else:
+
+        if not robot.ed.get_entity(id):
+            robot.speech.speak("I don't know where the {} is".format(id))
+            return
+        
         # Driving to anything else (e.g. a waypoint)
         nwc = NavigateToObserve(robot, EntityByIdDesignator(robot, id=id))
         nwc.execute()

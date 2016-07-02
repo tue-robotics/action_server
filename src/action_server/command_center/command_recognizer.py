@@ -187,38 +187,31 @@ class CommandRecognizer:
         self.choices = {"name" : [], "furniture" : [], "object" : [], "room" : []}
 
         for obj in challenge_knowledge.object_names:
-            self.parser.add_rule("SMALL_OBJECT[\"%s\"] -> %s" % (obj, resolve_name(obj, challenge_knowledge)))
-            self.choices["object"].append(obj)
+            obj_resolved = resolve_name(obj, challenge_knowledge)
+            self.choices["object"].append(obj_resolved)
+            self.parser.add_rule("SMALL_OBJECT[\"%s\"] -> %s" % (obj, obj_resolved))
 
         for loc in challenge_knowledge.get_locations():
             #parser.add_rule("FURNITURE[\"%s\"] -> %s" % (furniture, furniture))
-            self.parser.add_rule("FURNITURE[\"%s\"] -> %s" % (loc, resolve_name(loc, challenge_knowledge)))
-            self.choices["furniture"].append(loc)
+            loc_resolved = resolve_name(loc, challenge_knowledge)
+            self.choices["furniture"].append(loc_resolved)
+            self.parser.add_rule("FURNITURE[\"%s\"] -> %s" % (loc, loc_resolved))
 
         for name in challenge_knowledge.names:
             self.parser.add_rule("NAME[\"%s\"] -> %s" % (name.lower(), name.lower()))
-            self.choices["name"].append(name)
-
-            # for obj in objects:
-            #     #parser.add_rule("SMALL_OBJECT[\"%s\"] -> %s" % (obj, obj))
-            #     self.parser.add_rule("SMALL_OBJECT[\"%s\"] -> the %s" % (obj, obj))
-            #     self.parser.add_rule("SMALL_OBJECT[\"%s\"] -> a %s" % (obj, obj))
+            self.choices["name"].append(name.lower())
 
         for room in challenge_knowledge.rooms:
             #parser.add_rule("ROOM[\"%s\"] -> %s" % (rooms, rooms))
-            self.parser.add_rule("ROOM[\"%s\"] -> %s" % (room, resolve_name(room, challenge_knowledge)))
-            self.choices["room"].append(room)
+            room_resolved = resolve_name(room, challenge_knowledge)
+            self.parser.add_rule("ROOM[\"%s\"] -> %s" % (room, room_resolved))
+            self.choices["room"].append(room_resolved)
 
         for obj_cat in challenge_knowledge.object_categories:
             self.parser.add_rule("OBJ_CAT[\"%s\"] -> %s" % (obj_cat, obj_cat))
 
         for container in challenge_knowledge.get_objects(category="container"):
             self.parser.add_rule("CONTAINER[\"%s\"] -> %s" % (container, container))
-
-        # for (alias, obj) in challenge_knowledge.object_aliases.iteritems():
-        #     #parser.add_rule("NP[\"%s\"] -> %s" % (obj, alias))
-        #     self.parser.add_rule("NP[\"%s\"] -> the %s" % (obj, alias))
-        #     self.parser.add_rule("NP[\"%s\"] -> a %s" % (obj, alias))
 
         self.grammar_string = unwrap_grammar("T", self.parser)
 

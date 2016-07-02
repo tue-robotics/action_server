@@ -101,6 +101,13 @@ class CommandCenter:
 
     # ------------------------------------------------------------------------------------------------------------------------
 
+    # Functions must have signature (robot, world, parameters)
+    def register_action(self, name, function):
+        print "Registering action {}".format(name)
+        self.action_functions[name] = function
+
+    # ------------------------------------------------------------------------------------------------------------------------
+
     # returns: None if getting command failed, otherwise (command_words, command_semantics)
     def request_command(self, ask_confirmation=True, ask_missing_info=False, timeout=600, sentences=None, n_tries=100):
 
