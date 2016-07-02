@@ -224,9 +224,6 @@ class CommandRecognizer:
 
         print "GRAMMAR STRING LENGTH: {}".format(len(self.grammar_string))
 
-        print self.grammar_string
-        print self.choices
-
         self.knowledge = challenge_knowledge
 
         # print len(self.grammar_string)
@@ -285,6 +282,8 @@ class CommandRecognizer:
             return None
 
         sentence = result.result
+
+        robot.speech.speak("You want me to %s" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
 
         if not sentence:
             return None

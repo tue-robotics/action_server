@@ -131,7 +131,9 @@ class CommandCenter:
         def ask_confirm(tries=3):
             sentence = " ".join(words)
 
-            self.robot.speech.speak("Do you want me to %s?" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
+            self.robot.speech.speak("Is that correct?", block=True)
+
+            # self.robot.speech.speak("Do you want me to %s?" % sentence.replace(" your", " my").replace(" me", " you"), block=True)
             for i in range(0, tries):
                 if rospy.is_shutdown():
                     return None
