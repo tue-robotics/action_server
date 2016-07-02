@@ -64,9 +64,9 @@ def resolve_entity_description(world, parameters):
 
 # ------------------------------------------------------------------------------------------------------------------------
 
-def move_robot(robot, world, id=None, type=None, nav_area=None, room=None):
+def move_robot(robot, world, id=None, type=None, nav_area=None, loc=None):
 
-    rospy.loginfo("ROBOT MOVING TO: ( id = {}, type = {}, nav_area = {}, room = {} )".format(id, type, nav_area, room))
+    rospy.loginfo("ROBOT MOVING TO: ( id = {}, type = {}, nav_area = {}, loc = {} )".format(id, type, nav_area, loc))
 
     if world.is_room(id):
         # Driving to a room
@@ -82,12 +82,19 @@ def move_robot(robot, world, id=None, type=None, nav_area=None, room=None):
         #    nwc =  NavigateToSymbolic(robot,
         #                                    { EntityByIdDesignator(robot, id=id) : "in" },
         #                                      EntityByIdDesignator(robot, id=id))
-        if room:
-            room_des = EdEntityDesignator(robot, id=room)
-            f = FindPerson(robot, room_des)
-            result = f.execute()
+        if loc:
+            if world.is_room(loc):
+                room_des = EdEntityDesignator(robot, id=room)
+                f = FindPerson(robot, room_des)
+                result = f.execute()
             # if result == 'succeeded':
             #     robot.speech.speak("I found you!")
+            else:
+                # TODO
+                move_robot(robot, world, id=loc)
+                #robot.base.force_drive(0, 0, 3.1415 / 4, 4)
+                f = FindPerson(robot, None)
+                result = f.execute()            
         else:
             robot.speech.speak("I don't know where I can find the person")
 
@@ -121,7 +128,7 @@ def navigate(robot, world, parameters):
         entity_descr.location = world.last_location
 
     if entity_descr.type == "person":
-        move_robot(robot, world, entity_descr.id, entity_descr.type, room=entity_descr.location.id)
+        move_robot(robot, world, entity_descr.id, entity_descr.type, loc=entity_descr.location.id)
 
     elif not entity_descr.id:
         not_implemented(robot, parameters)
@@ -144,7 +151,7 @@ def follow(robot, world, parameters):
         entity_descr.location = world.last_location
 
     if entity_descr.type == "person":
-        move_robot(robot, world, entity_descr.id, entity_descr.type, room=entity_descr.location.id)
+        move_robot(robot, world, entity_descr.id, entity_descr.type, loc=entity_descr.location.id)
 
     elif not entity_descr.id:
         not_implemented(robot, parameters)
@@ -231,12 +238,11 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
 
     if entity_descr.type == "person":
 
-        if world.is_room(entity_descr.location.id):
-            room = entity_descr.location.id
-        else:
-            room = world.get_room(entity_descr.location.id)
+        if not entity_descr.location:
+            robot.speech.speak("I need to find a person, but I have no idea where to start looking!", block=False)
+            return
 
-        move_robot(robot, world, id=entity_descr.id, type=entity_descr.type, room=room)
+        move_robot(robot, world, id=entity_descr.id, type=entity_descr.type, loc=entity_descr.location.id)
         return
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -416,7 +422,7 @@ def bring(robot, world, parameters):
 
     if to_descr.type == "person" or to_descr.id == "gpsr_starting_pose":
         if to_descr.location:
-            move_robot(robot, world, id=to_descr.id, type=to_descr.type, room=to_descr.location.id)
+            move_robot(robot, world, id=to_descr.id, type=to_descr.type, loc=to_descr.location.id)
         else:
             move_robot(robot, world, id=to_descr.id, type=to_descr.type)
 
