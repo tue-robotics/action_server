@@ -139,11 +139,20 @@ def unwrap_grammar(lname, parser):
         ok = True
         for conj in opt.conjuncts:
             if conj.is_variable:
-                unwrapped_string = unwrap_grammar(conj.name, parser)
-                if unwrapped_string:
-                    conj_strings.append(unwrapped_string)
+                if conj.name == "FURNITURE":
+                    conj_strings.append("<furniture>")
+                elif conj.name == "ROOM":
+                    conj_strings.append("<room>")
+                elif conj.name == "SMALL_OBJECT":
+                    conj_strings.append("<object>")
+                elif conj.name == "NAME":
+                    conj_strings.append("<name>")
                 else:
-                    ok = False
+                    unwrapped_string = unwrap_grammar(conj.name, parser)
+                    if unwrapped_string:
+                        conj_strings.append(unwrapped_string)
+                    else:
+                        ok = False
             else:
                 conj_strings.append(conj.name)
 
@@ -175,16 +184,20 @@ class CommandRecognizer:
     def __init__(self, grammar_file, challenge_knowledge):
         self.parser = cfgparser.CFGParser.fromfile(grammar_file)
 
+        self.choices = {"name" : [], "furniture" : [], "object" : [], "room" : []}
+
         for obj in challenge_knowledge.object_names:
             self.parser.add_rule("SMALL_OBJECT[\"%s\"] -> %s" % (obj, resolve_name(obj, challenge_knowledge)))
+            self.choices["object"].append(obj)
 
         for loc in challenge_knowledge.get_locations():
-            print loc
             #parser.add_rule("FURNITURE[\"%s\"] -> %s" % (furniture, furniture))
             self.parser.add_rule("FURNITURE[\"%s\"] -> %s" % (loc, resolve_name(loc, challenge_knowledge)))
+            self.choices["furniture"].append(loc)
 
         for name in challenge_knowledge.names:
             self.parser.add_rule("NAME[\"%s\"] -> %s" % (name.lower(), name.lower()))
+            self.choices["name"].append(name)
 
             # for obj in objects:
             #     #parser.add_rule("SMALL_OBJECT[\"%s\"] -> %s" % (obj, obj))
@@ -194,6 +207,7 @@ class CommandRecognizer:
         for room in challenge_knowledge.rooms:
             #parser.add_rule("ROOM[\"%s\"] -> %s" % (rooms, rooms))
             self.parser.add_rule("ROOM[\"%s\"] -> %s" % (room, resolve_name(room, challenge_knowledge)))
+            self.choices["room"].append(room)
 
         for obj_cat in challenge_knowledge.object_categories:
             self.parser.add_rule("OBJ_CAT[\"%s\"] -> %s" % (obj_cat, obj_cat))
@@ -207,6 +221,11 @@ class CommandRecognizer:
         #     self.parser.add_rule("NP[\"%s\"] -> a %s" % (obj, alias))
 
         self.grammar_string = unwrap_grammar("T", self.parser)
+
+        print "GRAMMAR STRING LENGTH: {}".format(len(self.grammar_string))
+
+        print self.grammar_string
+        print self.choices
 
         self.knowledge = challenge_knowledge
 
@@ -260,7 +279,7 @@ class CommandRecognizer:
 
     # Returns (words, semantics)
     def recognize(self, robot, timeout):
-        result = robot.ears.recognize(self.grammar_string, time_out=rospy.Duration(timeout))
+        result = robot.ears.recognize(self.grammar_string, choices=self.choices, time_out=rospy.Duration(timeout))
 
         if not result:
             return None
