@@ -84,7 +84,7 @@ def move_robot(robot, world, id=None, type=None, nav_area=None, loc=None):
         #                                      EntityByIdDesignator(robot, id=id))
         if loc:
             if world.is_room(loc):
-                room_des = EdEntityDesignator(robot, id=room)
+                room_des = EdEntityDesignator(robot, id=loc)
                 f = FindPerson(robot, room_des)
                 result = f.execute()
             # if result == 'succeeded':
