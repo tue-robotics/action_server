@@ -105,7 +105,7 @@ def move_robot(robot, world, id=None, type=None, nav_area=None, room=None):
             room_des = ds.EntityByIdDesignator(robot, id=room_id)
             nwc = NavigateToSymbolic(robot, {location_des : nav_area, room_des : "in"}, location_des)
         else:
-            nwc = NavigateToSymbolic(robot, {location_des : nav_area}, location_des)            
+            nwc = NavigateToSymbolic(robot, {location_des : nav_area}, location_des)
         nwc.execute()
     else:
         # Driving to anything else (e.g. a waypoint)
@@ -203,6 +203,15 @@ def say(robot, world, parameters):
         line = datetime.now().strftime('It is day %d of the month')
     elif sentence == 'DAY_OF_WEEK':
         line = datetime.today().strftime('Today is a %A')
+    elif sentence == 'JOKE':
+        line = random.choice([
+            "What do you call a fish with no eyes? A fsh.",
+            "You don't need a parachute to go skydiving. You need a parachute to go skydiving twice.",
+            "What is the difference between a snowman and a snowwomen? Snowballs.",
+            "What is Bruce Lee's favorite drink? Wataaaaah!",
+            "A blind man walks into a bar. And a table. And a chair.",
+            "It's color is yellow and when you push the button, it turns red?         A chick in the blender"
+        ])
     else:
         line = sentence
 
@@ -349,7 +358,7 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
                         best_prob = prob
                         entity_descr.id = det.id
 
-            if not entity_descr.id:         
+            if not entity_descr.id:
                 # If we are here, no classification result had a probability > 0 for the
                 # type we are looking for. Now simply get the closest entity
 
