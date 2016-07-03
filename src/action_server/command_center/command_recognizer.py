@@ -219,6 +219,9 @@ class CommandRecognizer:
 
         self.knowledge = challenge_knowledge
 
+        if not challenge_knowledge.rooms:
+            del self.choices["room"]
+
         # print len(self.grammar_string)
 
     # Returns: semantics
