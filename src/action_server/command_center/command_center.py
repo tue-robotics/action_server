@@ -12,7 +12,6 @@
 import os
 import sys
 import yaml
-import cfgparser
 import rospy
 import random
 import argparse
