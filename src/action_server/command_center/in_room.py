@@ -30,7 +30,7 @@ def in_room(robot, pose):
 
         # Create a convex hull to check
         convex_hull = []
-        for testarea in room.data['areas']:
+        for testarea in room.data['areas']:  # TODO: room is a robot_skills.util.Entity,  which does not have a .data-attribute
             ''' See if the area is in the list of inspection areas '''
             if testarea['name'] == 'in':
                 ''' Check if we have a shape '''
