@@ -392,7 +392,7 @@ def find_and_pick_up(robot, world, parameters, pick_up=True):
                     if not entity:
                         continue
 
-                    p = transformations.tf_transform(entity.pose.position, "/map",
+                    p = transformations.tf_transform(entity.pose.p, "/map",
                                                  robot.robot_name+"/base_link",
                                                  robot.tf_listener)
                     distance = p.x*p.x + p.y*p.y
