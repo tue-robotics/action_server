@@ -1,7 +1,7 @@
 import os
 import sys
 import yaml
-import cfgparser
+from grammar_parser import cfgparser
 import rospy
 import random
 import time

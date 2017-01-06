@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
     tue_config
     cb_planner_msgs_srvs
     ed
+    grammar_parser
 )
 
 # find_package(Boost REQUIRED COMPONENTS system program_options)

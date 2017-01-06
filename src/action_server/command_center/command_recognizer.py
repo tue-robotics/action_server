@@ -1,7 +1,7 @@
 #! /usr/bin/python
 
 import os
-import cfgparser
+from grammar_parser import cfgparser
 import sys
 import rospy
 
