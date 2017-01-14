@@ -40,9 +40,6 @@ def entities_from_description(entity_descr, robot):
     robot_pos = robot.base.get_location().pose.position
 
     # Sort entities by distance
-    entities = sorted(entities,
-                      key=lambda entity: length_sq(
-                          robot_pos.x - entity.pose.position.x,
-                          robot_pos.y - entity.pose.position.y))
+    entities = sorted(entities, key=lambda entity: entity.distance_to_2d(robot_pos))
 
     return (entities, "")
