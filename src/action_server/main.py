@@ -33,13 +33,13 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    server = Server("action_server_py", robot)
+    server = Server("state_machine_py", robot)
 
     # Register all actions that can be found in the actions module
     for name, obj in inspect.getmembers(actions):
         if inspect.isclass(obj):
             server.register_skill(class_name_camelcase_to_dashes(name), obj)
 
-    server.connect('action_server/register_action_server')
+    server.connect('state_machine/register_action_server')
 
     rospy.spin()
