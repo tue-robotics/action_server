@@ -38,7 +38,9 @@ if __name__ == "__main__":
     # Register all actions that can be found in the actions module
     for name, obj in inspect.getmembers(actions):
         if inspect.isclass(obj):
-            server.register_skill(class_name_camelcase_to_dashes(name), obj)
+            action_name = class_name_camelcase_to_dashes(name)
+            server.register_skill(action_name, obj)
+            rospy.logdebug("Adding {name}: {obj}".format(name=name, obj=obj))
 
     server.connect('state_machine/register_action_server')
 

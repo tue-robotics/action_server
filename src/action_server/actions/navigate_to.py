@@ -23,7 +23,7 @@ class NavigateTo(Action):
 
         e = entities[0]
 
-        if "waypoint" in e.types:
+        if e.is_a("waypoint"):
             self._nwc = NavigateToWaypoint(robot,
                                           waypoint_designator=robot_smach_states.util.designators.EdEntityDesignator(robot, id=e.id),
                                           radius=0.1)

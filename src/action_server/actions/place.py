@@ -4,7 +4,7 @@ from util import entities_from_description
 from robot_skills.arms import Arm
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
-import ed.msg
+from robot_skills.util.entity import Entity
 
 import threading
 
@@ -46,7 +46,7 @@ class Place(Action):
         except KeyError:
             height = 0.8
 
-        item_to_place = robot_smach_states.util.designators.Designator(arm.occupied_by, resolve_type=ed.msg.EntityInfo)  # Which item do we want to place? The object in the hand we indicated
+        item_to_place = robot_smach_states.util.designators.Designator(arm.occupied_by, resolve_type=Entity)  # Which item do we want to place? The object in the hand we indicated
         arm_with_item_designator = robot_smach_states.util.designators.Designator(arm, resolve_type=Arm)  # No need for ArmHoldingEntityDesignator, we already know that from the config
         place_position = robot_smach_states.util.designators.EmptySpotDesignator(robot, robot_smach_states.util.designators.EdEntityDesignator(robot, id=place_entity.id))
 
