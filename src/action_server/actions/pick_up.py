@@ -19,8 +19,8 @@ class PickUp(FSMAction):
         if not entities:
             return error_msg
 
-        # Only filter to entities that do not have a shape but do have a convex hull
-        entities = [e for e in entities if not e.has_shape and len(e.convex_hull) > 0]
+        # Only filter to entities that can be picked up, e.g not furniture etc
+        entities = [e for e in entities if not e.is_a("furniture")]
 
         if not entities:
             return "Inpossible to grab that object"

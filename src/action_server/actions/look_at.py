@@ -1,7 +1,7 @@
 from action import Action
 from util import entities_from_description
 
-import robot_skills.util.msg_constructors as msgs
+import robot_skills.util.kdl_conversions as kdl
 
 import threading
 
@@ -30,8 +30,8 @@ class LookAt(Action):
         self._robot.head.cancel_goal()
 
         if self._entity:
-            pos = self._entity.pose.position
-            self._robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, pos.z, "/map"), timeout=10)
+            pos = self._entity._pose
+            self._robot.head.look_at_point(kdl.VectorStamped(vector=pos, frame_id="/map"), timeout=10)
 
     def _cancel(self):
         self._robot.head.cancel_goal()
