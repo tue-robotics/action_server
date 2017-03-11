@@ -21,28 +21,6 @@ class Server(object):
         rospy.loginfo("Registering skill '%s' (%s)" % (action_type, skill))
         self._action_type_to_skill[action_type] = skill
 
-    def connect(self, register_service_name):
-        rospy.loginfo("Waiting for registration service ('%s') ..." % register_service_name)
-        rospy.wait_for_service(register_service_name)
-        rospy.loginfo("...found")
-
-        self._cl_register = rospy.ServiceProxy(register_service_name,
-                                              action_server.srv.RegisterActionServer)
-
-        try:
-            resp = self._cl_register(self._add_action_service_name,
-                                    self._get_action_status_service_name,
-                                    [k for k in self._action_type_to_skill.iterkeys()])
-        except rospy.ServiceException, e:
-            print "Service call failed: %s" % e
-            return False
-
-        if resp.error_msg:
-            rospy.logerr("Response from action server: " + resp.error_msg)
-            return False
-
-        return True
-
     def add_action_cb(self, req):
         try:
             action_class = self._action_type_to_skill[req.action]

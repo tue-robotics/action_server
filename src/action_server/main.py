@@ -15,7 +15,7 @@ def class_name_camelcase_to_dashes(name):
     return re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower()
 
 if __name__ == "__main__":
-    rospy.init_node('action_server_py')
+    rospy.init_node('action_server')
 
     # Create Robot object based on argv[1]
     if len(sys.argv) < 2:
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    server = Server("state_machine_py", robot)
+    server = Server("state_machine", robot)
 
     # Register all actions that can be found in the actions module
     for name, obj in inspect.getmembers(actions):
@@ -41,7 +41,5 @@ if __name__ == "__main__":
             action_name = class_name_camelcase_to_dashes(name)
             server.register_skill(action_name, obj)
             rospy.logdebug("Adding {name}: {obj}".format(name=name, obj=obj))
-
-    server.connect('state_machine/register_action_server')
 
     rospy.spin()
