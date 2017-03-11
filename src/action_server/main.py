@@ -42,6 +42,4 @@ if __name__ == "__main__":
             server.register_skill(action_name, obj)
             rospy.logdebug("Adding {name}: {obj}".format(name=name, obj=obj))
 
-    server.connect('state_machine/register_action_server')
-
     rospy.spin()
