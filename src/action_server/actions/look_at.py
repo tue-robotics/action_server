@@ -30,7 +30,7 @@ class LookAt(Action):
         self._robot.head.cancel_goal()
 
         if self._entity:
-            pos = self._entity._pose
+            pos = self._entity._pose.p
             self._robot.head.look_at_point(kdl.VectorStamped(vector=pos, frame_id="/map"), timeout=10)
 
     def _cancel(self):
