@@ -4,8 +4,18 @@ from robot_skills.robot import Robot
 import smach
 
 class Action:
+    def configure(self, config):
+        res = self._configure(config)
+        if res:
+            self._config = config
+            return True
+        else:
+            return False
 
-    def start(self, config, robot):
+    def configure(self, config):
+        raise NotImplementedError
+
+    def start(self, robot):
         if not isinstance(config, dict):
             rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
             return False
@@ -32,10 +42,10 @@ class FSMAction(Action):
     def __init__(self):
         self._fsm = None
 
-    def _init_fsm(self, config, robot):
+    def _init_fsm(self, robot):
         raise NotImplementedError
 
-    def _start(self, config, robot):
+    def _start(self, robot):
         err = self._init_fsm(config, robot)
         if err:
             return err
