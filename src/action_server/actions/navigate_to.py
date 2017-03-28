@@ -11,28 +11,34 @@ class NavigateTo(Action):
     def __init__(self):
         self._nwc = None
 
-    def _start(self, config, robot):
-
+    def _configure_(self, robot, config):
         if "entity" not in config:
-            return "No entity given"
+            self._config_result.missing_field = "entity"
+            return
 
-        entity_descr = config["entity"]
-        (entities, error_msg) = entities_from_description(entity_descr, robot)
+        self._robot = robot # TODO: this should also check if the given robot is capable of this action.
+        self._entity_description = config["entity"]
+
+        self._config_result.succeeded = True
+        return
+
+    def _start(self):
+        (entities, error_msg) = entities_from_description(self._entity_description, self._robot)
         if not entities:
             return error_msg
 
         e = entities[0]
 
         if e.is_a("waypoint"):
-            self._nwc = NavigateToWaypoint(robot,
-                                          waypoint_designator=robot_smach_states.util.designators.EdEntityDesignator(robot, id=e.id),
+            self._nwc = NavigateToWaypoint(self._robot,
+                                          waypoint_designator=robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=e.id),
                                           radius=0.1)
-            rospy.logwarn("ACTION_SERVER: Navigating to waypoint")
+            rospy.loginfo("Navigating to waypoint")
         else:
-            self._nwc = NavigateToObserve(robot,
-                                         entity_designator=robot_smach_states.util.designators.EdEntityDesignator(robot, id=e.id),
+            self._nwc = NavigateToObserve(self._robot,
+                                         entity_designator=robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=e.id),
                                          radius=.5)
-            rospy.logwarn("ACTION_SERVER: Navigating to observe")
+            rospy.loginfo("Navigating to observe")
 
         self._thread = threading.Thread(name='navigate', target=self._nwc.execute)
         self._thread.start()

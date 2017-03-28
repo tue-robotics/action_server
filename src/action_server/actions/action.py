@@ -3,19 +3,17 @@ import rospy, threading
 from robot_skills.robot import Robot
 import smach
 
+class ConfigurationResult(object):
+    def __init__(self, succeeded=False, resulting_knowledge=None):
+        if resulting_knowledge is None:
+            resulting_knowledge = {}
+
+        self.succeeded = succeeded
+        self.resulting_knowledge = resulting_knowledge
+        self.missing_field = None
+
 class Action:
-    def configure(self, config):
-        res = self._configure(config)
-        if res:
-            self._config = config
-            return True
-        else:
-            return False
-
-    def configure(self, config):
-        raise NotImplementedError
-
-    def start(self, robot):
+    def configure(self, robot, config):
         if not isinstance(config, dict):
             rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
             return False
@@ -24,9 +22,17 @@ class Action:
             rospy.logerr("Action: the specified robot should be a Robot! I received: %s" % str(robot))
             return False
 
-        return self._start(config, robot)
+        self._config_result = ConfigurationResult()
+        self._configure(robot, config)
+        return self._config_result
 
-    def _start(self, config, robot):
+    def _configure(self, robot, config):
+        raise NotImplementedError
+
+    def start(self):
+        return self._start()
+
+    def _start(self):
         raise NotImplementedError
 
     def cancel(self):

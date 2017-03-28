@@ -2,8 +2,8 @@
 
 import rospy
 import actionlib
-import task_manager.msg
-        
+import action_server.msg
+from action_factory import ActionFactory
 
 class TaskManager(object):
     def __init__(self, robot):
@@ -14,28 +14,36 @@ class TaskManager(object):
 
         # Set up actionlib interface for clients to give a task to the robot.
         self._action_name = robot.robot_name + "/task/"
-        self._action_server = actionlib.SimpleActionServer(self._action_name, task_manager.msg.TaskAction, execute_cb=self._execute_cb, auto_start=False)
-        self._feedback = task_manager.msg.TaskFeedback()
-        self._result = task_manager.msg.TaskResult()
+        self._action_server = actionlib.SimpleActionServer(self._action_name, action_server.msg.TaskAction, execute_cb=self._execute_cb, auto_start=False)
+        self._feedback = action_server.msg.TaskFeedback()
+        self._result = action_server.msg.TaskResult()
         self._action_server.start()
 
-    def _execute_cb(self, task):
-        recipe = self._parser.parse(task)
-        if self.self._set_up_state_machine(recipe):
+    def _execute_cb(self, goal):
+        configuration_result = self._set_up_state_machine(goal.recipe)
+        if configuration_result and configuration_result.succeeded:
             self._execute_state_machine()
             self._action_server.set_succeeded()
         else:
-            self._action_server.set_failed()
+            self._action_server.set_aborted(configuration_result)
 
     def _set_up_state_machine(self, recipe):
-        for action_name, config in recipe:
+        configuration_result = None
+        for action_name, config in recipe.iteritems():
+            # Set up the action
             Action = self._action_factory.get_action(action_name)
             action = Action()
-            if action.configure(config)
+
+            # Try to configure the action
+            configuration_result = action.configure(config)
+
+            # If action configuration succeeded, append configured action to action sequence
+            if configuration_result.succeeded:
                 self._action_sequence.append(action)
+            # If action configuration failed, return the configuration result, specifying what went wrong
             else:
-                return False
-        return True
+                return configuration_result
+        return configuration_result
 
     def _execute_state_machine(self):
         for action in self._action_sequence:
@@ -43,32 +51,6 @@ class TaskManager(object):
                 return False
         return True
 
-    def add_action_cb(self, req):
-        try:
-            action_class = self._action_name_to_class[req.action]
-        except KeyError:
-            return action_server.srv.AddActionResponse("", "Action type '%s' not found." % req.action)
-
-        config = yaml.load(req.parameters)
-
-        if self._action:
-            self._action.cancel()
-
-        action = action_class()
-
-        try:
-            err = action.start(config, self._robot)
-            if not err:
-                self._action = action
-                id = str(uuid.uuid1())
-                return action_server.srv.AddActionResponse(id, "")
-            else:
-                return action_server.srv.AddActionResponse("", "Could not construct action: %s" % err)
-        except Exception as err:
-            error_msg = "%s\n\n" % err
-            import traceback
-            error_msg += traceback.format_exc()
-            return action_server.srv.AddActionResponse("", "Error while starting action: %s" % error_msg)
 
 if __name__ == "__main__":
     rospy.init_node('task_manager')
@@ -89,10 +71,7 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    task_manager = TaskManager()
-
-    # Register all actions that can be found in the actions module
-    
+    task_manager = TaskManager(robot)
 
     rospy.spin()
 

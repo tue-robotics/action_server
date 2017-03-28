@@ -4,7 +4,7 @@
   <version>0.0.0</version>
   <description>No description available</description>
 
-  <maintainer email="todo@tue.nl">todo</maintainer>
+  <maintainer email="rokusottervanger@github.com">Rokus Ottervanger</maintainer>
 
   <license>TODO</license>
 
@@ -30,5 +30,10 @@
 
   <build_depend>robot_skills</build_depend>
   <run_depend>robot_skills</run_depend>
+
+  <build_depend>actionlib</build_depend>
+  <build_depend>actionlib_msgs</build_depend>
+  <run_depend>actionlib</run_depend>
+  <run_depend>actionlib_msgs</run_depend>
 
 </package>

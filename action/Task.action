@@ -1,0 +1,13 @@
+# The goal contains a task recipe
+string recipe
+---
+# The result of configuring and executing the task recipe
+uint8 RESULT_MISSING_INFORMATION=0
+uint8 RESULT_TASK_EXECUTION_FAILED=1
+uint8 RESULT_SUCCEEDED=2
+uint8 RESULT_UNKNOWN=3
+
+uint8 result
+---
+# The message that can be reported to the user
+string log_message

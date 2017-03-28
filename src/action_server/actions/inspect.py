@@ -1,20 +1,39 @@
-from action import FSMAction
+from action import Action
 
 from util import entities_from_description
 
 import robot_smach_states
+import threading
 
-class Inspect(FSMAction):
-
-    def _init_fsm(self, config, robot):
+class InspectAction(Action):
+    def _configure(self, robot, config):
         if "entity" not in config:
-            return "No entity given"
+            self._config_result.missing_field = "entity"
+            return
 
-        entity_descr = config["entity"]
-        (entities, error_msg) = entities_from_description(entity_descr, robot)
+        self._robot = robot # TODO: this should also check if the given robot is capable of this action.
+        self._entity_description = config["entity"]
+
+        self._config_result.succeeded = True
+        return
+
+    def _start(self):
+        (entities, error_msg) = entities_from_description(self._entity_descr, robot)
         if not entities:
             return error_msg
 
         entity = entities[0]
 
-        self._fsm = robot_smach_states.world_model.Inspect(robot, entityDes = robot_smach_states.util.designators.EdEntityDesignator(robot, id=entity.id))
+        self._fsm = robot_smach_states.world_model.Inspect(self._robot,
+                                                           entityDes=robot_smach_states.util.designators.EdEntityDesignator(
+                                                               robot, id=entity.id))
+
+        self._thread = threading.Thread(name='inspect', target=self._fsm.execute)
+        self._thread.start()
+
+    def _cancel(self):
+        if self._fsm.is_running:
+            self._fsm.request_preempt()
+
+        # Wait until canceled
+        self._thread.join()

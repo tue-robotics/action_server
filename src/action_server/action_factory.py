@@ -9,9 +9,8 @@ def class_name_camelcase_to_dashes(name):
 
 class ActionFactory(object):
 
-    def __init__(self, name, robot):
+    def __init__(self):
         self._action_name_to_class = {}
-        self._robot = robot
 
         for name, obj in inspect.getmembers(actions):
             if inspect.isclass(obj):

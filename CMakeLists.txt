@@ -3,6 +3,9 @@ project(action_server)
 
 find_package(catkin REQUIRED COMPONENTS
     message_generation
+    genmsg
+    actionlib_msgs
+    actionlib
 )
 
 catkin_python_setup()
@@ -18,8 +21,16 @@ add_service_files(
    GetActionStatus.srv
 )
 
+add_action_files(
+   DIRECTORY
+   action
+   FILES
+   Task.action
+)
+
 # Generate added messages and services with any dependencies listed here
 generate_messages(
+    DEPENDENCIES actionlib_msgs
 )
 
 # ------------------------------------------------------------------------------------------------
