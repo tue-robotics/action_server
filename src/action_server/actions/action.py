@@ -18,6 +18,10 @@ class ActionResult(object):
         self.message = message
 
 class Action:
+    def __init__(self):
+        self._config_result = ConfigurationResult()
+        self._execute_result = ActionResult()
+
     def configure(self, robot, config):
         if not isinstance(config, dict):
             rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
@@ -27,7 +31,6 @@ class Action:
             rospy.logerr("Action: the specified robot should be a Robot! I received: %s" % str(robot))
             return False
 
-        self._config_result = ConfigurationResult()
         self._configure(robot, config)
         return self._config_result
 
@@ -35,7 +38,8 @@ class Action:
         raise NotImplementedError
 
     def start(self):
-        return self._start()
+        self._start()
+        return self._execute_result
 
     def _start(self):
         raise NotImplementedError
