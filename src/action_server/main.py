@@ -1,18 +1,11 @@
 #!/usr/bin/env python
 
 '''
-A central place to dispatch actions received from various sources. These sources could come from
-GUIs, command line tools or natural language.
+The Action Server ROS node running an instance of the server for a specific robot.
 '''
 
-import rospy, sys, inspect, re
-
-import actions
+import rospy, sys
 from server import Server
-
-def class_name_camelcase_to_dashes(name):
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower()
 
 if __name__ == "__main__":
     rospy.init_node('action_server')
@@ -34,12 +27,5 @@ if __name__ == "__main__":
     robot = Robot()
 
     server = Server("state_machine", robot)
-
-    # Register all actions that can be found in the actions module
-    for name, obj in inspect.getmembers(actions):
-        if inspect.isclass(obj):
-            action_name = class_name_camelcase_to_dashes(name)
-            server.register_skill(action_name, obj)
-            rospy.logdebug("Adding {name}: {obj}".format(name=name, obj=obj))
 
     rospy.spin()

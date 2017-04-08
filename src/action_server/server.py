@@ -1,9 +1,13 @@
-import rospy, yaml, uuid
+import rospy, yaml
 
 import action_server.srv
 import actionlib
 import action_server.msg
 from task_manager import TaskManager
+
+'''
+The Server wraps the TaskManager to expose a ROS actionlib interface.
+'''
 
 class Server(object):
 
@@ -23,14 +27,26 @@ class Server(object):
     def _add_action_cb(self, goal):
         recipe = yaml.load(goal.recipe)
 
-        configuration_result = self._task_manager.configure(recipe)
+        configuration_result = self._task_manager.set_up_state_machine(recipe)
 
-        if not configuration_result.succeeded:
+        if configuration_result.succeeded:
+            rospy.loginfo("Setting up state machine succeeded")
+        else:
             self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
             self._action_server.set_aborted(self._result)
+            rospy.loginfo("Setting up state machine failed")
+            return
 
-        while True:
-            action_result = self._task_manager.run_next_action()
+        self._feedback.log_messages = []
+
+        while not self._task_manager.done:
+            action_result = self._task_manager.execute_next_action()
+            self._feedback.log_messages.append(action_result.message)
             if not action_result.succeeded:
-                break
-            # TODO: Send feedback here
+                # TODO: If an action failed, this does not mean the following actions are useless to do
+                self._action_server.set_aborted(self._result)
+                rospy.logwarn("Execution of state machine aborted because action failed.")
+                return
+
+        rospy.loginfo("Execution of state machine succeeded.")
+        self._action_server.set_succeeded(self._result)

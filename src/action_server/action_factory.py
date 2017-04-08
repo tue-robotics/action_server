@@ -1,5 +1,6 @@
 #! /usr/bin/python
 
+import rospy
 import inspect, re
 import actions
 

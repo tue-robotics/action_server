@@ -10,4 +10,4 @@ uint8 RESULT_UNKNOWN=3
 uint8 result
 ---
 # The message that can be reported to the user
-string log_message
+string[] log_messages
