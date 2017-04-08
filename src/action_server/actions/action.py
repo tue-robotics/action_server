@@ -12,6 +12,11 @@ class ConfigurationResult(object):
         self.resulting_knowledge = resulting_knowledge
         self.missing_field = None
 
+class ActionResult(object):
+    def __init__(self, succeeded=False, message=""):
+        self.succeeded = succeeded
+        self.message = message
+
 class Action:
     def configure(self, robot, config):
         if not isinstance(config, dict):
