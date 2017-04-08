@@ -1,49 +1,36 @@
 import rospy, yaml, uuid
 
 import action_server.srv
+import actionlib
+import action_server.msg
+from task_manager import TaskManager
 
 class Server(object):
 
     def __init__(self, name, robot):
         self._name = name
-        self._action_type_to_skill = {}
-        self._action = None
         self._robot = robot
-        self._cl_register = None
+        self._task_manager = TaskManager(self._robot)
 
-        self._add_action_service_name = self._name + '/add_action'
-        self._get_action_status_service_name = self._name + '/get_action_status'
-        self._srv_add_action = rospy.Service(self._add_action_service_name,
-                                            action_server.srv.AddAction,
-                                            self.add_action_cb)
+        # Set up actionlib interface for clients to give a task to the robot.
+        self._action_name = robot.robot_name + "/task"
+        self._action_server = actionlib.SimpleActionServer(self._action_name, action_server.msg.TaskAction,
+                                                           execute_cb=self._add_action_cb, auto_start=False)
+        self._feedback = action_server.msg.TaskFeedback()
+        self._result = action_server.msg.TaskResult()
+        self._action_server.start()
 
-    def register_skill(self, action_type, skill):
-        rospy.loginfo("Registering skill '%s' (%s)" % (action_type, skill))
-        self._action_type_to_skill[action_type] = skill
+    def _add_action_cb(self, goal):
+        recipe = yaml.load(goal.recipe)
 
-    def add_action_cb(self, req):
-        try:
-            action_class = self._action_type_to_skill[req.action]
-        except KeyError:
-            return action_server.srv.AddActionResponse("", "Action type '%s' not found." % req.action)
+        configuration_result = self._task_manager.configure(recipe)
 
-        config = yaml.load(req.parameters)
+        if not configuration_result.succeeded:
+            self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
+            self._action_server.set_aborted(self._result)
 
-        if self._action:
-            self._action.cancel()
-
-        action = action_class()
-
-        try:
-            err = action.start(config, self._robot)
-            if not err:
-                self._action = action
-                id = str(uuid.uuid1())
-                return action_server.srv.AddActionResponse(id, "")
-            else:
-                return action_server.srv.AddActionResponse("", "Could not construct action: %s" % err)
-        except Exception as err:
-            error_msg = "%s\n\n" % err
-            import traceback
-            error_msg += traceback.format_exc()
-            return action_server.srv.AddActionResponse("", "Error while starting action: %s" % error_msg)
+        while True:
+            action_result = self._task_manager.run_next_action()
+            if not action_result.succeeded:
+                break
+            # TODO: Send feedback here

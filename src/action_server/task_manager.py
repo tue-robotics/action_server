@@ -1,8 +1,6 @@
 #! /usr/bin/python
 
 import rospy
-import actionlib
-import action_server.msg
 from action_factory import ActionFactory
 
 class TaskManager(object):
@@ -12,20 +10,8 @@ class TaskManager(object):
         self._action_factory = ActionFactory()
         self._action_sequence = []
 
-        # Set up actionlib interface for clients to give a task to the robot.
-        self._action_name = robot.robot_name + "/task/"
-        self._action_server = actionlib.SimpleActionServer(self._action_name, action_server.msg.TaskAction, execute_cb=self._execute_cb, auto_start=False)
-        self._feedback = action_server.msg.TaskFeedback()
-        self._result = action_server.msg.TaskResult()
-        self._action_server.start()
-
-    def _execute_cb(self, goal):
-        configuration_result = self._set_up_state_machine(goal.recipe)
-        if configuration_result and configuration_result.succeeded:
-            self._execute_state_machine()
-            self._action_server.set_succeeded()
-        else:
-            self._action_server.set_aborted(configuration_result)
+    def configure(self, recipe):
+        return self._set_up_state_machine(recipe)
 
     def _set_up_state_machine(self, recipe):
         configuration_result = None
