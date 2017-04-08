@@ -5,7 +5,7 @@ from util import entities_from_description
 import robot_smach_states
 import threading
 
-class InspectAction(Action):
+class Inspect(Action):
     def _configure(self, robot, config):
         if "entity" not in config:
             self._config_result.missing_field = "entity"
