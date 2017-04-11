@@ -114,7 +114,7 @@ class PersonDesignator(ds.Designator):
             return persons_in_room[0]
         else:
             # We just pick the person closest to the robot
-            bp = self._robot.base.get_location()
+            bp = self._robot.base.get_location().frame
             possible_humans = sorted(possible_humans,
                                      key=lambda ph: math.hypot(ph.pose.position.x - bp.pose.position.x,
                                                                ph.pose.position.y - bp.pose.position.y))
