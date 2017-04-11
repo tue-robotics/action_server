@@ -13,6 +13,7 @@ class ResetWM(Action):
 
     def _start(self):
         self._robot.ed.reset()
+        self._execute_result.succeeded = True
 
     def _cancel(self):
         pass
