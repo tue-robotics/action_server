@@ -1,4 +1,5 @@
-from action import Action, ConfigureResult
+from action import Action
+
 
 class ResetWM(Action):
 
