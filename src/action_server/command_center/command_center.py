@@ -123,7 +123,7 @@ class CommandCenter:
                 if rospy.is_shutdown():
                     return None
 
-                self.robot.speech.speak(sentence, block=False)
+                self.robot.speech.speak(sentence, block=True)
                 res = self.command_recognizer.recognize(self.robot, timeout=timeout)
                 if not res:
                     pass

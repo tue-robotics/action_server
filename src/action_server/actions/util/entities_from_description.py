@@ -37,7 +37,7 @@ def entities_from_description(entity_descr, robot):
     if not entities:
         return ([], "No such entity")
 
-    robot_pos = robot.base.get_location().p
+    robot_pos = robot.base.get_location().frame.p
 
     # Sort entities by distance
     entities = sorted(entities, key=lambda entity: entity.distance_to_2d(robot_pos))
