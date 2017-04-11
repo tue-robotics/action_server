@@ -6,28 +6,33 @@ import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
 
+import rospy
 import threading
+
 
 class Place(Action):
 
     def __init__(self):
+        Action.__init__(self)
         self._place = None
         self._thread = None
         self._goal_entity = None
 
-    def _start(self, config, robot):
-        print "Place!"
+    def _configure(self, robot, config):
+        self._robot = robot
 
         try:
             self._goal_entity = config["entity"]
         except KeyError:
-            return "Specify an 'entity' to place on"
+            rospy.logwarn("Specify an 'entity' to place on")
+            return
 
-        # Get 'from' location
-        (entities, error_msg) = entities_from_description(config["entity"], robot)
+        entity_description = {"id": config["entity"]}
+        (entities, error_msg) = entities_from_description(entity_description, robot)
         if not entities:
-            return error_msg
-        place_entity = entities[0]
+            rospy.logwarn(error_msg)
+            return
+        self._place_entity = entities[0]
 
         try:
             side = config["side"]
@@ -35,25 +40,31 @@ class Place(Action):
             side = "right"  # Default
 
         if side == "left":
-            arm = robot.leftArm
-            goal_y = 0.2
+            self._arm = robot.leftArm
+            self._goal_y = 0.2
         else:
-            arm = robot.rightArm
-            goal_y = -0.2
+            self._arm = robot.rightArm
+            self._goal_y = -0.2
 
         try:
-            height = config["height"]
+            self._height = config["height"]
         except KeyError:
-            height = 0.8
+            self._height = 0.8
 
-        item_to_place = robot_smach_states.util.designators.Designator(arm.occupied_by, resolve_type=Entity)  # Which item do we want to place? The object in the hand we indicated
-        arm_with_item_designator = robot_smach_states.util.designators.Designator(arm, resolve_type=Arm)  # No need for ArmHoldingEntityDesignator, we already know that from the config
-        place_position = robot_smach_states.util.designators.EmptySpotDesignator(robot, robot_smach_states.util.designators.EdEntityDesignator(robot, id=place_entity.id))
+        self._config_result.succeeded = True
 
-        self._place = PlaceSmachState(robot, item_to_place, place_position, arm_with_item_designator)
+    def _start(self):
+        item_to_place = robot_smach_states.util.designators.Designator(self._arm.occupied_by, resolve_type=Entity)  # Which item do we want to place? The object in the hand we indicated
+        arm_with_item_designator = robot_smach_states.util.designators.Designator(self._arm, resolve_type=Arm)  # No need for ArmHoldingEntityDesignator, we already know that from the config
+        place_position = robot_smach_states.util.designators.EmptySpotDesignator(self._robot, robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self._place_entity.id))
+
+        self._place = PlaceSmachState(self._robot, item_to_place, place_position, arm_with_item_designator)
 
         self._thread = threading.Thread(name='grab', target=self._place.execute)
         self._thread.start()
+
+        self._thread.join()
+        self._execute_result.succeeded = True
 
     def _cancel(self):
         if self._place.is_running:

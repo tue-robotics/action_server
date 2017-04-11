@@ -5,11 +5,15 @@ import robot_smach_states
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToGrasp, NavigateToSymbolic
 import robot_skills.util.msg_constructors as msgs
 
-import threading, time, rospy
+import threading
+import time
+import rospy
+
 
 class Bring(Action):
 
     def __init__(self):
+        Action.__init__(self)
         self._fsm = None
         self._thread = None
 
@@ -17,22 +21,26 @@ class Bring(Action):
         self._to_entity = None
         self._entity_description = None
 
-    def _start(self, config, robot):
+    def _configure(self, robot, config):
         self._robot = robot
 
         if "from" not in config or "to" not in config:
-            return "Please specify a from and to entity"
+            rospy.logwarn("Please specify a from and to entity")
+            return
 
         # Get 'from' location
         (entities, error_msg) = entities_from_description(config["from"], robot)
         if not entities:
-            return error_msg
+            rospy.logwarn(error_msg)
+            return
+
         self._from_entity = entities[0]
 
         # Get 'to' location
         (entities, error_msg) = entities_from_description(config["to"], robot)
         if not entities:
-            return error_msg
+            rospy.logwarn(error_msg)
+            return
         self._to_entity = entities[0]
 
         if "to_radius" in config:
@@ -47,12 +55,16 @@ class Bring(Action):
 
         # Get type of entity that should be transported
         if "entity" not in config:
-            return "Please specify the entity argument (dictionary)"
+            rospy.logwarn("Please specify the entity argument (dictionary)")
+            return
 
         self._entity_description = config["entity"]
+        self._config_result.succeeded = True
 
+    def _start(self):
         self._thread = threading.Thread(name='bring', target=self._execute)
         self._thread.start()
+        self._thread.join()
 
     def _execute(self):
 
@@ -126,6 +138,8 @@ class Bring(Action):
 
         # Cancel the head goal
         self._robot.head.cancel_goal()
+
+        self._execute_result.succeeded = True
 
     def _cancel(self):
         if self._fsm:

@@ -4,6 +4,8 @@ from util import entities_from_description
 import robot_skills.util.kdl_conversions as kdl
 
 import threading
+import rospy
+
 
 class LookAt(Action):
 
@@ -11,20 +13,28 @@ class LookAt(Action):
         self._robot = None
         self._entity = None
 
-    def _start(self, config, robot):
+    def _configure(self, robot, config):
         self._robot = robot
 
         if "entity" not in config:
-            return "Please specify an entity to look at"
+            self._config_result.missing_field = "entity"
+            rospy.logwarn("Please specify an entity to look at")
+            return
 
         (entities, error_msg) = entities_from_description(config["entity"], robot)
         if not entities:
-            return error_msg
+            rospy.logwarn(error_msg)
+            return
 
         self._entity = entities[0]
 
-        self._thread = threading.Thread(name='arm-goal', target=self._execute)
+        self._config_result.succeeded = True
+
+    def _start(self):
+        self._thread = threading.Thread(name='head-goal', target=self._execute)
         self._thread.start()
+
+        self._thread.join()
 
     def _execute(self):
         self._robot.head.cancel_goal()
@@ -32,6 +42,8 @@ class LookAt(Action):
         if self._entity:
             pos = self._entity._pose.p
             self._robot.head.look_at_point(kdl.VectorStamped(vector=pos, frame_id="/map"), timeout=10)
+
+        self._execute_result.succeeded = True
 
     def _cancel(self):
         self._robot.head.cancel_goal()
