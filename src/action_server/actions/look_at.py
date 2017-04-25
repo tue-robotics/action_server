@@ -10,6 +10,7 @@ import rospy
 class LookAt(Action):
 
     def __init__(self):
+        Action.__init__(self)
         self._robot = None
         self._entity = None
 

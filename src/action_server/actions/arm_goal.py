@@ -7,6 +7,7 @@ import rospy
 class ArmGoal(Action):
 
     def __init__(self):
+        Action.__init__(self)
         self._arm = None
         self._symbolic_goal = None
 
