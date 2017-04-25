@@ -16,7 +16,7 @@ class Inspect(Action):
             return
 
         self._robot = robot  # TODO: this should also check if the given robot is capable of this action.
-        self._entity_description = {"id": config["entity"]}
+        self._entity_description = config["entity"]
 
         self._config_result.succeeded = True
         return

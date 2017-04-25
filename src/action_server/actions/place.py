@@ -27,8 +27,7 @@ class Place(Action):
             rospy.logwarn("Specify an 'entity' to place on")
             return
 
-        entity_description = {"id": config["entity"]}
-        (entities, error_msg) = entities_from_description(entity_description, robot)
+        (entities, error_msg) = entities_from_description(config["entity"], robot)
         if not entities:
             rospy.logwarn(error_msg)
             return

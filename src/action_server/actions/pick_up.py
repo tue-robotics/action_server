@@ -21,8 +21,7 @@ class PickUp(Action):
             rospy.logwarn("No entity given")
             return
 
-        entity_descr = {"id": config["entity"]}
-        (entities, error_msg) = entities_from_description(entity_descr, robot)
+        (entities, error_msg) = entities_from_description(config["entity"], robot)
         if not entities:
             rospy.logwarn(error_msg)
             return

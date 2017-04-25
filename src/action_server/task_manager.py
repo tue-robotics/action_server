@@ -25,7 +25,7 @@ class TaskManager(object):
             action = Action()
 
             # Try to configure the action
-            configuration_result = action.configure(self._robot, instruction['parameters'])
+            configuration_result = action.configure(self._robot, instruction)
 
             # If action configuration succeeded, append configured action to action sequence
             if configuration_result.succeeded:
