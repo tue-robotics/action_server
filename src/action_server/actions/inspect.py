@@ -7,6 +7,9 @@ import threading
 
 
 class Inspect(Action):
+    def __init__(self):
+        Action.__init__(self)
+
     def _configure(self, robot, config):
         if "entity" not in config:
             self._config_result.missing_field = "entity"
