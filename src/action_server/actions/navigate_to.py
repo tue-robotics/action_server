@@ -17,6 +17,7 @@ class NavigateTo(Action):
     def _configure(self, robot, config):
         if "entity" not in config:
             self._config_result.missing_field = "entity"
+            rospy.loginfo("Missing entity field")
             return
 
         # TODO: this should also check if the given robot is capable of this action.
