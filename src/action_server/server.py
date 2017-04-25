@@ -44,9 +44,11 @@ class Server(object):
             self._feedback.log_messages.append(action_result.message)
             if not action_result.succeeded:
                 # TODO: If an action failed, this does not mean the following actions are useless to do
+                self._result.result = action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
                 self._action_server.set_aborted(self._result)
                 rospy.logwarn("Execution of state machine aborted because action failed.")
                 return
 
         rospy.loginfo("Execution of state machine succeeded.")
+        self._result.result = action_server.msg.TaskResult.RESULT_SUCCEEDED
         self._action_server.set_succeeded(self._result)
