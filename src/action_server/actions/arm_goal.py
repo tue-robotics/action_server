@@ -14,6 +14,7 @@ class ArmGoal(Action):
     def _configure(self, robot, config):
         if not "side" in config:
             rospy.logwarn( "Please provide 'side'")
+            self._config_result.missing_field = "side"
             return
 
         if config['side'] == 'left':
