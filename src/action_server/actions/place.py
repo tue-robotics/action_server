@@ -19,6 +19,12 @@ class Place(Action):
         self._goal_entity = None
 
     def _configure(self, robot, config):
+        # TODO: remove right and left
+        if not hasattr(robot, 'rightArm') or hasattr(robot, 'leftArm'):
+            rospy.logerr("Robot {} does not have attribute 'speech'".format(robot.robot_name))
+            self._config_result.missing_skill = "speech"
+            return
+
         self._robot = robot
 
         try:
