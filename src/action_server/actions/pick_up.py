@@ -13,6 +13,7 @@ class PickUp(Action):
 
     def __init__(self):
         Action.__init__(self)
+        self._required_parameters = ['entity']
 
     def _configure(self, robot, config):
         # TODO: remove right and left
@@ -22,10 +23,6 @@ class PickUp(Action):
             return
 
         self._robot = robot
-
-        if not "entity" in config:
-            rospy.logwarn("No entity given")
-            return
 
         (entities, error_msg) = entities_from_description(config["entity"], robot)
         if not entities:
