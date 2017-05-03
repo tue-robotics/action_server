@@ -23,6 +23,15 @@ class Action:
     def __init__(self):
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
+        self._required_parameters = []
+
+    def _check_parameters(self, config):
+        for p in self._required_parameters:
+            if p not in config:
+                rospy.logerr("Missing required parameter {}".format(p))
+                self._config_result.missing_field = p
+                return False
+        return True
 
     def configure(self, robot, config):
         if not isinstance(config, dict):
@@ -32,6 +41,9 @@ class Action:
         if not isinstance(robot, Robot):
             rospy.logerr("Action: the specified robot should be a Robot! I received: %s" % str(robot))
             return False
+
+        if not self._check_parameters(config):
+            return self._config_result
 
         self._configure(robot, config)
         return self._config_result
