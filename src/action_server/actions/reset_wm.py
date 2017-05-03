@@ -7,6 +7,11 @@ class ResetWM(Action):
         Action.__init__(self)
 
     def _configure(self, robot, config):
+        if not hasattr(robot, "ed"):
+            rospy.logerr("Robot {} does not have attribute 'ed'".format(robot.robot_name))
+            self._config_result.missing_skill = "ed"
+            return
+
         self._robot = robot  # TODO: this should also check if the given robot is capable of this action.
 
         self._config_result.succeeded = True
