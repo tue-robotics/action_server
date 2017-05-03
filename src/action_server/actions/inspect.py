@@ -30,9 +30,15 @@ class Inspect(Action):
 
         entity = entities[0]
 
+        if entity.is_a('furniture'):
+            area = 'in_front_of'
+        else:
+            area = ''
+
         self._fsm = robot_smach_states.world_model.Inspect(self._robot,
                                                            entityDes=robot_smach_states.util.designators.EdEntityDesignator(
-                                                               self._robot, id=entity.id))
+                                                               self._robot, id=entity.id),
+                                                           inspection_area=area)
 
         self._thread = threading.Thread(name='inspect', target=self._fsm.execute)
         self._thread.start()
