@@ -7,7 +7,7 @@ from gripper_goal import GripperGoal
 from inspect import Inspect
 from look_at import LookAt
 from navigate_to import NavigateTo
-# from pick_up import PickUp
+from pick_up import PickUp
 # from place import Place
 from reset_wm import ResetWM
 from find import Find

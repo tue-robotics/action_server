@@ -17,8 +17,8 @@ class PickUp(Action):
 
     def _configure(self, robot, config):
         # TODO: remove right and left
-        if not hasattr(robot, 'rightArm') or hasattr(robot, 'leftArm'):
-            rospy.logerr("Robot {} does not have attribute 'speech'".format(robot.robot_name))
+        if not hasattr(robot, 'rightArm') or not hasattr(robot, 'leftArm'):
+            rospy.logerr("Robot {} does not have attribute 'leftArm'".format(robot.robot_name))
             self._config_result.missing_skill = "arm"
             return
 
@@ -33,7 +33,7 @@ class PickUp(Action):
         entities = [e for e in entities if not e.is_a("furniture")]
 
         if not entities:
-            rospy.logwarn("Impossible to grab that object")
+            rospy.logerr("Impossible to grab that object")
             return
 
         self._entity = entities[0]
