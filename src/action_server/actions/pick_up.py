@@ -15,6 +15,12 @@ class PickUp(Action):
         Action.__init__(self)
 
     def _configure(self, robot, config):
+        # TODO: remove right and left
+        if not hasattr(robot, 'rightArm') or hasattr(robot, 'leftArm'):
+            rospy.logerr("Robot {} does not have attribute 'speech'".format(robot.robot_name))
+            self._config_result.missing_skill = "arm"
+            return
+
         self._robot = robot
 
         if not "entity" in config:
