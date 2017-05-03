@@ -1,6 +1,7 @@
 import rospy
 
 from robot_skills.robot import Robot
+from robocup_knowledge import load_knowledge
 
 
 class ConfigurationResult(object):
@@ -24,6 +25,7 @@ class Action:
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
         self._required_parameters = []
+        self._knowledge = load_knowledge('common')
 
     def _check_parameters(self, config):
         for p in self._required_parameters:
