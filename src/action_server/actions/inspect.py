@@ -5,6 +5,8 @@ from util import entities_from_description
 import robot_smach_states
 import threading
 
+import rospy
+
 
 class Inspect(Action):
     def __init__(self):
@@ -44,3 +46,26 @@ class Inspect(Action):
 
         # # Wait until canceled
         # self._thread.join()
+
+
+if __name__ == "__main__":
+    rospy.init_node('inspect_test')
+
+    import sys
+    robot_name = sys.argv[1]
+    if robot_name == 'amigo':
+        from robot_skills.amigo import Amigo as Robot
+    elif robot_name == 'sergio':
+        from robot_skills.sergio import Sergio as Robot
+    else:
+        from robot_skills.mockbot import Mockbot as Robot
+
+    robot = Robot()
+
+    action = Inspect()
+
+    config = {'action': 'inspect',
+              'entity': {'id': 'cabinet'}}
+
+    action.configure(robot, config)
+    action.start()

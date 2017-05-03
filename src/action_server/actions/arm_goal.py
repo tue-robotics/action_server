@@ -43,3 +43,26 @@ class ArmGoal(Action):
 
     def _cancel(self):
         pass
+
+if __name__ == "__main__":
+    rospy.init_node('arm_goal_test')
+
+    import sys
+    robot_name = sys.argv[1]
+    if robot_name == 'amigo':
+        from robot_skills.amigo import Amigo as Robot
+    elif robot_name == 'sergio':
+        from robot_skills.sergio import Sergio as Robot
+    else:
+        from robot_skills.mockbot import Mockbot as Robot
+
+    robot = Robot()
+
+    action = ArmGoal()
+
+    config = {'action': 'arm_goal',
+              'side': 'right',
+              'symbolic': 'carrying_box_pose'}
+
+    action.configure(robot, config)
+    action.start()

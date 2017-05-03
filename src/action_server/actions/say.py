@@ -61,3 +61,25 @@ class Say(Action):
 
     def _cancel(self):
         pass
+
+if __name__ == "__main__":
+    rospy.init_node('say_test')
+
+    import sys
+    robot_name = sys.argv[1]
+    if robot_name == 'amigo':
+        from robot_skills.amigo import Amigo as Robot
+    elif robot_name == 'sergio':
+        from robot_skills.sergio import Sergio as Robot
+    else:
+        from robot_skills.mockbot import Mockbot as Robot
+
+    robot = Robot()
+
+    action = Say()
+
+    config = {'action': 'say',
+              'sentence': 'JOKE'}
+
+    action.configure(robot, config)
+    action.start()

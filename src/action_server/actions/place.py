@@ -71,3 +71,27 @@ class Place(Action):
 
         # Wait until canceled
         self._thread.join()
+
+if __name__ == "__main__":
+    rospy.init_node('place_test')
+
+    import sys
+    robot_name = sys.argv[1]
+    if robot_name == 'amigo':
+        from robot_skills.amigo import Amigo as Robot
+    elif robot_name == 'sergio':
+        from robot_skills.sergio import Sergio as Robot
+    else:
+        from robot_skills.mockbot import Mockbot as Robot
+
+    robot = Robot()
+
+    action = Place()
+
+    config = {'action': 'place',
+              'entity': {'id': 'cabinet'},
+              'side': 'left',
+              'height': 0.8}
+
+    action.configure(robot, config)
+    action.start()
