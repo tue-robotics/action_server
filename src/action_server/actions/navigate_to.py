@@ -5,7 +5,8 @@ import threading
 import rospy
 
 import robot_smach_states
-from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint
+from robot_smach_states.navigation import NavigateToWaypoint, NavigateToSymbolic
+from robot_smach_states.util.designators import EdEntityDesignator
 
 
 class NavigateTo(Action):
@@ -40,14 +41,21 @@ class NavigateTo(Action):
 
         if e.is_a("waypoint"):
             self._fsm = NavigateToWaypoint(self._robot,
-                                          waypoint_designator=robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=e.id),
+                                          waypoint_designator=EdEntityDesignator(self._robot, id=e.id),
                                           radius=0.1)
             rospy.loginfo("Navigating to waypoint")
         else:
-            self._fsm = NavigateToObserve(self._robot,
-                                         entity_designator=robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=e.id),
-                                         radius=.5)
-            rospy.loginfo("Navigating to observe")
+            if e.is_a("room"):
+                area = "in"
+            elif e.is_a("furniture"):
+                area = "in_front_of"
+            else:
+                area = "near"
+
+            entity_designator = EdEntityDesignator(robot=self._robot, id=e.id)
+            self._fsm = NavigateToSymbolic(self._robot,
+                                           entity_designator_area_name_map={entity_designator: area},
+                                           entity_lookat_designator=entity_designator)
 
         self._thread = threading.Thread(name='navigate', target=self._fsm.execute)
         self._thread.start()
