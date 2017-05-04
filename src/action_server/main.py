@@ -10,22 +10,25 @@ from server import Server
 if __name__ == "__main__":
     rospy.init_node('action_server')
 
-    # Create Robot object based on argv[1]
-    if len(sys.argv) < 2:
-        print "Please specify a robot name 'amigo/sergio'"
-        sys.exit()
+    try:
+        robot_name = rospy.get_param('~robot_name')
+    except KeyError:
+        rospy.logerr("Please provide a 'robot_name'")
+        exit(0)
 
-    robot_name = sys.argv[1]
+    rospy.loginfo("Parameters:")
+    rospy.loginfo("robot_name = {}".format(robot_name))
+
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
     elif robot_name == 'sergio':
         from robot_skills.sergio import Sergio as Robot
     else:
-        print "unknown robot"
+        rospy.logerr("'robot_name' must be either 'amigo' or 'sergio'")
         sys.exit()
 
     robot = Robot()
 
-    server = Server("state_machine", robot)
+    server = Server(robot, rospy.get_name())
 
     rospy.spin()
