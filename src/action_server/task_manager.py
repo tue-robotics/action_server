@@ -1,6 +1,3 @@
-#! /usr/bin/python
-
-import rospy
 from action_factory import ActionFactory
 
 '''
@@ -17,8 +14,12 @@ class TaskManager(object):
 
     def set_up_state_machine(self, recipe):
         configuration_result = None
+
         for instruction in recipe:
-            action_name = instruction['action']
+            try:
+                action_name = instruction['action']
+            except KeyError:
+                return configuration_result
 
             # Set up the action
             Action = self._action_factory.get_action(action_name)
