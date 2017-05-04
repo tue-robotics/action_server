@@ -14,13 +14,6 @@ catkin_python_setup()
 #                                     ROS MESSAGES AND SERVICES
 # ------------------------------------------------------------------------------------------------
 
-# Generate services
-add_service_files(
-   FILES
-   AddAction.srv
-   GetActionStatus.srv
-)
-
 add_action_files(
    DIRECTORY
    action
