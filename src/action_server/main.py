@@ -29,6 +29,6 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    server = Server(robot, rospy.get_name())
+    server = Server(robot)
 
     rospy.spin()

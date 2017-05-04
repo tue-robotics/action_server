@@ -11,12 +11,12 @@ The Server wraps the TaskManager to expose a ROS actionlib interface.
 
 class Server(object):
 
-    def __init__(self, robot, name="action_server"):
+    def __init__(self, robot):
         self._robot = robot
         self._task_manager = TaskManager(self._robot)
 
         # Set up actionlib interface for clients to give a task to the robot.
-        self._action_name = "/" + self._robot.robot_name + name + "/task"
+        self._action_name = "/" + self._robot.robot_name + "/action_server/task"
         self._action_server = actionlib.SimpleActionServer(self._action_name, action_server.msg.TaskAction,
                                                            execute_cb=self._add_action_cb, auto_start=False)
         self._feedback = action_server.msg.TaskFeedback()
@@ -32,7 +32,10 @@ class Server(object):
         if configuration_result.succeeded:
             rospy.loginfo("Setting up state machine succeeded")
         else:
-            self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
+            if configuration_result.missing_field:
+                self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
+            else:
+                self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
             self._action_server.set_aborted(self._result)
             rospy.loginfo("Setting up state machine failed")
             return
