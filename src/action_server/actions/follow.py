@@ -30,7 +30,8 @@ class Follow(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._required_parameters = ['location-from', 'location-to', 'target']
+        self._required_field_prompts = {'location-to': "I don't know where to go",
+                                        'target': "I don't know who to follow"}
 
     def _configure(self, robot, config):
         # if not "entity" in config:
@@ -41,6 +42,7 @@ class Follow(Action):
         # self._entity_description = resolve_entity_description(config["entity"])
 
         # TODO: if id and id is operator, directly follow instead of first navigating to location-from
+        # TODO: if id id is not operator, go to location-from and then follow
 
         self._origin = resolve_entity_description(config["location-from"])
 
@@ -54,7 +56,7 @@ class Follow(Action):
         # If we need to navigate to some origin location, do that first TODO: Use the navigate action for this
         if self._origin:
             if not navigate(robot=self._robot, entity_description=self._origin):
-                self._execute_result.message += "failed to get to the origin location to follow"
+                self._execute_result.message += "i cannot resolve the origin location"
                 return
             self._execute_result.message += "navigated to the origin location to follow the operator and "
 
