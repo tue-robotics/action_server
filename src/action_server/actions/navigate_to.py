@@ -58,6 +58,7 @@ class NavigateTo(Action):
         self._thread.join()
         self._execute_result.succeeded = True
         self._execute_result.message = " I successfully navigated to the " + e.id
+        self._robot.speech.speak("I arrived at the {}".format(e.id))
 
     def _cancel(self):
         if self._fsm.is_running:
@@ -83,7 +84,7 @@ if __name__ == "__main__":
 
     action = NavigateTo()
 
-    config = {'action': 'navigate_to',
+    config = {'action': 'navigate-to',
               'object': {'id': 'cabinet'}}
 
     action.configure(robot, config)
