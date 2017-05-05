@@ -2,7 +2,7 @@
 
 from answer_question import AnswerQuestion
 from arm_goal import ArmGoal
-# from bring import Bring
+from bring import Bring
 from gripper_goal import GripperGoal
 from inspect import Inspect
 from look_at import LookAt
