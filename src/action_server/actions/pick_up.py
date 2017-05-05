@@ -13,7 +13,7 @@ class PickUp(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._required_parameters = ['object']
+        self._required_field_prompts = {'object' : " I don't know what to pick up. "}
 
     def _configure(self, robot, config):
         # TODO: remove right and left
@@ -40,11 +40,13 @@ class PickUp(Action):
 
         self._side = config['side'] if 'side' in config else 'right'
 
+        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[self._side])
+
         self._fsm = robot_smach_states.grab.Grab(self._robot,
                                                  item=EdEntityDesignator(self._robot, id=self._entity.id),
-                                                 arm=UnoccupiedArmDesignator(self._robot.arms,
-                                                                             self._robot.arms[self._side]))
+                                                 arm=arm_des)
 
+        self._config_result.resulting_knowledge = {'arm-designator' : arm_des}
         self._config_result.succeeded = True
 
     def _start(self):

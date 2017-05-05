@@ -55,6 +55,11 @@ class Place(Action):
             self._goal_y = -0.2
 
         try:
+            self._arm = config['arm-designator'].resolve()
+        except:
+            pass
+
+        try:
             self._height = config["height"]
         except KeyError:
             self._height = 0.8

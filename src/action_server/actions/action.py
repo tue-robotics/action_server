@@ -30,7 +30,6 @@ class Action:
         self._knowledge = load_knowledge('common')
 
     def _check_parameters(self, config):
-        print self._required_field_prompts
         for k, v in self._required_field_prompts.items():
             if k not in config:
                 rospy.logerr("Missing required parameter {}".format(k))
