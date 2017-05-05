@@ -35,11 +35,14 @@ class Server(object):
             if configuration_result.missing_field:
                 self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
                 self._feedback.log_messages.append(" I didn't have enough information to perform that task.")
-                self._action_server.publish_feedback(self._feedback)
+            elif configuration_result.message:
+                # TODO: this task result should not be RESULT_UNKNOWN
+                self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
+                self._feedback.log_messages.append(configuration_result.message)
             else:
                 self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
                 self._feedback.log_messages.append(" It seems that I am unable to perform that task. Not sure why though.")
-                self._action_server.publish_feedback(self._feedback)
+            self._action_server.publish_feedback(self._feedback)
             self._action_server.set_aborted(self._result)
             rospy.logerr("Setting up state machine failed")
             return
