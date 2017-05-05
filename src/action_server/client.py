@@ -1,6 +1,5 @@
 import rospy
 
-import action_server.srv
 import actionlib
 import action_server.msg
 
