@@ -30,8 +30,7 @@ class Follow(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'location-to': "I don't know where to go",
-                                        'target': "I don't know who to follow"}
+        self._required_field_prompts = {'target': "I don't know who to follow"}
 
     def _configure(self, robot, config):
         # if not "entity" in config:
@@ -39,10 +38,16 @@ class Follow(Action):
         #     self._config_result.missing_field = "entity"
         #     return
 
-        # self._entity_description = resolve_entity_description(config["entity"])
+        target = resolve_entity_description(config["target"])
+
+        if not target.id == "operator" and not "location-from" in config:
+            self._config_result.missing_field = "location-from"
+            self._config_result.message = " Where can I find {}? ".format(target.id)
+            return
+
 
         # TODO: if id and id is operator, directly follow instead of first navigating to location-from
-        # TODO: if id id is not operator, go to location-from and then follow
+        # TODO: if id is not operator, go to location-from and then follow
 
         self._origin = resolve_entity_description(config["location-from"])
 
