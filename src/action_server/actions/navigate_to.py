@@ -51,14 +51,19 @@ class NavigateTo(Action):
                                            entity_designator_area_name_map={entity_designator: area},
                                            entity_lookat_designator=entity_designator)
 
-        self._thread = threading.Thread(name='navigate', target=self._fsm.execute)
-        self._thread.start()
+        result = self._fsm.execute()
 
-        # TODO: implement possibility to cancel action when started, but still block while executing
-        self._thread.join()
-        self._execute_result.succeeded = True
-        self._execute_result.message = " I successfully navigated to the " + e.id
-        self._robot.speech.speak("I arrived at the {}".format(e.id))
+        if result == 'arrived':
+            self._execute_result.succeeded = True
+            self._execute_result.message = " I successfully navigated to the " + e.id
+            self._robot.speech.speak("I arrived at the {}".format(e.id))
+        elif result == 'unreachable':
+            self._execute_result.message = " I was unable to get to the {} because my path was blocked. ".format(e.id)
+            self._robot.speech.speak("Oops, it seems that I can't get there right now.")
+        else:
+            self._execute_result.message = " I don't know why, but I couldn't find the place I should go. "
+            self._robot.speech.speak("I don't know why, but I couldn't find the place I should go.")
+
 
     def _cancel(self):
         if self._fsm.is_running:
