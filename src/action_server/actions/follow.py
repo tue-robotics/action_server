@@ -38,13 +38,12 @@ class Follow(Action):
         #     self._config_result.missing_field = "entity"
         #     return
 
-        target = resolve_entity_description(config["target"])
+        self._target = resolve_entity_description(config["target"])
 
-        if not target.id == "operator" and not "location-from" in config:
+        if not self._target.id == "operator" and not "location-from" in config:
             self._config_result.missing_field = "location-from"
-            self._config_result.message = " Where can I find {}? ".format(target.id)
+            self._config_result.message = " Where can I find {}? ".format(self._target.id)
             return
-
 
         # TODO: if id and id is operator, directly follow instead of first navigating to location-from
         # TODO: if id is not operator, go to location-from and then follow
@@ -59,7 +58,7 @@ class Follow(Action):
 
     def _start(self):
         # If we need to navigate to some origin location, do that first TODO: Use the navigate action for this
-        if self._origin:
+        if not self._target.id == "operator":
             if not navigate(robot=self._robot, entity_description=self._origin):
                 self._execute_result.message += "i cannot resolve the origin location"
                 return
