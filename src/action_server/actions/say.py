@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 class Say(Action):
     def __init__(self):
         Action.__init__(self)
+        self._required_parameters = {'sentence' : "I didn't get what you want me to say."}
 
     def _configure(self, robot, config):
         if not hasattr(robot, "speech"):
@@ -14,11 +15,6 @@ class Say(Action):
             return
 
         self._robot = robot
-
-        if not "sentence" in config:
-            rospy.logerr("Config for action 'Say' does not contain required parameter 'sentence' in its config")
-            self._config_result.missing_field = 'sentence'
-            return
 
         self._sentence = config['sentence']
 
@@ -58,6 +54,8 @@ class Say(Action):
             line = self._sentence
 
         self._robot.speech.speak(line)
+        self._execute_result.succeeded = True
+        self._execute_result.message = " I told you what you wanted to hear. "
 
     def _cancel(self):
         pass

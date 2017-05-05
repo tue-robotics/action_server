@@ -1,5 +1,5 @@
 from action import Action
-from util import entities_from_description
+from entity_description import resolve_entity_description
 
 import robot_smach_states
 from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToGrasp, NavigateToSymbolic
@@ -8,6 +8,16 @@ import robot_skills.util.msg_constructors as msgs
 import threading
 import time
 import rospy
+
+class Bring(Action):
+    def __init__(self):
+        Action.__init__(self)
+        self._required_parameters = ['from',
+                                     'to',
+                                     'entity']
+
+    def _configure(self, robot, config):
+        self._robot = robot
 
 
 class Bring(Action):
@@ -147,3 +157,27 @@ class Bring(Action):
 
         # Wait until canceled
         self._thread.join()
+
+if __name__ == "__main__":
+    rospy.init_node('bring_test')
+
+    import sys
+    robot_name = sys.argv[1]
+    if robot_name == 'amigo':
+        from robot_skills.amigo import Amigo as Robot
+    elif robot_name == 'sergio':
+        from robot_skills.sergio import Sergio as Robot
+    else:
+        from robot_skills.mockbot import Mockbot as Robot
+
+    robot = Robot()
+
+    action = Bring()
+
+    config = {'action': 'bring',
+              'entity': {'location': 'cabinet'},
+              'from': {'id': 'cabinet'},
+              'to': {'id': 'dinner_table'}}
+
+    action.configure(robot, config)
+    action.start()

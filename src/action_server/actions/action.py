@@ -13,6 +13,7 @@ class ConfigurationResult(object):
         self.resulting_knowledge = resulting_knowledge
         self.missing_field = None
         self.missing_skill = None
+        self.message = ""
 
 
 class ActionResult(object):
@@ -25,14 +26,16 @@ class Action:
     def __init__(self):
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
-        self._required_parameters = []
+        self._required_field_prompts = {}
         self._knowledge = load_knowledge('common')
 
     def _check_parameters(self, config):
-        for p in self._required_parameters:
-            if p not in config:
-                rospy.logerr("Missing required parameter {}".format(p))
-                self._config_result.missing_field = p
+        print self._required_field_prompts
+        for k, v in self._required_field_prompts.items():
+            if k not in config:
+                rospy.logerr("Missing required parameter {}".format(k))
+                self._config_result.missing_field = k
+                self._config_result.message = v
                 return False
         return True
 

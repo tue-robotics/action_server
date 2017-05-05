@@ -13,18 +13,12 @@ class NavigateTo(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._fsm = None
+        self._required_parameters = {'object' : 'Where should I go?'}
 
     def _configure(self, robot, config):
-        if "entity" not in config:
-            self._config_result.missing_field = "entity"
-            rospy.loginfo("Missing entity field")
-            return
-
         # TODO: this should also check if the given robot is capable of this action.
         self._robot = robot
-        self._entity_description = config['entity']
-
+        self._entity_description = config['object']
         self._config_result.succeeded = True
         return
 
@@ -32,9 +26,9 @@ class NavigateTo(Action):
         (entities, error_msg) = entities_from_description(self._entity_description, self._robot)
 
         if not entities:
-            rospy.loginfo("No knowledge of a " + self._entity_description["id"] + " in the world model")
+            rospy.loginfo("No knowledge of a {} in the world model.".format(self._entity_description["id"]))
             self._execute_result.succeeded = False
-            self._execute_result.message = "did not have knowledge of a " + self._entity_description["id"]
+            self._execute_result.message = " I have no knowledge of a {} in my world model. ".format(self._entity_description["id"])
             return
 
         e = entities[0]
@@ -63,7 +57,7 @@ class NavigateTo(Action):
         # TODO: implement possibility to cancel action when started, but still block while executing
         self._thread.join()
         self._execute_result.succeeded = True
-        self._execute_result.message = "navigated to the " + e.id
+        self._execute_result.message = " I successfully navigated to the " + e.id
 
     def _cancel(self):
         if self._fsm.is_running:
@@ -90,7 +84,7 @@ if __name__ == "__main__":
     action = NavigateTo()
 
     config = {'action': 'navigate_to',
-              'entity': {'id': 'cabinet'}}
+              'object': {'id': 'cabinet'}}
 
     action.configure(robot, config)
     action.start()

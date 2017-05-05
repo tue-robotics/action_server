@@ -18,6 +18,9 @@ class Place(Action):
         self._thread = None
         self._goal_entity = None
 
+        self._required_field_prompts = {'object': " I didn't get what you want me to find. ",
+                                        'location': " I didn't get where I should look. "}
+
     def _configure(self, robot, config):
         # TODO: remove right and left
         if not hasattr(robot, 'rightArm') or not hasattr(robot, 'leftArm'):

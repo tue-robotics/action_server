@@ -26,32 +26,36 @@ class Server(object):
 
     def _add_action_cb(self, goal):
         recipe = yaml.load(goal.recipe)
+        configuration_result = self._task_manager.set_up_state_machine(recipe['actions'])
 
-        configuration_result = self._task_manager.set_up_state_machine(recipe)
+        self._feedback.log_messages = []
 
         if configuration_result.succeeded:
-            rospy.loginfo("Setting up state machine succeeded")
+            rospy.logdebug("Setting up state machine succeeded")
         else:
             if configuration_result.missing_field:
                 self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
+                self._feedback.log_messages.append(" I didn't have enough information to perform that task.")
+                self._action_server.publish_feedback(self._feedback)
             else:
                 self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
+                self._feedback.log_messages.append(" It seems that I am unable to perform that task. Not sure why though.")
+                self._action_server.publish_feedback(self._feedback)
             self._action_server.set_aborted(self._result)
-            rospy.loginfo("Setting up state machine failed")
+            rospy.logerr("Setting up state machine failed")
             return
-
-        self._feedback.log_messages = []
 
         while not self._task_manager.done:
             action_result = self._task_manager.execute_next_action()
             self._feedback.log_messages.append(action_result.message)
+            self._action_server.publish_feedback(self._feedback)
             if not action_result.succeeded:
                 # TODO: If an action failed, this does not mean the following actions are useless to do
                 self._result.result = action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
                 self._action_server.set_aborted(self._result)
-                rospy.logwarn("Execution of state machine aborted because action failed.")
+                rospy.logdebug("Execution of state machine aborted because action failed.")
                 return
 
-        rospy.loginfo("Execution of state machine succeeded.")
+        rospy.logdebug("Execution of state machine succeeded.")
         self._result.result = action_server.msg.TaskResult.RESULT_SUCCEEDED
         self._action_server.set_succeeded(self._result)

@@ -11,3 +11,4 @@ from pick_up import PickUp
 from place import Place
 from reset_wm import ResetWM
 from find import Find
+from say import Say

@@ -1,7 +1,8 @@
 from action import Action
 from entity_description import resolve_entity_description
 
-from robot_smach_states import FollowOperator, EdEntityDesignator
+from robot_smach_states import FollowOperator
+from robot_smach_states.util.designators import EdEntityDesignator
 
 import rospy
 
@@ -29,26 +30,21 @@ class Follow(Action):
 
     def __init__(self):
         Action.__init__(self)
+        self._required_parameters = ['location-from', 'location-to', 'target']
 
     def _configure(self, robot, config):
-        if not "entity" in config:
-            rospy.logwarn("Please provide required field in config. Got config: {}".format(config))
-            self._config_result.missing_field = "entity"
-            return
+        # if not "entity" in config:
+        #     rospy.logwarn("Please provide required field in config. Got config: {}".format(config))
+        #     self._config_result.missing_field = "entity"
+        #     return
 
-        self._entity_description = resolve_entity_description(config["entity"])
+        # self._entity_description = resolve_entity_description(config["entity"])
 
-        self._origin = None
-        if not "origin" in config:
-            rospy.logdebug("No 'origin' entity given in config. Got config: {}".format(config))
-        else:
-            self._origin = resolve_entity_description(config["origin"])
+        # TODO: if id and id is operator, directly follow instead of first navigating to location-from
 
-        self._goal = None
-        if not "goal" in config:
-            rospy.logdebug("No 'goal' entity given in config. Got config: {}".format(config))
-        else:
-            self._origin = resolve_entity_description(config["goal"])
+        self._origin = resolve_entity_description(config["location-from"])
+
+        self._goal = resolve_entity_description(config["location-to"])
 
         self._robot = robot
 

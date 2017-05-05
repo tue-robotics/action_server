@@ -11,29 +11,34 @@ class Find(Action):
     def __init__(self):
         Action.__init__(self)
         # TODO: change this to a python dictionary schema
-        self._required_parameters = ['object', 'location']
+        self._required_field_prompts = {'object': " I didn't get what you want me to find. ",
+                                        'location': " I didn't get where I should look. "}
 
     def _configure(self, robot, config):
         self._robot = robot
         object = resolve_entity_description(config['object'])
         location = resolve_entity_description(config['location'])
 
-        # Set up designator for location to go and find something
-        if not location.id:
-            self._config_result.missing_field('location.id')
-            return
         self._location_designator = EdEntityDesignator(self._robot, id=location.id)
 
         # Set up designator for area
-        if not 'area' in config['location']:
-            self._config_result.missing_field('location.area')
-            return
-        self._area_designator = VariableDesignator(config['location']['area'])
+        print "location id = {}".format(location.id)
+        print "rooms in knowledge: {}".format(self._knowledge.location_rooms)
+        if location.id in self._knowledge.location_rooms:
+            area = "in"
+            print "selecting 'in' area"
+        elif object.type == "person":
+            area = "near"
+            print "selecting 'near' area"
+        else:
+            # TODO: inspect other areas of the same object
+            area = "on_top_of"
+            print "selecting 'in' area"
+
+        print "area = {}".format(area)
+        self._area_designator = VariableDesignator(area)
 
         # Set up the designator with the object description
-        if not object.type:
-            self._config_result.missing_field('object.type')
-            return
         self._description_designator = VariableDesignator({'type': object.type})
 
         # Set up designator to be filled with the found entity

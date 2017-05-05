@@ -1,9 +1,10 @@
 
 class EntityDescription(object):
-    def __init__(self, id=None, type=None, location=None):
+    def __init__(self, id=None, type=None, location=None, area=None):
         self.id = id
         self.type = type
         self.location = location
+        self.area = area
 
 def resolve_entity_description(parameters):
     description = EntityDescription()
