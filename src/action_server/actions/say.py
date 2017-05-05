@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 class Say(Action):
     def __init__(self):
         Action.__init__(self)
-        self._required_parameters = {'sentence' : "I didn't get what you want me to say."}
+        self._required_field_prompts = {'sentence' : "I didn't get what you want me to say."}
 
     def _configure(self, robot, config):
         if not hasattr(robot, "speech"):
