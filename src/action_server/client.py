@@ -32,10 +32,8 @@ class Client(object):
         self._feedback = []
 
     def _handle_feedback(self, feedback):
-        rospy.logerr("Logging feedback {}".format(feedback.log_messages))
         for message in feedback.log_messages:
             self._feedback.append(message)
-        rospy.logerr("Stored feedback: {}".format(self._feedback))
         exit(0)
 
     def send_task(self, semantics):
