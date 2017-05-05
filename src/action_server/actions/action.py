@@ -21,6 +21,7 @@ class ActionResult(object):
         self.succeeded = succeeded
         self.message = message
 
+# TODO: implement possibility to cancel action when started, but still block while executing
 
 class Action:
     def __init__(self):
