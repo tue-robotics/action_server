@@ -48,9 +48,15 @@ class Follow(Action):
         # TODO: if id and id is operator, directly follow instead of first navigating to location-from
         # TODO: if id is not operator, go to location-from and then follow
 
-        self._origin = resolve_entity_description(config["location-from"])
+        if "location-from" in config:
+            self._origin = resolve_entity_description(config["location-from"])
+        else:
+            self._origin = None
 
-        self._goal = resolve_entity_description(config["location-to"])
+        if "location-to" in config:
+            self._goal = resolve_entity_description(config["location-to"])
+        else:
+            self._goal = None
 
         self._robot = robot
 
@@ -58,7 +64,7 @@ class Follow(Action):
 
     def _start(self):
         # If we need to navigate to some origin location, do that first TODO: Use the navigate action for this
-        if not self._target.id == "operator":
+        if self._origin:
             if not navigate(robot=self._robot, entity_description=self._origin):
                 self._execute_result.message += "i cannot resolve the origin location"
                 return
