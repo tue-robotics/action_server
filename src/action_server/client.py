@@ -55,8 +55,10 @@ class Client(object):
         result = self._action_client.get_result()
 
         if result.result == action_server.msg.TaskResult.RESULT_MISSING_INFORMATION:
-            return TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
-                               self._feedback)
+            to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
+                             self._feedback)
+            to.missing_field = result.missing_field
+            return to
 
         elif result.result == action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED:
             return TaskOutcome(TaskOutcome.RESULT_TASK_EXECUTION_FAILED,
