@@ -14,13 +14,17 @@ class PickUp(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'object' : " I don't know what to pick up. ",
-                                        'found-object-des' : " I don't expect to know what to grab when I get there. "}
+        self._required_field_prompts = {'object' : " What would you like me to pick up? "}
 
     def _configure(self, robot, config):
+        if not 'found-object-des' in config:
+            self._config_result.message = " I can't pick up anything without looking for it first! "
+            return
+
         # TODO: remove right and left
         if not hasattr(robot, 'rightArm') or not hasattr(robot, 'leftArm'):
             rospy.logerr("Robot {} does not have attribute 'leftArm'".format(robot.robot_name))
+            self._config_result.message = " I don't have any arms to grab stuff with. "
             self._config_result.missing_skill = "arm"
             return
 
