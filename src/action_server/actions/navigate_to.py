@@ -55,7 +55,7 @@ class NavigateTo(Action):
 
         if result == 'arrived':
             self._execute_result.succeeded = True
-            self._execute_result.message = " I successfully navigated to the " + e.id
+            self._execute_result.message = " I successfully navigated to the {}".format(e.id)
             self._robot.speech.speak("I arrived at the {}".format(e.id))
         elif result == 'unreachable':
             self._execute_result.message = " I was unable to get to the {} because my path was blocked. ".format(e.id)
@@ -68,9 +68,6 @@ class NavigateTo(Action):
     def _cancel(self):
         if self._fsm.is_running:
             self._fsm.request_preempt()
-
-        # Wait until canceled
-        self._thread.join()
 
 
 if __name__ == "__main__":
