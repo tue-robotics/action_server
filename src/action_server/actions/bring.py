@@ -48,7 +48,7 @@ class Bring(Action):
 
         self._place_action = Place()
         place_config = {'object': config['target-location'],
-                        'arm_designator': self._arm_designator}
+                        'arm-designator': self._arm_designator}
         place_config_result = self._place_action.configure(self._robot, place_config)
         if not place_config_result.succeeded:
             self._config_result.message = place_config_result.message
