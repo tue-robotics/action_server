@@ -15,6 +15,7 @@ class TaskManager(object):
     def set_up_state_machine(self, recipe):
         configuration_result = None
 
+        i = 0
         for instruction in recipe:
             try:
                 action_name = instruction['action']
@@ -33,7 +34,9 @@ class TaskManager(object):
                 self._action_sequence.append(action)
             # If action configuration failed, return the configuration result, specifying what went wrong
             else:
+                configuration_result.missing_field = "[{}].".format(i) + configuration_result.missing_field
                 return configuration_result
+            i += 1
 
         self.done = False
 
