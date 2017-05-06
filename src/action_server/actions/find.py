@@ -38,7 +38,7 @@ class Find(Action):
         self._robot.speech.speak("I will point at you now.")
 
         self._robot.head.look_at_ground_in_front_of_robot(distance=100)
-        self._robot.rightArm._send_joint_trajectory([[0,1.0,0.3,0.8,0,0,0]])
+        self._robot.rightArm._send_joint_trajectory([[-0.2, -0.5, 0.2, 2.0, 0, 0.1, 0.0]])
 
         self._robot.speech.speak("You're right there!")
 
