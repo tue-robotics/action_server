@@ -49,8 +49,6 @@ class Find(Action):
         self._object = resolve_entity_description(config['object'])
         self._location = resolve_entity_description(config['location'])
 
-        self._location_designator = EdEntityDesignator(self._robot, id=self._location.id)
-
         # If we need to find a manipulable item, the location should also be manipulable
         if not self._object.type == "person" and self._location.id not in self._knowledge.manipulation_locations:
             self._location.id = self._knowledge.get_location_from_room(self._location.id)
@@ -60,6 +58,8 @@ class Find(Action):
                 self._config_result.message = " I don't think it makes sense to look for a {} at the {}. ".format(
                     self._object.type, self._location.id)
                 return
+
+        self._location_designator = EdEntityDesignator(self._robot, id=self._location.id)
 
         # Set up designator for area
         if self._location.id in self._knowledge.location_rooms:
