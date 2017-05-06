@@ -46,13 +46,19 @@ class Bring(Action):
             self._config_result.message = nav_config_result.message
             return
 
-        self._place_action = Place()
-        place_config = {'entity': config['target-location'],
-                        'arm-designator': self._arm_designator}
-        place_config_result = self._place_action.configure(self._robot, place_config)
-        if not place_config_result.succeeded:
-            self._config_result.message = place_config_result.message
-            return
+        target_location = resolve_entity_description(config['target-location'])
+        self._drop_waypoint_after_find = False
+        if target_location.type == "person":
+            # TODO: Also handle bringing something to someone else than the operator
+            self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(), type="waypoint")
+        else:
+            self._place_action = Place()
+            place_config = {'entity': config['target-location'],
+                            'arm-designator': self._arm_designator}
+            place_config_result = self._place_action.configure(self._robot, place_config)
+            if not place_config_result.succeeded:
+                self._config_result.message = place_config_result.message
+                return
 
         self._config_result.succeeded = True
         self._robot.speech.speak("Bring the action!")
@@ -69,22 +75,21 @@ class Bring(Action):
         find_result = self._find_action.start()
 
         if not find_result.succeeded:
-            self._execute_result.message = " I was unable to find the {}".format(self._object.type)
+            self._execute_result.message = " I was unable to find the {}. ".format(self._object.type)
             return
 
         # Grab
         grab_result = self._grab_action.start()
 
         if not grab_result.succeeded:
-            self._execute_result.message = " I was unable to grab the {}".format(self._object.type)
+            self._execute_result.message = " I was unable to grab the {}. ".format(self._object.type)
             return
 
         # Navigate
         nav_result = self._nav_action.start()
 
         if not nav_result.succeeded:
-            self._execute_result.message = " I was unable to go to the {}".format(self._target_location.id)
-            return
+            self._execute_result.message = " I was unable to go to the {}. ".format(self._target_location.id)
 
         # Handover or place
         if self._target_location.type == "person":
@@ -97,7 +102,7 @@ class Bring(Action):
                 return
 
         self._execute_result.succeeded = True
-        self._execute_result.message = " I brought a {} from {} to {}. ".format(self._object.type,
+        self._execute_result.message += " I brought a {} from {} to {}. ".format(self._object.type,
                                                                                 self._source_location.id,
                                                                                 self._target_location.id)
 
