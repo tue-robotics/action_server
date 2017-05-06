@@ -60,6 +60,7 @@ class Action:
         raise NotImplementedError
 
     def start(self):
+        rospy.loginfo("Starting executing of action {}.".format(self.__class__.__name__))
         self._start()
         return self._execute_result
 
@@ -67,6 +68,7 @@ class Action:
         raise NotImplementedError
 
     def cancel(self):
+        rospy.loginfo("Canceling executing of action {}.".format(self.__class__.__name__))
         return self._cancel()
 
     def _cancel(self):
