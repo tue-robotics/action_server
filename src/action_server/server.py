@@ -51,12 +51,12 @@ class Server(object):
             action_result = self._task_manager.execute_next_action()
             self._feedback.log_messages.append(action_result.message)
             self._action_server.publish_feedback(self._feedback)
-            if not action_result.succeeded:
-                # TODO: If an action failed, this does not mean the following actions are useless to do
-                self._result.result = action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
-                self._action_server.set_aborted(self._result)
-                rospy.logdebug("Execution of state machine aborted because action failed.")
-                return
+            # if not action_result.succeeded:
+            #     # TODO: If an action failed, this does not mean the following actions are useless to do
+            #     self._result.result = action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
+            #     self._action_server.set_aborted(self._result)
+            #     rospy.logdebug("Execution of state machine aborted because action failed.")
+            #     return
 
         rospy.logdebug("Execution of state machine succeeded.")
         self._result.result = action_server.msg.TaskResult.RESULT_SUCCEEDED
