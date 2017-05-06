@@ -1,5 +1,6 @@
 from action import Action
 from util import entities_from_description
+from entity_description import resolve_entity_description
 
 from robot_skills.arms import Arm
 import robot_smach_states
@@ -18,8 +19,9 @@ class Place(Action):
         self._thread = None
         self._goal_entity = None
 
-        self._required_field_prompts = {'object': " I didn't get what you want me to find. ",
-                                        'location': " I didn't get where I should look. "}
+        self._required_field_prompts = {'location': " Where should I leave the object? ",
+                                        'arm-designator': " I won't be able to place anything before I grasped it. "
+                                                          "Please tell me what to get. "}
 
     def _configure(self, robot, config):
         # TODO: remove right and left
@@ -31,7 +33,7 @@ class Place(Action):
         self._robot = robot
 
         try:
-            self._goal_entity = config["entity"]
+            self._goal_entity = resolve_entity_description(config["entity"])
         except KeyError:
             rospy.logwarn("Specify an 'entity' to place on")
             return

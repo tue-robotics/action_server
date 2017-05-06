@@ -21,15 +21,18 @@ class Bring(Action):
         self._target_location = resolve_entity_description(config['target-location'])
         self._object = resolve_entity_description(config['object'])
 
+        # TODO Passing on knowledge needs to be automated in the future...
         self._find_action = Find()
-        find_config = {'object': self._object, 'location': self._source_location}
+        find_config = {'object': config['object'],
+                       'location': config['source-location']}
         find_config_result = self._find_action.configure(self._robot, find_config)
         if not find_config_result.succeeded:
             self._config_result.message = find_config_result.message
             return
+        self._found_object_designator = find_config_result.resulting_knowledge['found-object-des']
 
         self._grab_action = PickUp()
-        grab_config = {'object': self._object}
+        grab_config = {'object': config['object'], 'found-object-des': self._found_object_designator}
         grab_config_result = self._grab_action.configure(self._robot, grab_config)
         if not grab_config_result.succeeded:
             self._config_result.message = grab_config_result.message
@@ -37,14 +40,14 @@ class Bring(Action):
         self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
 
         self._nav_action = NavigateTo()
-        nav_config = {'object': self._target_location}
+        nav_config = {'object': config['target-location']}
         nav_config_result = self._nav_action.configure(self._robot, nav_config)
         if not nav_config_result.succeeded:
             self._config_result.message = nav_config_result.message
             return
 
         self._place_action = Place()
-        place_config = {'object': self._target_location,
+        place_config = {'object': config['target-location'],
                         'arm_designator': self._arm_designator}
         place_config_result = self._place_action.configure(self._robot, place_config)
         if not place_config_result.succeeded:

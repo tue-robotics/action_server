@@ -73,7 +73,6 @@ class Find(Action):
             self._nav_area = "in_front_of"
             self._area = "on_top_of"
 
-        print "area = {}".format(self._area)
         self._area_designator = VariableDesignator(self._area)
 
         # Set up the designator with the object description
@@ -94,6 +93,8 @@ class Find(Action):
                                 area_name_designator=self._area_designator,
                                 navigation_area_designator=self._navigation_area_designator,
                                 found_entity_designator=self._found_entity_designator)
+
+        self._config_result.resulting_knowledge = {"found-object-des" : self._found_entity_designator}
 
         self._config_result.succeeded = True
 

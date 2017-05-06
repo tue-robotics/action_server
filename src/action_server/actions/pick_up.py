@@ -1,6 +1,7 @@
 from action import Action
 
 from util import entities_from_description
+from entity_description import resolve_entity_description
 
 import robot_smach_states
 
@@ -13,7 +14,8 @@ class PickUp(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'object' : " I don't know what to pick up. "}
+        self._required_field_prompts = {'object' : " I don't know what to pick up. ",
+                                        'found-object-des' : " I don't expect to know what to grab when I get there. "}
 
     def _configure(self, robot, config):
         # TODO: remove right and left
@@ -24,26 +26,20 @@ class PickUp(Action):
 
         self._robot = robot
 
-        (entities, error_msg) = entities_from_description(config["object"], robot)
-        if not entities:
-            rospy.logwarn(error_msg)
-            return
+        self._object = resolve_entity_description(config["object"])
 
         # Only filter to entities that can be picked up, e.g not furniture etc
-        entities = [e for e in entities if not e.is_a("furniture")]
-
-        if not entities:
-            rospy.logerr("Impossible to grab that object")
+        manipulable_object_types = [o['name'] for o in self._knowledge.objects]
+        if not self._object.type in manipulable_object_types:
+            self._config_result.message = " A {} is not something I can pick up. ".format(self._object.type)
             return
-
-        self._entity = entities[0]
 
         self._side = config['side'] if 'side' in config else 'right'
 
         arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[self._side])
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
-                                                 item=EdEntityDesignator(self._robot, id=self._entity.id),
+                                                 item=config['found-object-des'],
                                                  arm=arm_des)
 
         self._config_result.resulting_knowledge = {'arm-designator' : arm_des}
