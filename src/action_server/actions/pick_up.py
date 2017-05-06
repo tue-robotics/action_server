@@ -52,7 +52,7 @@ class PickUp(Action):
         # TODO: implement possibility to cancel action when started, but still block while executing
         self._thread.join()
         self._execute_result.succeeded = True
-        self._execute_result.message = "picked up the " + self._entity.id
+        self._execute_result.message = " I picked up the {} ".format(self._object.type)
 
     def _cancel(self):
         if self._fsm.is_running:
