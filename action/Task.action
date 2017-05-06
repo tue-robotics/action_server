@@ -2,6 +2,7 @@
 string recipe
 ---
 # The result of configuring and executing the task recipe
+string missing_field
 uint8 RESULT_MISSING_INFORMATION=0
 uint8 RESULT_TASK_EXECUTION_FAILED=1
 uint8 RESULT_SUCCEEDED=2
