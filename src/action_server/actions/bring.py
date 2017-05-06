@@ -10,9 +10,9 @@ import rospy
 class Bring(Action):
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'source-location': " I don't know where you want me to get it. ",
-                                        'target-location': " I don't know where you want me to take it. ",
-                                        'object' : " I don't know what you want me to bring"}
+        self._required_field_prompts = {'source-location': " Where would you like me to get it? ",
+                                        'target-location': " Where would you like me to take it? ",
+                                        'object' : " What would you like me to bring, exactly? "}
 
     def _configure(self, robot, config):
         self._robot = robot

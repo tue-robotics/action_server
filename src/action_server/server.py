@@ -35,7 +35,7 @@ class Server(object):
             if configuration_result.missing_field:
                 self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
                 self._feedback.log_messages.append(" I don't have enough information to perform that task.")
-                self._feedback.log_messages = configuration_result.message
+                self._feedback.log_messages.append(configuration_result.message)
             elif configuration_result.message:
                 # TODO: this task result should not be RESULT_UNKNOWN
                 self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
