@@ -15,8 +15,8 @@ class Find(Action):
     def __init__(self):
         Action.__init__(self)
         # TODO: change this to a python dictionary schema
-        self._required_field_prompts = {'object': " I didn't get what you want me to find. ",
-                                        'location': " I didn't get where I should look. "}
+        self._required_field_prompts = {'object': " What exactly would you like me to find? ",
+                                        'location': " Where should I look? "}
 
     def _point_at_person(self, person):
         person_pose = kdl.poseMsgToKdlFrame(person.pose)

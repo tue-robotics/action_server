@@ -31,7 +31,7 @@ class Follow(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'target': "I don't know who to follow"}
+        self._required_field_prompts = {'target': " Who would you like me to follow? "}
 
     def _configure(self, robot, config):
         # if not "entity" in config:
