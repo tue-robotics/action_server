@@ -101,7 +101,8 @@ class Find(Action):
         res = self._fsm.execute()
 
         if res == 'succeeded':
-            self._execute_result.message = " I found what you wanted me to find. "
+            self._execute_result.message = " I found {}. ".format(
+                self._object.id if self._object.id else "a " + self._object.type)
             self._execute_result.succeeded = True
 
             if self._object.type == "person":
@@ -109,12 +110,22 @@ class Find(Action):
             else:
                 self._robot.speech.speak("Hey, I found a {}!".format(self._object.type))
             return
-        else:
+        elif res == 'not_found':
             if self._object.type == "person":
                 self._robot.speech.speak(" I don't see anyone here. ")
             else:
                 self._robot.speech.speak("I don't see what I am looking for here.")
-            self._execute_result.message = " I couldn't find what you wanted me to find. "
+            self._execute_result.message = " I couldn't find {} {} the {} ".format(
+                self._object.id if self._object.id else "a " + self._object.type,
+                "in" if self._location.id in self._knowledge.location_rooms else "at",
+                self._location.id
+            )
+        else:
+            self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._location.id))
+            self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
+                self._location.id,
+                self._object.id if self._object.id else "a " + self._object.type
+            )
 
     def _cancel(self):
         pass
