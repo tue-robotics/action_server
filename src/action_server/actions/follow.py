@@ -1,4 +1,5 @@
 from action import Action
+from find import Find
 from entity_description import resolve_entity_description
 
 from robot_smach_states import FollowOperator
@@ -45,13 +46,23 @@ class Follow(Action):
             self._config_result.message = " Where can I find {}? ".format(self._target.id)
             return
 
-        # TODO: if id and id is operator, directly follow instead of first navigating to location-from
-        # TODO: if id is not operator, go to location-from and then follow
-
         if "location-from" in config:
             self._origin = resolve_entity_description(config["location-from"])
+            self._find_action = Find()
+            find_config = {'location': {'id' : self._origin.id},
+                           'object': {'type': 'person',
+                                      'id': self._target.id}}
+            find_config_result = self._find_action.configure(robot, find_config)
+            if not find_config_result.succeeded:
+                self._config_result.message = " I don't know how to find {} in the {}. ".format(self._origin.id,
+                                                                                                self._target.id)
+                return
         else:
             self._origin = None
+            self._find_action = None
+
+        if self._target.id == "operator":
+            self._target.id = "you"
 
         if "location-to" in config:
             self._goal = resolve_entity_description(config["location-to"])
@@ -63,12 +74,13 @@ class Follow(Action):
         self._config_result.succeeded = True
 
     def _start(self):
-        # If we need to navigate to some origin location, do that first TODO: Use the navigate action for this
-        if self._origin:
-            if not navigate(robot=self._robot, entity_description=self._origin):
-                self._execute_result.message += "i cannot resolve the origin location"
+        # If we need to navigate to some origin location, do that first TODO: Use the find action for this
+        if self._find_action:
+            find_result = self._find_action.start()
+            self._execute_result.message += find_result.message
+            if not find_result.succeeded:
                 return
-            self._execute_result.message += "navigated to the origin location to follow the operator and "
+            # TODO: Navigate to the found person before following
 
         # Do some awesome following
         follow_sm = FollowOperator(self._robot)
@@ -78,13 +90,14 @@ class Follow(Action):
         if not res == "succeeded":
             if self._goal:
                 if not navigate(robot=self._robot, entity_description=self._goal):
-                    self._execute_result.message += "failed to follow to the {}".format(self._goal.id)
+                    self._execute_result.message += " But I failed to follow {} to the {}. ".format(self._target.id,
+                                                                                                    self._goal.id)
                     return
             else:
-                self._execute_result.message += "failed to follow the operator"
+                self._execute_result.message += " But I failed to follow {} ".format(self._target.id)
                 return
 
-        self._execute_result.message += "followed the operator"
+        self._execute_result.message += " I successfully followed {} ".format(self._goal.id)
         if self._goal:
             self._execute_result.message += " to the {}".format(self._goal.id)
 
