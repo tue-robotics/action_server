@@ -40,6 +40,8 @@ class Action:
         return True
 
     def configure(self, robot, config):
+        # TODO: push to debug
+        rospy.loginfo("Configuring action {} with config {}.".format(self.__class__.__name__, config))
         if not isinstance(config, dict):
             rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
             return False
