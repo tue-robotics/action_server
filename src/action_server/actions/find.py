@@ -19,16 +19,11 @@ class Find(Action):
                                         'location': " Where should I look? "}
 
     def _point_at_person(self, person):
-        person_pose = kdl.poseMsgToKdlFrame(person.pose)
-        person_pose_stamped = kdl.FrameStamped(person_pose, 'map')
-        pose_base_link_kdl = person_pose_stamped.projectToFrame(self._robot.robot_name + '/base_link',
+        pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',
                                                                 self._robot.tf_listener)
         pose_base_link = kdl.kdlFrameStampedToPoseStampedMsg(pose_base_link_kdl)
 
-        x = pose_base_link.pose.position.x
-        y = pose_base_link.pose.position.y
-
-        th = math.atan2(y, x)
+        th = math.atan2(pose_base_link_kdl.frame.p.y(), pose_base_link_kdl.frame.p.x())
         vth = 0.5
 
         self._robot.head.cancel_goal()
