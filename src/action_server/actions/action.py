@@ -49,11 +49,6 @@ class Action(object):
         return True
 
     def _check_skills(self, robot):
-        if not hasattr(robot, "speech"):
-
-            self._config_result.missing_skill = "speech"
-            self._config_result.message = " I cannot speak! "
-            return
         for skill in self._required_skills:
             if not hasattr(robot, skill):
                 rospy.logerr("Robot {} does not have attribute '{}'".format(robot.robot_name, skill))
