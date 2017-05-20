@@ -15,7 +15,15 @@ class TaskOutcome(object):
         self.result = result
         self.missing_field = missing_field
         self.messages = messages
-        self.succeeded = (self.result == self.RESULT_SUCCEEDED)
+
+    @property
+    def succeeded(self):
+        return self.result == self.RESULT_SUCCEEDED
+
+    @succeeded.setter
+    def succeeded(self, value):
+        if value:
+            self.result = self.RESULT_SUCCEEDED
 
 
 class Client(object):
