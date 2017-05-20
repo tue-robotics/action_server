@@ -17,10 +17,12 @@ class TaskOutcome(object):
         self.messages = messages
         self.succeeded = (self.result == self.RESULT_SUCCEEDED)
 
-'''
-The Client is a facade to the ros interface of a client of the main.py.
-'''
+
 class Client(object):
+    ''' A client for the action server
+
+    Wraps the client side of the actionlib interface so that it can be easily used in client side applications.
+    '''
     def __init__(self, robot_name):
         action_name = "/" + robot_name + "/action_server/task"
         self._action_client = actionlib.SimpleActionClient(action_name,
