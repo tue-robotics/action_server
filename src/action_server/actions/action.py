@@ -36,6 +36,7 @@ class Action(object):
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
         self._required_field_prompts = {}
+        self._required_skills = []
         self._knowledge = load_knowledge('common')
 
     def _check_parameters(self, config):
@@ -47,21 +48,30 @@ class Action(object):
                 return False
         return True
 
+    def _check_skills(self, robot):
+        for skill in self._required_skills:
+            if not hasattr(robot, skill):
+                self._config_result.missing_skill = skill
+                self._config_result.message = " I am missing the required skill {}. ".format(skill)
+                return False
+        return True
+
     def configure(self, robot, config):
         # TODO: push to debug
         rospy.loginfo("Configuring action {} with config {}.".format(self.__class__.__name__, config))
         if not isinstance(config, dict):
             rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
-            return False
+            self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "
+            return self._config_result
 
         if not isinstance(robot, Robot):
             rospy.logerr("Action: the specified robot should be a Robot! I received: %s" % str(robot))
-            return False
-
-        if not self._check_parameters(config):
+            self._config_result.message = " I don't know what to say. I'm having an identity crisis. I'm so sorry. "
             return self._config_result
 
-        self._configure(robot, config)
+        if self._check_parameters(config) and self._check_skills(robot):
+            self._configure(robot, config)
+
         return self._config_result
 
     def _configure(self, robot, config):
