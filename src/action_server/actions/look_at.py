@@ -8,7 +8,11 @@ import rospy
 
 
 class LookAt(Action):
+    ''' The LookAt class implements the action to look at a world model entity.
 
+    Parameters to pass to the configure() method are:
+     - `entity` (optional): the entity id to look at.
+    '''
     def __init__(self):
         Action.__init__(self)
         self._robot = None

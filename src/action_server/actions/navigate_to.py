@@ -10,7 +10,11 @@ from robot_smach_states.util.designators import EdEntityDesignator
 
 
 class NavigateTo(Action):
+    ''' The NavigateTo class implements the action to navigate to a world model entity.
 
+    Parameters to pass to the configure() method are:
+     - `object` (required): the id of the entity to navigate to
+    '''
     def __init__(self):
         Action.__init__(self)
         self._required_parameters = {'object' : 'Where should I go?'}

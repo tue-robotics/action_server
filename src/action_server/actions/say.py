@@ -5,6 +5,11 @@ import random
 from datetime import datetime, timedelta
 
 class Say(Action):
+    ''' The Say class implements the action to say something.
+
+    Parameters to pass to the configure() method are:
+     - `sentence` (required): The sentence to speak. May be a keyword to tell something more intelligent.
+    '''
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'sentence' : "I didn't get what you want me to say."}

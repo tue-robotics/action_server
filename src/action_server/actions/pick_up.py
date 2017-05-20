@@ -11,7 +11,12 @@ import threading
 
 
 class PickUp(Action):
+    ''' The PickUp class implements the action to grasp an object.
 
+    Parameters to pass to the configure() method are:
+     - `object` (required): the id of the object to grab
+     - `found-object-des` (required): a designator resolving to the object to grab
+    '''
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'object' : " What would you like me to pick up? "}

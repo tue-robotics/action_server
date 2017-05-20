@@ -3,7 +3,15 @@ from action import Action
 import rospy
 from robocup_knowledge import load_knowledge
 
+
 class AnswerQuestion(Action):
+    """ The AnswerQuestion class implements the action of answering a question
+
+    It requires that the robot to perform this action has a speech and an ears skill. It will ask the user what
+    the question is, try to answer it based on the grammar defined in the knowledge defined for the speech and
+    person recognition challenge and answer it based on the same knowledge.
+
+    """
     def __init__(self):
         Action.__init__(self)
 
@@ -22,7 +30,7 @@ class AnswerQuestion(Action):
 
         self._robot = robot
 
-        self._speech_data = load_knowledge('challenge_speech_recognition')
+        self._speech_data = load_knowledge('challenge_spr')
         if not self._speech_data:
             rospy.logerr("Failed to load speech data for 'AnswerQuestion' action")
             return
@@ -46,7 +54,8 @@ class AnswerQuestion(Action):
 
         if "question" in res.choices:
             rospy.loginfo("Question was: '%s'?" % res.result)
-            self._robot.speech.speak("The answer is %s" % self._speech_data.choice_answer_mapping[res.choices['question']])
+            self._robot.speech.speak(
+                "The answer is %s" % self._speech_data.choice_answer_mapping[res.choices['question']])
             self._execute_result.message = "answered the question {}".format(res.choices['question'])
             self._execute_result.succeeded = True
         else:
@@ -56,10 +65,12 @@ class AnswerQuestion(Action):
     def _cancel(self):
         pass
 
+
 if __name__ == "__main__":
     rospy.init_node('answer_question_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

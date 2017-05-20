@@ -28,17 +28,17 @@ def navigate(robot, entity_description):
     return navigation_sm.execute() == "succeeded"
 
 class Follow(Action):
+    ''' The Follow class implements the action to follow a person.
 
+    Parameters to pass to the configure() method are:
+     - `target` (required): the target id to assign to the id that is followed
+     - `location-from` (optional): the location to find the target to follow
+    '''
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'target': " Who would you like me to follow? "}
 
     def _configure(self, robot, config):
-        # if not "entity" in config:
-        #     rospy.logwarn("Please provide required field in config. Got config: {}".format(config))
-        #     self._config_result.missing_field = "entity"
-        #     return
-
         self._target = resolve_entity_description(config["target"])
 
         if not self._target.id == "operator" and not "location-from" in config:

@@ -4,12 +4,11 @@ import actionlib
 import action_server.msg
 from task_manager import TaskManager
 
-'''
-The Server wraps the TaskManager to expose a ROS actionlib interface.
-'''
 
 class Server(object):
-
+    '''
+    The Server wraps the TaskManager to expose a ROS actionlib interface.
+    '''
     def __init__(self, robot):
         self._robot = robot
         self._task_manager = TaskManager(self._robot)
@@ -43,7 +42,8 @@ class Server(object):
                 self._feedback.log_messages.append(configuration_result.message)
             else:
                 self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
-                self._feedback.log_messages.append(" It seems that I am unable to perform that task. Not sure why though.")
+                self._feedback.log_messages.append(" It seems that I am unable to perform that task. "
+                                                   "Not sure why though.")
             self._action_server.publish_feedback(self._feedback)
             self._action_server.set_aborted(self._result)
             rospy.logerr("Setting up state machine failed")

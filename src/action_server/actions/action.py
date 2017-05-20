@@ -5,6 +5,9 @@ from robocup_knowledge import load_knowledge
 
 
 class ConfigurationResult(object):
+    '''
+    The ConfigurationResult class defines the data structure that is returned by the configure() methods of actions
+    '''
     def __init__(self, succeeded=False, resulting_knowledge=None):
         if resulting_knowledge is None:
             resulting_knowledge = {}
@@ -17,13 +20,18 @@ class ConfigurationResult(object):
 
 
 class ActionResult(object):
+    '''
+    The ActionResult class defines the data structure that is returned by the run() methods of actions.
+    '''
     def __init__(self, succeeded=False, message=""):
         self.succeeded = succeeded
         self.message = message
 
-# TODO: implement possibility to cancel action when started, but still block while executing
 
-class Action:
+class Action(object):
+    '''
+    The Action class defines the interface of actions that can be configured and started by the task_manager.
+    '''
     def __init__(self):
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()

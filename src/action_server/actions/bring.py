@@ -8,6 +8,12 @@ from entity_description import resolve_entity_description
 import rospy
 
 class Bring(Action):
+    """
+    The Bring class implements the action to bring an object from a source to a target location.
+
+    Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
+     an object to bring (required).
+    """
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'source-location': " Where would you like me to get it? ",

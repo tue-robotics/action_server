@@ -12,6 +12,12 @@ import robot_skills.util.kdl_conversions as kdl
 
 
 class Find(Action):
+    """ The Find class implements the action to find an object or person at a specified location.
+
+    Parameters to pass to the configure() method are:
+     - `location` (required): location to find the object (room or pre-existing world model entity)
+     - `object` (required): the object to find.
+    """
     def __init__(self):
         Action.__init__(self)
         # TODO: change this to a python dictionary schema

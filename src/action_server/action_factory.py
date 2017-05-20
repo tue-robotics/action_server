@@ -1,14 +1,23 @@
-#! /usr/bin/python
-
 import rospy
-import inspect, re
+import inspect
+import re
 import actions
+
 
 def class_name_camelcase_to_dashes(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower()
 
+
 class ActionFactory(object):
+    """ The action factory creates Action instances based on an action name.
+
+        The ./actions/ directory is inspected for child classes of Action. These
+        classes are registered in the _action_name_to_class dict. The user can
+        get the registered action names by calling get_action_names() and an
+        instance of an action can be created by calling get_action(<action_name>).
+
+        """
 
     def __init__(self):
         self._action_name_to_class = {}

@@ -3,6 +3,8 @@ from action import Action
 import rospy
 
 class ResetWM(Action):
+    ''' The ResetWM class implements the action reset the robot's world model.
+    '''
     def __init__(self):
         Action.__init__(self)
 

@@ -9,6 +9,11 @@ import rospy
 
 
 class Inspect(Action):
+    """ The Inspect class implements the action to inspect an area.
+
+    Parameters to pass to the configure() method are:
+     - `entity` (required): an entity with a segmentation area to inspect
+    """
     def __init__(self):
         Action.__init__(self)
 

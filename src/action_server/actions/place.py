@@ -12,7 +12,12 @@ import threading
 
 
 class Place(Action):
+    ''' The Place class implements the action to place something on an object.
 
+    Parameters to pass to the configure() method are:
+     - `entity` (required): Entity to place the object on;
+     - `arm-designator` (required): Designator resolving to the arm to place with
+    '''
     def __init__(self):
         Action.__init__(self)
         self._place = None
@@ -69,9 +74,15 @@ class Place(Action):
         self._config_result.succeeded = True
 
     def _start(self):
-        item_to_place = robot_smach_states.util.designators.Designator(self._arm.occupied_by, resolve_type=Entity)  # Which item do we want to place? The object in the hand we indicated
-        arm_with_item_designator = robot_smach_states.util.designators.Designator(self._arm, resolve_type=Arm)  # No need for ArmHoldingEntityDesignator, we already know that from the config
-        place_position = robot_smach_states.util.designators.EmptySpotDesignator(self._robot, robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self._place_entity.id))
+        # Which item do we want to place? The object in the hand we indicated
+        item_to_place = robot_smach_states.util.designators.Designator(self._arm.occupied_by, resolve_type=Entity)
+
+        # No need for ArmHoldingEntityDesignator, we already know that from the config
+        arm_with_item_designator = robot_smach_states.util.designators.Designator(self._arm, resolve_type=Arm)
+        place_position = robot_smach_states.util.designators.EmptySpotDesignator(
+            self._robot,
+            robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self._place_entity.id)
+        )
 
         self._place = PlaceSmachState(self._robot, item_to_place, place_position, arm_with_item_designator)
 

@@ -5,6 +5,12 @@ import rospy
 
 
 class ArmGoal(Action):
+    """
+    The ArmGoal class implements the action of moving the arm to a predefined joint position.
+
+    Parameters to pass to the configure method are 'side' (optional) and 'symbolic' (required). The 'symbolic'
+     parameter must be a string as defined in Arm.default_joint_configurations.
+    """
 
     def __init__(self):
         Action.__init__(self)

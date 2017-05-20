@@ -5,7 +5,12 @@ import threading
 
 
 class GripperGoal(Action):
+    """ The GripperGoal class implements the action to open or close the gripper.
 
+    Parameters to pass to the configure() method are:
+     - `side` (required): the gripper's side (left or right)
+     - `goal` (required): the goal (open or close).
+    """
     def __init__(self):
         Action.__init__(self)
         self._arm = None
