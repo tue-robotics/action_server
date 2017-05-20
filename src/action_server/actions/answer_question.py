@@ -11,11 +11,13 @@ class AnswerQuestion(Action):
         if not hasattr(robot, "speech"):
             rospy.logerr("Robot {} does not have attribute 'speech'".format(robot.robot_name))
             self._config_result.missing_skill = "speech"
+            self._config_result.message = " I cannot speak! "
             return
 
         if not hasattr(robot, "ears"):
             rospy.logerr("Robot {} does not have attribute 'ears'".format(robot.robot_name))
             self._config_result.missing_skill = "ears"
+            self._config_result.message = " I don't have the capability to hear. "
             return
 
         self._robot = robot
