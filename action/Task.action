@@ -1,0 +1,27 @@
+# Goal
+
+# The task recipe is a json dict with an 'actions' key mapping
+# to a list of instructions. Each instruction is a dict with
+# at least an 'action' key and keys for the parameters of the
+# action.
+
+string recipe
+---
+# Result
+
+# If a parameter is missing from an action, the missing field
+# gives a json path in the recipe to the missing parameter.
+string missing_field
+
+uint8 RESULT_MISSING_INFORMATION=0
+uint8 RESULT_TASK_EXECUTION_FAILED=1
+uint8 RESULT_SUCCEEDED=2
+uint8 RESULT_UNKNOWN=3
+
+uint8 result  # Result code as defined in the enum above
+---
+# Feedback
+
+# Messages to report to the user about the task planning/
+# execution are returned as feedback in a list of log messages
+string[] log_messages

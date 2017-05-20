@@ -3,6 +3,9 @@ project(action_server)
 
 find_package(catkin REQUIRED COMPONENTS
     message_generation
+    genmsg
+    actionlib_msgs
+    actionlib
 )
 
 catkin_python_setup()
@@ -11,15 +14,16 @@ catkin_python_setup()
 #                                     ROS MESSAGES AND SERVICES
 # ------------------------------------------------------------------------------------------------
 
-# Generate services
-add_service_files(
+add_action_files(
+   DIRECTORY
+   action
    FILES
-   AddAction.srv
-   GetActionStatus.srv
+   Task.action
 )
 
 # Generate added messages and services with any dependencies listed here
 generate_messages(
+    DEPENDENCIES actionlib_msgs
 )
 
 # ------------------------------------------------------------------------------------------------

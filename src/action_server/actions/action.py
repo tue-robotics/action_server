@@ -1,55 +1,93 @@
-import rospy, threading
+import rospy
 
 from robot_skills.robot import Robot
-import smach
+from robocup_knowledge import load_knowledge
 
-class Action:
 
-    def start(self, config, robot):
+class ConfigurationResult(object):
+    '''
+    The ConfigurationResult class defines the data structure that is returned by the configure() methods of actions
+    '''
+    def __init__(self, succeeded=False, resulting_knowledge=None):
+        if resulting_knowledge is None:
+            resulting_knowledge = {}
+
+        self.succeeded = succeeded
+        self.resulting_knowledge = resulting_knowledge
+        self.missing_field = None
+        self.missing_skill = None
+        self.message = ""
+
+
+class ActionResult(object):
+    '''
+    The ActionResult class defines the data structure that is returned by the run() methods of actions.
+    '''
+    def __init__(self, succeeded=False, message=""):
+        self.succeeded = succeeded
+        self.message = message
+
+
+class Action(object):
+    '''
+    The Action class defines the interface of actions that can be configured and started by the task_manager.
+    '''
+    def __init__(self):
+        self._config_result = ConfigurationResult()
+        self._execute_result = ActionResult()
+        self._required_field_prompts = {}
+        self._required_skills = []
+        self._knowledge = load_knowledge('common')
+
+    def _check_parameters(self, config):
+        for k, v in self._required_field_prompts.items():
+            if k not in config:
+                rospy.logerr("Missing required parameter {}".format(k))
+                self._config_result.missing_field = k
+                self._config_result.message = v
+                return False
+        return True
+
+    def _check_skills(self, robot):
+        for skill in self._required_skills:
+            if not hasattr(robot, skill):
+                rospy.logerr("Robot {} does not have attribute '{}'".format(robot.robot_name, skill))
+                self._config_result.missing_skill = skill
+                self._config_result.message = " I am missing the required skill {}. ".format(skill)
+                return False
+        return True
+
+    def configure(self, robot, config):
+        rospy.logdebug("Configuring action {} with config {}.".format(self.__class__.__name__, config))
         if not isinstance(config, dict):
             rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
-            return False
+            self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "
+            return self._config_result
 
         if not isinstance(robot, Robot):
             rospy.logerr("Action: the specified robot should be a Robot! I received: %s" % str(robot))
-            return False
+            self._config_result.message = " I don't know what to say. I'm having an identity crisis. I'm so sorry. "
+            return self._config_result
 
-        return self._start(config, robot)
+        if self._check_parameters(config) and self._check_skills(robot):
+            self._configure(robot, config)
 
-    def _start(self, config, robot):
+        return self._config_result
+
+    def _configure(self, robot, config):
+        raise NotImplementedError
+
+    def start(self):
+        rospy.loginfo("Starting executing of action {}.".format(self.__class__.__name__))
+        self._start()
+        return self._execute_result
+
+    def _start(self):
         raise NotImplementedError
 
     def cancel(self):
+        rospy.loginfo("Canceling executing of action {}.".format(self.__class__.__name__))
         return self._cancel()
 
     def _cancel(self):
         raise NotImplementedError
-
-# ----------------------------------------------------------------------------------------------------
-
-class FSMAction(Action):
-
-    def __init__(self):
-        self._fsm = None
-
-    def _init_fsm(self, config, robot):
-        raise NotImplementedError
-
-    def _start(self, config, robot):
-        err = self._init_fsm(config, robot)
-        if err:
-            return err
-
-        self._thread = threading.Thread(name='fsm', target=self._run)
-        self._thread.start()
-
-    def _run(self):
-        self._fsm.execute()
-        self._fsm = None
-
-    def _cancel(self):
-        if self._fsm and isinstance(self._fsm, smach.StateMachine) and self._fsm.is_running:
-            self._fsm.request_preempt()
-
-        # Wait until canceled
-        self._thread.join()

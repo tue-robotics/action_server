@@ -1,5 +1,6 @@
 # List of all skills/actions that are going to be registered
 
+from answer_question import AnswerQuestion
 from arm_goal import ArmGoal
 from bring import Bring
 from gripper_goal import GripperGoal
@@ -9,3 +10,6 @@ from navigate_to import NavigateTo
 from pick_up import PickUp
 from place import Place
 from reset_wm import ResetWM
+from find import Find
+from say import Say
+from follow import Follow

@@ -1,49 +1,64 @@
-import rospy, yaml, uuid
+import rospy, yaml
 
-import action_server.srv
+import actionlib
+import action_server.msg
+from task_manager import TaskManager
+
 
 class Server(object):
-
-    def __init__(self, name, robot):
-        self._name = name
-        self._action_type_to_skill = {}
-        self._action = None
+    '''
+    The Server wraps the TaskManager to expose a ROS actionlib interface.
+    '''
+    def __init__(self, robot):
         self._robot = robot
-        self._cl_register = None
+        self._task_manager = TaskManager(self._robot)
 
-        self._add_action_service_name = self._name + '/add_action'
-        self._get_action_status_service_name = self._name + '/get_action_status'
-        self._srv_add_action = rospy.Service(self._add_action_service_name,
-                                            action_server.srv.AddAction,
-                                            self.add_action_cb)
+        # Set up actionlib interface for clients to give a task to the robot.
+        self._action_name = "/" + self._robot.robot_name + "/action_server/task"
+        self._action_server = actionlib.SimpleActionServer(self._action_name, action_server.msg.TaskAction,
+                                                           execute_cb=self._add_action_cb, auto_start=False)
+        self._feedback = action_server.msg.TaskFeedback()
+        self._result = action_server.msg.TaskResult()
+        self._action_server.start()
+        rospy.logdebug("Started action server with action name {}".format(self._action_name))
 
-    def register_skill(self, action_type, skill):
-        rospy.loginfo("Registering skill '%s' (%s)" % (action_type, skill))
-        self._action_type_to_skill[action_type] = skill
+    def _add_action_cb(self, goal):
+        recipe = yaml.load(goal.recipe)
+        configuration_result = self._task_manager.set_up_state_machine(recipe['actions'])
 
-    def add_action_cb(self, req):
-        try:
-            action_class = self._action_type_to_skill[req.action]
-        except KeyError:
-            return action_server.srv.AddActionResponse("", "Action type '%s' not found." % req.action)
+        self._feedback.log_messages = []
 
-        config = yaml.load(req.parameters)
-
-        if self._action:
-            self._action.cancel()
-
-        action = action_class()
-
-        try:
-            err = action.start(config, self._robot)
-            if not err:
-                self._action = action
-                id = str(uuid.uuid1())
-                return action_server.srv.AddActionResponse(id, "")
+        if configuration_result.succeeded:
+            rospy.logdebug("Setting up state machine succeeded")
+        else:
+            if configuration_result.missing_field:
+                self._result.result = action_server.msg.TaskResult.RESULT_MISSING_INFORMATION
+                self._result.missing_field = "actions" + configuration_result.missing_field
+                self._feedback.log_messages.append(" I don't have enough information to perform that task.")
+                self._feedback.log_messages.append(configuration_result.message)
+            elif configuration_result.message:
+                # TODO: this task result should not be RESULT_UNKNOWN
+                self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
+                self._feedback.log_messages.append(configuration_result.message)
             else:
-                return action_server.srv.AddActionResponse("", "Could not construct action: %s" % err)
-        except Exception as err:
-            error_msg = "%s\n\n" % err
-            import traceback
-            error_msg += traceback.format_exc()
-            return action_server.srv.AddActionResponse("", "Error while starting action: %s" % error_msg)
+                self._result.result = action_server.msg.TaskResult.RESULT_UNKNOWN
+                self._feedback.log_messages.append(" It seems that I am unable to perform that task. "
+                                                   "Not sure why though.")
+            self._action_server.publish_feedback(self._feedback)
+            self._action_server.set_aborted(self._result)
+            rospy.logerr("Setting up state machine failed")
+            return
+
+        while not self._task_manager.done:
+            action_result = self._task_manager.execute_next_action()
+            self._feedback.log_messages.append(action_result.message)
+            self._action_server.publish_feedback(self._feedback)
+            # if not action_result.succeeded:
+            #     self._result.result = action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
+            #     self._action_server.set_aborted(self._result)
+            #     rospy.logdebug("Execution of state machine aborted because action failed.")
+            #     return
+
+        rospy.logdebug("Execution of state machine succeeded.")
+        self._result.result = action_server.msg.TaskResult.RESULT_SUCCEEDED
+        self._action_server.set_succeeded(self._result)

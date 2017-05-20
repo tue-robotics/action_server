@@ -1,135 +1,138 @@
 from action import Action
-from util import entities_from_description
+from find import Find
+from pick_up import PickUp
+from navigate_to import NavigateTo
+from place import Place
+from entity_description import resolve_entity_description
 
-import robot_smach_states
-from robot_smach_states.navigation import NavigateToObserve, NavigateToWaypoint, NavigateToGrasp, NavigateToSymbolic
-import robot_skills.util.msg_constructors as msgs
-
-import threading, time, rospy
+import rospy
 
 class Bring(Action):
+    """
+    The Bring class implements the action to bring an object from a source to a target location.
 
+    Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
+     an object to bring (required).
+    """
     def __init__(self):
-        self._fsm = None
-        self._thread = None
+        Action.__init__(self)
+        self._required_field_prompts = {'source-location': " Where would you like me to get it? ",
+                                        'target-location': " Where would you like me to take it? ",
+                                        'object' : " What would you like me to bring, exactly? "}
+        self._required_skills = ['base']
 
-        self._from_entity = None
-        self._to_entity = None
-        self._entity_description = None
-
-    def _start(self, config, robot):
+    def _configure(self, robot, config):
         self._robot = robot
 
-        if "from" not in config or "to" not in config:
-            return "Please specify a from and to entity"
+        self._source_location = resolve_entity_description(config['source-location'])
+        self._target_location = resolve_entity_description(config['target-location'])
+        self._object = resolve_entity_description(config['object'])
 
-        # Get 'from' location
-        (entities, error_msg) = entities_from_description(config["from"], robot)
-        if not entities:
-            return error_msg
-        self._from_entity = entities[0]
+        # TODO Passing on knowledge needs to be automated in the future...
+        self._find_action = Find()
+        find_config = {'object': config['object'],
+                       'location': config['source-location']}
+        find_config_result = self._find_action.configure(self._robot, find_config)
+        if not find_config_result.succeeded:
+            self._config_result.message = find_config_result.message
+            return
+        self._found_object_designator = find_config_result.resulting_knowledge['found-object-des']
 
-        # Get 'to' location
-        (entities, error_msg) = entities_from_description(config["to"], robot)
-        if not entities:
-            return error_msg
-        self._to_entity = entities[0]
+        self._grab_action = PickUp()
+        grab_config = {'object': config['object'], 'found-object-des': self._found_object_designator}
+        grab_config_result = self._grab_action.configure(self._robot, grab_config)
+        if not grab_config_result.succeeded:
+            self._config_result.message = grab_config_result.message
+            return
+        self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
 
-        if "to_radius" in config:
-            self.to_radius = config["to_radius"]
-        else:
-            self.to_radius = 0.7
-
-        if "from_room" in config:
-            self.from_room = config["from_room"]
-        else:
-            self.from_room = None
-
-        # Get type of entity that should be transported
-        if "entity" not in config:
-            return "Please specify the entity argument (dictionary)"
-
-        self._entity_description = config["entity"]
-
-        self._thread = threading.Thread(name='bring', target=self._execute)
-        self._thread.start()
-
-    def _execute(self):
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        # Navigate to the room
-
-        if self.from_room:
-            self._fsm = NavigateToSymbolic(
-                self._robot,
-                 { robot_smach_states.util.designators.EdEntityDesignator(robot, id=self.from_room) : "in" },
-                 robot_smach_states.util.designators.EdEntityDesignator(self._robot, id = self._from_entity.id))
-            self._fsm.execute()
-
-        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        # Inspect to find the entities
-
-        found_entities_des = robot_smach_states.util.designators.VariableDesignator([])
-
-        self._fsm = robot_smach_states.world_model.Inspect(
-            self._robot,
-            entityDes = robot_smach_states.util.designators.EdEntityDesignator(self._robot, id = self._from_entity.id),
-            objectIDsDes = found_entities_des)
-        self._fsm.execute()
-
-        found_ids = [e.id for e in found_entities_des.resolve()]
-
-        (entities, error_msg) = entities_from_description(self._entity_description, self._robot)
-
-        # Only filter to entities that where detected
-        entities = [e for e in entities if e.id in found_ids]
-
-        if not entities:
-            rospy.logerr("I could not find the object you are looking for")
+        self._nav_action = NavigateTo()
+        nav_config = {'object': config['target-location']}
+        nav_config_result = self._nav_action.configure(self._robot, nav_config)
+        if not nav_config_result.succeeded:
+            self._config_result.message = nav_config_result.message
             return
 
-        self._fsm = robot_smach_states.grab.SjoerdsGrab(
-                        self._robot,
-                        item_des = robot_smach_states.util.designators.EdEntityDesignator(self._robot, id = entities[0].id),
-                        arm_des = robot_smach_states.util.designators.UnoccupiedArmDesignator(self._robot.arms, self._robot.rightArm))
-        self._fsm.execute()
+        target_location = resolve_entity_description(config['target-location'])
+        self._drop_waypoint_after_find = False
+        if target_location.type == "person":
+            # TODO: Also handle bringing something to someone else than the operator
+            self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(), type="waypoint")
+        else:
+            self._place_action = Place()
+            place_config = {'entity': config['target-location'],
+                            'arm-designator': self._arm_designator}
+            place_config_result = self._place_action.configure(self._robot, place_config)
+            if not place_config_result.succeeded:
+                self._config_result.message = place_config_result.message
+                return
 
-        self._fsm = NavigateToObserve(
-            self._robot,
-            robot_smach_states.util.designators.EdEntityDesignator(self._robot, id = self._to_entity.id),
-            radius = self.to_radius)
-        self._fsm.execute()
+        self._config_result.succeeded = True
+        self._robot.speech.speak("Bring the action!")
 
-        # - - - - - - - - - - - - - - - - - - - -
-        # Make sure the head looks at the entity
-
-        pos = self._to_entity.pose.position
-        self._robot.head.look_at_point(msgs.PointStamped(pos.x, pos.y, pos.z, "/map"), timeout=0)
-
-        # - - - - - - - - - - - - - - - - - - - -
-        # Hand over
-
-        arm = self._robot.rightArm
-
-        arm._send_joint_trajectory([[-0.1, 0.4, 0, 1.8, 0, -0.4, 0],[-0.1, 0.8, 0, 1, 0, -0.2, 0]])
-        self._robot.speech.speak("Here you go!")
-        arm.send_gripper_goal('open', timeout=5)
-
-        time.sleep(1)
-
-        # - - - - - - - - - - - - - - - - - - - -
-        # Reset arm
-
-        arm.send_gripper_goal('close', timeout=0)
-        arm._send_joint_trajectory([[-0.1, 0.4, 0, 1.8, 0, -0.4, 0]])
+    def _handover(self):
+        self._robot.speech.speak("I will hand over the {} now".format(self._object.type))
+        arm = self._arm_designator.resolve()
+        arm.handover_to_human()
+        self._robot.speech.speak("Here you go!", block=False)
         arm.reset()
 
-        # Cancel the head goal
-        self._robot.head.cancel_goal()
+    def _start(self):
+        # Find
+        find_result = self._find_action.start()
 
-    def _cancel(self):
-        if self._fsm:
-            self._fsm.request_preempt()
+        if not find_result.succeeded:
+            self._execute_result.message = " I was unable to find the {}. ".format(self._object.type)
+            return
 
-        # Wait until canceled
-        self._thread.join()
+        # Grab
+        grab_result = self._grab_action.start()
+
+        if not grab_result.succeeded:
+            self._execute_result.message = " I was unable to grab the {}. ".format(self._object.type)
+            return
+
+        # Navigate
+        nav_result = self._nav_action.start()
+
+        if not nav_result.succeeded:
+            self._execute_result.message = " I was unable to go to the {}. ".format(self._target_location.id)
+
+        # Handover or place
+        if self._target_location.type == "person":
+            self._handover()
+        else:
+            place_result = self._place_action.start()
+
+            if not place_result.succeeded:
+                self._execute_result.message = " I was unable to place the {}".format(self._object.type)
+                return
+
+        self._execute_result.succeeded = True
+        self._execute_result.message += " I brought a {} from {} to {}. ".format(self._object.type,
+                                                                                self._source_location.id,
+                                                                                self._target_location.id)
+
+if __name__ == "__main__":
+    rospy.init_node('bring_test')
+
+    import sys
+    robot_name = sys.argv[1]
+    if robot_name == 'amigo':
+        from robot_skills.amigo import Amigo as Robot
+    elif robot_name == 'sergio':
+        from robot_skills.sergio import Sergio as Robot
+    else:
+        from robot_skills.mockbot import Mockbot as Robot
+
+    robot = Robot()
+
+    action = Bring()
+
+    config = {'action': 'bring',
+              'entity': {'location': 'cabinet'},
+              'from': {'id': 'cabinet'},
+              'to': {'id': 'dinner_table'}}
+
+    action.configure(robot, config)
+    action.start()
