@@ -28,6 +28,8 @@ class Place(Action):
                                         'arm-designator': " I won't be able to place anything before I grasped it. "
                                                           "Please tell me what to get. "}
 
+        self._required_skills = ['arms']
+
     def _configure(self, robot, config):
         # TODO: remove right and left
         if not hasattr(robot, 'rightArm') or not hasattr(robot, 'leftArm'):

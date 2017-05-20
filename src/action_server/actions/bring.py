@@ -19,6 +19,7 @@ class Bring(Action):
         self._required_field_prompts = {'source-location': " Where would you like me to get it? ",
                                         'target-location': " Where would you like me to take it? ",
                                         'object' : " What would you like me to bring, exactly? "}
+        self._required_skills = ['base']
 
     def _configure(self, robot, config):
         self._robot = robot

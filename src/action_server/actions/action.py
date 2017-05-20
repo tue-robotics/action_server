@@ -49,16 +49,21 @@ class Action(object):
         return True
 
     def _check_skills(self, robot):
+        if not hasattr(robot, "speech"):
+
+            self._config_result.missing_skill = "speech"
+            self._config_result.message = " I cannot speak! "
+            return
         for skill in self._required_skills:
             if not hasattr(robot, skill):
+                rospy.logerr("Robot {} does not have attribute '{}'".format(robot.robot_name, skill))
                 self._config_result.missing_skill = skill
                 self._config_result.message = " I am missing the required skill {}. ".format(skill)
                 return False
         return True
 
     def configure(self, robot, config):
-        # TODO: push to debug
-        rospy.loginfo("Configuring action {} with config {}.".format(self.__class__.__name__, config))
+        rospy.logdebug("Configuring action {} with config {}.".format(self.__class__.__name__, config))
         if not isinstance(config, dict):
             rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
             self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "

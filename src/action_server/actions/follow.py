@@ -37,6 +37,7 @@ class Follow(Action):
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'target': " Who would you like me to follow? "}
+        self._required_skills = ['base']
 
     def _configure(self, robot, config):
         self._target = resolve_entity_description(config["target"])

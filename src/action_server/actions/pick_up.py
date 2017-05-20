@@ -20,17 +20,11 @@ class PickUp(Action):
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'object' : " What would you like me to pick up? "}
+        self._required_skills = ['arms']
 
     def _configure(self, robot, config):
         if not 'found-object-des' in config:
             self._config_result.message = " I can't pick up anything without looking for it first! "
-            return
-
-        # TODO: remove right and left
-        if not hasattr(robot, 'rightArm') or not hasattr(robot, 'leftArm'):
-            rospy.logerr("Robot {} does not have attribute 'leftArm'".format(robot.robot_name))
-            self._config_result.message = " I don't have any arms to grab stuff with. "
-            self._config_result.missing_skill = "arm"
             return
 
         self._robot = robot
@@ -43,9 +37,9 @@ class PickUp(Action):
             self._config_result.message = " A {} is not something I can pick up. ".format(self._object.type)
             return
 
-        self._side = config['side'] if 'side' in config else 'right'
+        side = config['side'] if 'side' in config else 'right'
 
-        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[self._side])
+        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[side])
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
                                                  item=config['found-object-des'],
@@ -58,7 +52,6 @@ class PickUp(Action):
         self._thread = threading.Thread(name='pick-up', target=self._fsm.execute)
         self._thread.start()
 
-        # TODO: implement possibility to cancel action when started, but still block while executing
         self._thread.join()
         self._execute_result.succeeded = True
         self._execute_result.message = " I picked up the {} ".format(self._object.type)

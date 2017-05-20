@@ -15,16 +15,11 @@ class LookAt(Action):
     '''
     def __init__(self):
         Action.__init__(self)
-        self._robot = None
-        self._entity = None
+        self._required_field_prompts = {'entity': " What would you like me to look at? "}
+        self._required_skills = ['head']
 
     def _configure(self, robot, config):
         self._robot = robot
-
-        if "entity" not in config:
-            self._config_result.missing_field = "entity"
-            rospy.logwarn("Please specify an entity to look at")
-            return
 
         (entities, error_msg) = entities_from_description(config["entity"], robot)
         if not entities:

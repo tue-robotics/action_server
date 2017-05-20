@@ -13,12 +13,9 @@ class Say(Action):
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'sentence' : "I didn't get what you want me to say."}
+        self._required_skills = ['speech']
 
     def _configure(self, robot, config):
-        if not hasattr(robot, "speech"):
-            rospy.logerr("Robot {} does not have attribute 'speech'".format(robot.robot_name))
-            return
-
         self._robot = robot
 
         self._sentence = config['sentence']

@@ -16,13 +16,11 @@ class Inspect(Action):
     """
     def __init__(self):
         Action.__init__(self)
+        self._required_field_prompts = {'entity': " What would you like me to inspect? "}
+        self._required_skills = ['head', 'ed', 'base']
 
     def _configure(self, robot, config):
-        if "entity" not in config:
-            self._config_result.missing_field = "entity"
-            return
-
-        self._robot = robot  # TODO: this should also check if the given robot is capable of this action.
+        self._robot = robot
         self._entity_description = config["entity"]
 
         self._config_result.succeeded = True

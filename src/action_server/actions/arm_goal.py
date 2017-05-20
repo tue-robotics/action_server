@@ -14,22 +14,15 @@ class ArmGoal(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._arm = None
-        self._symbolic_goal = None
+        self._required_field_prompts = {'side' : " Which arm should I move? ",
+                                        'symbolic' : " What should I do with my arm? "}
+        self._required_skills = ['arms']
 
     def _configure(self, robot, config):
-        if not "side" in config:
-            rospy.logwarn( "Please provide 'side'")
-            self._config_result.missing_field = "side"
-            return
-
         if config['side'] == 'left':
             self._arm = robot.leftArm
         else:
             self._arm = robot.rightArm
-
-        if not "symbolic" in config:
-            rospy.logwarn("Please provide 'symbolic' keyword.")
 
         self._symbolic_goal = config["symbolic"]
         self._config_result.succeeded = True

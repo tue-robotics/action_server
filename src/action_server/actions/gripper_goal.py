@@ -13,22 +13,17 @@ class GripperGoal(Action):
     """
     def __init__(self):
         Action.__init__(self)
-        self._arm = None
-        self._goal = None
+        self._required_field_prompts = {'side' : " Which gripper should I move? ",
+                                        'goal' : " Should I open my gripper, or close it? "}
+        self._required_skills = ['arms']
 
     def _configure(self, robot, config):
-        if not "side" in config:
-            rospy.logwarn("Please provide 'side'")
-            self._config_result.missing_field = "side"
-
-        if config['side'] == 'left':
-            self._arm = robot.leftArm
-        else:
-            self._arm = robot.rightArm
-
-        if not "goal" in config:
-            rospy.logwarn("Please specify 'goal'")
-            self._config_result.missing_field = "goal"
+        side = config['side']
+        try:
+            self._arm = robot.arms[side]
+        except KeyError:
+            self._config_result.message = " I don't have a {} arm with grippers to close. ".format(side)
+            self._config_result.missing_skill = side + "Arm"
 
         self._goal = config["goal"]
 

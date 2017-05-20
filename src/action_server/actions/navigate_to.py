@@ -17,10 +17,10 @@ class NavigateTo(Action):
     '''
     def __init__(self):
         Action.__init__(self)
-        self._required_parameters = {'object' : 'Where should I go?'}
+        self._required_parameters = {'object' : ' Where would you like me to go? '}
+        self._required_skills = ['base']
 
     def _configure(self, robot, config):
-        # TODO: this should also check if the given robot is capable of this action.
         self._robot = robot
         self._entity_description = config['object']
         self._config_result.succeeded = True
