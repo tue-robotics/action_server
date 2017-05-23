@@ -49,7 +49,6 @@ class Client(object):
     def _handle_feedback(self, feedback):
         for message in feedback.log_messages:
             self._feedback.append(message)
-        exit(0)
 
     def send_task(self, semantics):
         """
