@@ -25,6 +25,11 @@ class TaskOutcome(object):
         if value:
             self.result = self.RESULT_SUCCEEDED
 
+    def __repr__(self):
+        return "TaskOutcome(result={}, messages={}, missing_field='{}')".format(self.result,
+                                                                             self.messages,
+                                                                             self.missing_field)
+
 
 class Client(object):
     ''' A client for the action server
