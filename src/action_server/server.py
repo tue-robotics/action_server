@@ -24,7 +24,9 @@ class Server(object):
 
     def _add_action_cb(self, goal):
         recipe = yaml.load(goal.recipe)
+        rospy.logdebug("Received action recipe: {}".format(goal.recipe))
         configuration_result = self._task_manager.set_up_state_machine(recipe['actions'])
+        rospy.logdebug("Result of state machine setup: {}".format(configuration_result))
 
         self._feedback.log_messages = []
 
@@ -51,7 +53,9 @@ class Server(object):
 
         while not self._task_manager.done:
             action_result = self._task_manager.execute_next_action()
+            rospy.logdebug("Result of action execution: {}".format(action_result))
             self._feedback.log_messages.append(action_result.message)
+            rospy.logdebug("Sending feedback: {}".format(self._feedback))
             self._action_server.publish_feedback(self._feedback)
             # if not action_result.succeeded:
             #     self._result.result = action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
