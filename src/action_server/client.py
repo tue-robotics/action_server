@@ -2,6 +2,7 @@ import rospy
 
 import actionlib
 import action_server.msg
+import action_server.srv
 
 class TaskOutcome(object):
     RESULT_MISSING_INFORMATION = 0
@@ -44,11 +45,29 @@ class Client(object):
         self._action_client.wait_for_server()
         rospy.logdebug("Connected to task action server")
 
+        self.get_actions_proxy = rospy.ServiceProxy('get_actions', action_server.srv.GetActions)
+
         self._feedback = []
 
     def _handle_feedback(self, feedback):
         for message in feedback.log_messages:
             self._feedback.append(message)
+
+
+    def get_actions(self):
+        """
+        Query the available actions from the action server.
+
+        :return: List of action names as registered with the action server, or an empty list if the service call fails.
+        """
+        try:
+            res = self.get_actions_proxy()
+        except rospy.ServiceException:
+            rospy.logerr("Failed to get actions from the action server.")
+            res = []
+
+        return res.actions
+
 
     def send_task(self, semantics):
         """

@@ -32,8 +32,10 @@ class ActionFactory(object):
         self._action_name_to_class[action_type] = skill
 
     def get_action_names(self):
-        names = [name for name, action in self._action_name_to_class]
+        """Get a list of the action names of the registered actions"""
+        names = self._action_name_to_class.keys()
         return names
 
     def get_action(self, action_name):
+        """Get the Action class for the requested action_name"""
         return self._action_name_to_class[action_name]
