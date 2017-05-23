@@ -1,4 +1,5 @@
 from action_factory import ActionFactory
+from actions.action import ConfigurationResult
 
 '''
 The TaskManager sets up a state machine according to a task recipe and executes it.
@@ -13,7 +14,7 @@ class TaskManager(object):
         self.done = True
 
     def set_up_state_machine(self, recipe):
-        configuration_result = None
+        configuration_result = ConfigurationResult()
 
         i = 0
         for instruction in recipe:
