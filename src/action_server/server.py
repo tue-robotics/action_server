@@ -2,6 +2,7 @@ import rospy, yaml
 
 import actionlib
 import action_server.msg
+from action_server.srv import GetActions, GetActionsResponse
 from task_manager import TaskManager
 
 
@@ -20,7 +21,15 @@ class Server(object):
         self._feedback = action_server.msg.TaskFeedback()
         self._result = action_server.msg.TaskResult()
         self._action_server.start()
+
+        self._get_actions_srv = rospy.Service("get_actions", GetActions, self._get_actions_cb)
+
         rospy.logdebug("Started action server with action name {}".format(self._action_name))
+
+    def _get_actions_cb(self, req):
+        res = GetActionsResponse()
+        res.actions = self._task_manager.get_actions()
+        return res
 
     def _add_action_cb(self, goal):
         recipe = yaml.load(goal.recipe)
