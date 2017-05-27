@@ -36,4 +36,4 @@ before_script:
 
 script:
   - catkin build
-  - catki run_tests
+  - catkin run_tests
