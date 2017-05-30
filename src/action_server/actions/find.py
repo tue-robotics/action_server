@@ -26,10 +26,8 @@ class Find(Action):
         self._required_skills = ['head', 'base', 'rightArm', 'speech']
 
     def _point_at_person(self, person):
-        person_pose = kdl.poseMsgToKdlFrame(person.pose)
-        person_pose_stamped = kdl.FrameStamped(person_pose, 'map')
-        pose_base_link_kdl = person_pose_stamped.projectToFrame(self._robot.robot_name + '/base_link',
-                                                                self._robot.tf_listener)
+        pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',
+                                                        self._robot.tf_listener)
         pose_base_link = kdl.kdlFrameStampedToPoseStampedMsg(pose_base_link_kdl)
 
         x = pose_base_link.pose.position.x
