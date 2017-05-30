@@ -58,12 +58,10 @@ class Find(Action):
 
         # If we need to find a manipulable item, the location should also be manipulable
         if not self._object.type == "person" and self._location.id not in self._knowledge.manipulation_locations:
-            self._location.id = self._knowledge.get_location_from_room(self._location.id)
-
-            if not self._location.id:
-                rospy.logwarn("Not going to look for a {} at the {}".format(self._object.type, self._location.id))
-                self._config_result.message = " I don't think it makes sense to look for a {} at the {}. ".format(
-                    self._object.type, self._location.id)
+            if self._location.id in self._knowledge.location_rooms:
+                self._location.id = self._knowledge.get_location_from_room(self._location.id)
+            else:
+                self._config_result.message = " I can't grasp anything from the {}".format(self._location.id)
                 return
 
         self._location_designator = EdEntityDesignator(self._robot, id=self._location.id)
