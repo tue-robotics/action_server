@@ -37,8 +37,10 @@ class TaskManager(object):
             if configuration_result.succeeded:
                 self._action_sequence.append(action)
             # If action configuration failed, return the configuration result, specifying what went wrong
-            else:
+            elif configuration_result.missing_field:
                 configuration_result.missing_field = "[{}].".format(i) + configuration_result.missing_field
+                return configuration_result
+            else:
                 return configuration_result
             i += 1
 

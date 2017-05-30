@@ -14,7 +14,7 @@ class ConfigurationResult(object):
 
         self.succeeded = succeeded
         self.resulting_knowledge = resulting_knowledge
-        self.missing_field = None
+        self.missing_field = ""
         self.missing_skill = None
         self.message = ""
 
