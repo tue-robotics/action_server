@@ -2,6 +2,7 @@ from action import Action
 
 from util import entities_from_description
 from entity_description import resolve_entity_description
+from find import Find
 
 import robot_smach_states
 
@@ -19,13 +20,28 @@ class PickUp(Action):
     '''
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'object' : " What would you like me to pick up? "}
         self._required_skills = ['arms']
+        self._find_action = None
 
     def _configure(self, robot, config):
         if not 'found-object-des' in config:
-            self._config_result.message = " I can't pick up anything without looking for it first! "
-            return
+            # If we know where to look, and we know what to find, let's first see if we already know of such an object
+            if 'location' in config and 'object' in config:
+                entity_description = {'type': config['object']['type'],
+                                      'location': config['location']}
+                grab_entities, _ = entities_from_description(entity_description, robot)
+                if grab_entities:
+                    config['found-object-des'] = EdEntityDesignator(id=grab_entities[0].id, robot=robot)
+
+            # If we don't know the object already, set up a find action to go and find it
+            if not 'found-object-des' in config:
+                self._find_action = Find()
+                find_config_result = self._find_action.configure(robot, config)
+                if not find_config_result.succeeded:
+                    self._config_result = find_config_result
+                    return
+
+                config['found-object-des'] = find_config_result.resulting_knowledge['found-object-des']
 
         self._robot = robot
 
@@ -49,12 +65,19 @@ class PickUp(Action):
         self._config_result.succeeded = True
 
     def _start(self):
+        if self._find_action:
+            find_action_result = self._find_action.start()
+
+            self._execute_result.message += find_action_result.message
+            if not find_action_result.succeeded:
+                return
+
         self._thread = threading.Thread(name='pick-up', target=self._fsm.execute)
         self._thread.start()
 
         self._thread.join()
         self._execute_result.succeeded = True
-        self._execute_result.message = " I picked up the {} ".format(self._object.type)
+        self._execute_result.message += " I picked up the {}. ".format(self._object.type)
 
     def _cancel(self):
         if self._fsm.is_running:
