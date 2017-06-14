@@ -55,7 +55,8 @@ class PickUp(Action):
 
         side = config['side'] if 'side' in config else 'right'
 
-        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[side])
+        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[side]).lockable()
+        arm_des.lock()
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
                                                  item=config['found-object-des'],
