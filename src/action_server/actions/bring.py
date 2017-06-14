@@ -68,16 +68,28 @@ class Bring(Action):
                 return
 
         self._config_result.succeeded = True
-        self._robot.speech.speak("Bring the action!")
 
     def _handover(self):
         self._robot.speech.speak("I will hand over the {} now".format(self._object.type))
         arm = self._arm_designator.resolve()
+        arm.send_joint_goal('handover_to_human')
+        arm.wait_for_motion_done()
+
         arm.handover_to_human()
+
         self._robot.speech.speak("Here you go!", block=False)
+
+        arm.send_gripper_goal('open')
+        arm.wait_for_motion_done()
+
         arm.reset()
+        arm.wait_for_motion_done()
+
+        arm.occupied_by = None
 
     def _start(self):
+        self._robot.speech.speak("Bring the action!")
+
         # Find
         find_result = self._find_action.start()
 
