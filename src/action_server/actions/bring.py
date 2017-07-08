@@ -75,9 +75,15 @@ class Bring(Action):
         arm.send_joint_goal('handover_to_human')
         arm.wait_for_motion_done()
 
-        arm.handover_to_human()
+        self._robot.speech.speak("Please take it from my gripper.", block=False)
 
-        self._robot.speech.speak("Here you go!", block=False)
+        attempt = 0
+
+        while not arm.handover_to_human(timeout=10) and attempt < 2:
+            self._robot.speech.speak("Please take it from my gripper.", block=False)
+            attempt += 1
+
+        self._robot.speech.speak("I will open my gripper now.", block=False)
 
         arm.send_gripper_goal('open')
         arm.wait_for_motion_done()
