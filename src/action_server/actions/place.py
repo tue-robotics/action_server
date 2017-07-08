@@ -24,9 +24,10 @@ class Place(Action):
         self._thread = None
         self._goal_entity = None
 
-        self._required_field_prompts = {'entity': " Where should I leave the object? ",
-                                        'arm-designator': " I won't be able to place anything before I grasped it. "
-                                                          "Please tell me what to get. "}
+        self._required_field_prompts = {'entity': " Where should I leave the object? "}
+
+        self._required_passed_knowledge = {'arm-designator': " I won't be able to place anything before I grasped it. "
+                                                             "Please tell me what to get. "}
 
         self._required_skills = ['arms']
 
