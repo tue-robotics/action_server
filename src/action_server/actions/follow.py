@@ -88,7 +88,7 @@ class Follow(Action):
         res = follow_sm.execute()
 
         # If we didn't succeed in following, navigate to the goal location if we have one
-        if not res == "succeeded":
+        if not res == "stopped":
             if self._goal:
                 if not navigate(robot=self._robot, entity_description=self._goal):
                     self._execute_result.message += " But I failed to follow {} to the {}. ".format(self._target.id,
