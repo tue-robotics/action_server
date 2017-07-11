@@ -19,6 +19,7 @@ class ArmGoal(Action):
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
+        config = config.semantics
         if config['side'] == 'left':
             self._arm = robot.leftArm
         else:

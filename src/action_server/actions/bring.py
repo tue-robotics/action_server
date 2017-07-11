@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 from find import Find
 from pick_up import PickUp
 from navigate_to import NavigateTo
@@ -22,6 +22,7 @@ class Bring(Action):
         self._required_skills = ['base']
 
     def _configure(self, robot, config):
+        config = config.semantics
         self._robot = robot
 
         self._source_location = resolve_entity_description(config['source-location'])
@@ -30,8 +31,8 @@ class Bring(Action):
 
         # TODO Passing on knowledge needs to be automated in the future...
         self._find_action = Find()
-        find_config = {'object': config['object'],
-                       'location': config['source-location']}
+        find_config = ConfigurationData({'object': config['object'],
+                       'location': config['source-location']})
         find_config_result = self._find_action.configure(self._robot, find_config)
         if not find_config_result.succeeded:
             self._config_result.message = find_config_result.message
@@ -39,7 +40,7 @@ class Bring(Action):
         self._found_object_designator = find_config_result.resulting_knowledge['found-object-des']
 
         self._grab_action = PickUp()
-        grab_config = {'object': config['object'], 'found-object-des': self._found_object_designator}
+        grab_config = ConfigurationData({'object': config['object'], 'found-object-des': self._found_object_designator})
         grab_config_result = self._grab_action.configure(self._robot, grab_config)
         if not grab_config_result.succeeded:
             self._config_result.message = grab_config_result.message
@@ -47,7 +48,7 @@ class Bring(Action):
         self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
 
         self._nav_action = NavigateTo()
-        nav_config = {'object': config['target-location']}
+        nav_config = ConfigurationData({'object': config['target-location']})
         nav_config_result = self._nav_action.configure(self._robot, nav_config)
         if not nav_config_result.succeeded:
             self._config_result.message = nav_config_result.message
@@ -147,10 +148,10 @@ if __name__ == "__main__":
 
     action = Bring()
 
-    config = {'action': 'bring',
+    config = ConfigurationData({'action': 'bring',
               'entity': {'location': 'cabinet'},
               'from': {'id': 'cabinet'},
-              'to': {'id': 'dinner_table'}}
+              'to': {'id': 'dinner_table'}})
 
     action.configure(robot, config)
     action.start()

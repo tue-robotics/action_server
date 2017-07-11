@@ -50,15 +50,15 @@ class Action(object):
 
     def _check_parameters(self, config):
         for k, v in self._required_field_prompts.items():
-            if k not in config:
+            if k not in config.semantics:
                 rospy.logerr("Missing required parameter {}".format(k))
                 self._config_result.missing_field = k
                 self._config_result.message = v
                 return False
 
-        for k, v in self.required_passed_knowledge.items():
-            if k not in self.:
-                rospy.logerr("Missing required parameter {}".format(k))
+        for k, v in self._required_passed_knowledge.items():
+            if k not in self.knowledge:
+                rospy.logerr("Missing required knowledge {}".format(k))
                 self._config_result.missing_field = k
                 self._config_result.message = v
                 return False

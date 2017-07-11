@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 
 import rospy
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     action = ResetWM()
 
-    config = {'action': 'reset_wm'}
+    config = ConfigurationData({'action': 'reset_wm'})
 
     action.configure(robot, config)
     action.start()

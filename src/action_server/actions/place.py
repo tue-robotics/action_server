@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 from util import entities_from_description
 from entity_description import resolve_entity_description
 
@@ -32,6 +32,7 @@ class Place(Action):
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
+        config = config.semantics
         # TODO: remove right and left
         if not hasattr(robot, 'rightArm') or not hasattr(robot, 'leftArm'):
             rospy.logerr("Robot {} does not have attribute 'speech'".format(robot.robot_name))
@@ -118,10 +119,10 @@ if __name__ == "__main__":
 
     action = Place()
 
-    config = {'action': 'place',
+    config = ConfigurationData({'action': 'place',
               'entity': {'id': 'cabinet'},
               'side': 'left',
-              'height': 0.8}
+              'height': 0.8})
 
     action.configure(robot, config)
     action.start()

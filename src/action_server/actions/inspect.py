@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 
 from util import entities_from_description
 
@@ -20,6 +20,7 @@ class Inspect(Action):
         self._required_skills = ['head', 'ed', 'base']
 
     def _configure(self, robot, config):
+        config = config.semantics
         self._robot = robot
         self._entity_description = config["entity"]
 
@@ -73,8 +74,8 @@ if __name__ == "__main__":
 
     action = Inspect()
 
-    config = {'action': 'inspect',
-              'entity': {'id': 'cabinet'}}
+    config = ConfigurationData({'action': 'inspect',
+              'entity': {'id': 'cabinet'}})
 
     action.configure(robot, config)
     action.start()

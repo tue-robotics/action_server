@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 from find import Find
 from entity_description import resolve_entity_description
 
@@ -40,6 +40,7 @@ class Follow(Action):
         self._required_skills = ['base']
 
     def _configure(self, robot, config):
+        config = config.semantics
         self._target = resolve_entity_description(config["target"])
 
         if not self._target.id == "operator" and not "location-from" in config:
@@ -50,9 +51,9 @@ class Follow(Action):
         if "location-from" in config:
             self._origin = resolve_entity_description(config["location-from"])
             self._find_action = Find()
-            find_config = {'location': {'id' : self._origin.id},
+            find_config = ConfigurationData({'location': {'id' : self._origin.id},
                            'object': {'type': 'person',
-                                      'id': self._target.id}}
+                                      'id': self._target.id}})
             find_config_result = self._find_action.configure(robot, find_config)
             if not find_config_result.succeeded:
                 self._config_result.message = " I don't know how to find {} in the {}. ".format(self._origin.id,
@@ -124,8 +125,8 @@ if __name__ == "__main__":
 
     action = Follow()
 
-    config = {'action': 'follow',
-              'entity': {'special': 'me'}}
+    config = ConfigurationData({'action': 'follow',
+              'entity': {'special': 'me'}})
 
     action.configure(robot, config)
     action.start()

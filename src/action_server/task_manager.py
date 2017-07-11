@@ -1,5 +1,5 @@
 from action_factory import ActionFactory
-from actions.action import ConfigurationResult
+from actions.action import ConfigurationResult, ConfigurationData
 
 '''
 The TaskManager sets up a state machine according to a task recipe and executes it.
@@ -20,6 +20,7 @@ class TaskManager(object):
         configuration_result = ConfigurationResult()
 
         i = 0
+
         for instruction in recipe:
             try:
                 action_name = instruction['action']
@@ -30,8 +31,10 @@ class TaskManager(object):
             Action = self._action_factory.get_action(action_name)
             action = Action()
 
+            config_data = ConfigurationData(instruction, configuration_result.resulting_knowledge)
+
             # Try to configure the action
-            configuration_result = action.configure(self._robot, instruction)
+            configuration_result = action.configure(self._robot, config_data)
 
             # If action configuration succeeded, append configured action to action sequence
             if configuration_result.succeeded:

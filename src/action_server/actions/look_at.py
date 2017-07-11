@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 from util import entities_from_description
 
 import robot_skills.util.kdl_conversions as kdl
@@ -64,8 +64,8 @@ if __name__ == "__main__":
 
     action = LookAt()
 
-    config = {'action': 'look_at',
-              'entity': {'id': 'cabinet'}}
+    config = ConfigurationData({'action': 'look_at',
+              'entity': {'id': 'cabinet'}})
 
     action.configure(robot, config)
     action.start()

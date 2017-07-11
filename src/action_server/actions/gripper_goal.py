@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 
 import rospy
 import threading
@@ -18,6 +18,7 @@ class GripperGoal(Action):
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
+        config = config.semantics
         side = config['side']
         try:
             self._arm = robot.arms[side]
@@ -59,9 +60,9 @@ if __name__ == "__main__":
 
     action = GripperGoal()
 
-    config = {'action': 'gripper_goal',
+    config = ConfigurationData({'action': 'gripper_goal',
               'side': 'left',
-              'goal': 'close'}
+              'goal': 'close'})
 
     action.configure(robot, config)
     action.start()

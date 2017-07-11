@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 
 from util import entities_from_description
 from entity_description import resolve_entity_description
@@ -24,6 +24,7 @@ class PickUp(Action):
         self._find_action = None
 
     def _configure(self, robot, config):
+        config = config.semantics
         if not 'found-object-des' in config:
             # If we know where to look, and we know what to find, let's first see if we already know of such an object
             if 'location' in config and 'object' in config:
@@ -100,10 +101,10 @@ if __name__ == "__main__":
 
     action = PickUp()
 
-    config = {'action': 'pick_up',
+    config = ConfigurationData({'action': 'pick_up',
               'entity': {'id': 'cabinet'},
               'side': 'left',
-              'height': 0.8}
+              'height': 0.8})
 
     action.configure(robot, config)
     action.start()
