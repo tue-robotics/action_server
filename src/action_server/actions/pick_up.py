@@ -37,7 +37,8 @@ class PickUp(Action):
             # If we don't know the object already, set up a find action to go and find it
             if not 'found-object-des' in config:
                 self._find_action = Find()
-                find_config_result = self._find_action.configure(robot, config)
+                find_config = ConfigurationData(config)
+                find_config_result = self._find_action.configure(robot, find_config)
                 if not find_config_result.succeeded:
                     self._config_result = find_config_result
                     return
