@@ -82,10 +82,12 @@ class Client(object):
 
         recipe = semantics
 
-        goal = action_server.msg.TaskGoal(recipe=recipe)
-        self._action_client.send_goal(goal, feedback_cb=self._handle_feedback)
-        self._action_client.wait_for_result()
-        result = self._action_client.get_result()
+        result = None
+        while not result:
+            goal = action_server.msg.TaskGoal(recipe=recipe)
+            self._action_client.send_goal(goal, feedback_cb=self._handle_feedback)
+            self._action_client.wait_for_result()
+            result = self._action_client.get_result()
 
         if result.result == action_server.msg.TaskResult.RESULT_MISSING_INFORMATION:
             to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
