@@ -74,12 +74,13 @@ class PickUp(Action):
             if not find_action_result.succeeded:
                 return
 
-        self._thread = threading.Thread(name='pick-up', target=self._fsm.execute)
-        self._thread.start()
+        fsm_result = self._fsm.execute()
 
-        self._thread.join()
-        self._execute_result.succeeded = True
-        self._execute_result.message += " I picked up the {}. ".format(self._object.type)
+        if fsm_result == "done":
+            self._execute_result.succeeded = True
+            self._execute_result.message += " I picked up the {}. ".format(self._object.type)
+        else:
+            self._execute_result.message += " I could not pick up the {}. ".format(self._object_type)
 
     def _cancel(self):
         if self._fsm.is_running:
