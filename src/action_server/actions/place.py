@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 from util import entities_from_description
 from entity_description import resolve_entity_description
 
@@ -24,9 +24,10 @@ class Place(Action):
         self._thread = None
         self._goal_entity = None
 
-        self._required_field_prompts = {'entity': " Where should I leave the object? ",
-                                        'arm-designator': " I won't be able to place anything before I grasped it. "
-                                                          "Please tell me what to get. "}
+        self._required_field_prompts = {'entity': " Where should I leave the object? "}
+
+        self._required_passed_knowledge = {'arm-designator': " I won't be able to place anything before I grasped it. "
+                                                             "Please tell me what to get. "}
 
         self._required_skills = ['arms']
 
@@ -40,19 +41,19 @@ class Place(Action):
         self._robot = robot
 
         try:
-            self._goal_entity = resolve_entity_description(config["entity"])
+            self._goal_entity = resolve_entity_description(config.semantics["entity"])
         except KeyError:
             rospy.logwarn("Specify an 'entity' to place on")
             return
 
-        (entities, error_msg) = entities_from_description(config["entity"], robot)
+        (entities, error_msg) = entities_from_description(config.semantics["entity"], robot)
         if not entities:
             rospy.logwarn(error_msg)
             return
         self._place_entity = entities[0]
 
         try:
-            side = config["side"]
+            side = config.semantics["side"]
         except KeyError:
             side = "right"  # Default
 
@@ -64,12 +65,12 @@ class Place(Action):
             self._goal_y = -0.2
 
         try:
-            self._arm = config['arm-designator'].resolve()
+            self._arm = config.semantics['arm-designator'].resolve()
         except:
             pass
 
         try:
-            self._height = config["height"]
+            self._height = config.semantics["height"]
         except KeyError:
             self._height = 0.8
 
@@ -117,10 +118,10 @@ if __name__ == "__main__":
 
     action = Place()
 
-    config = {'action': 'place',
-              'entity': {'id': 'cabinet'},
-              'side': 'left',
-              'height': 0.8}
+    semantics = {'action': 'place',
+                 'entity': {'id': 'cabinet'},
+                 'side': 'left',
+                 'height': 0.8}
 
-    action.configure(robot, config)
+    action.configure(robot, ConfigurationData(semantics))
     action.start()

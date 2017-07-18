@@ -3,6 +3,18 @@ import rospy
 from robot_skills.robot import Robot
 from robocup_knowledge import load_knowledge
 
+class ConfigurationData(object):
+    '''
+    The ConfigurationData class defines the input data structure for configuration of an action.
+    '''
+    def __init__(self, semantics, knowledge=None):
+        '''
+        :param semantics: Dictionary of the following structure: {'action': <action-name>, 'param1': <param-value>}.
+        :param knowledge: Dictionary of parameter names to knowledge provided by previous actions.
+        '''
+        self.semantics = semantics
+        self.knowledge = knowledge
+
 
 class ConfigurationResult(object):
     '''
@@ -36,13 +48,21 @@ class Action(object):
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
         self._required_field_prompts = {}
+        self._required_passed_knowledge = {}
         self._required_skills = []
         self._knowledge = load_knowledge('common')
 
     def _check_parameters(self, config):
         for k, v in self._required_field_prompts.items():
-            if k not in config:
+            if k not in config.semantics:
                 rospy.logerr("Missing required parameter {}".format(k))
+                self._config_result.missing_field = k
+                self._config_result.message = v
+                return False
+
+        for k, v in self._required_passed_knowledge.items():
+            if k not in config.knowledge:
+                rospy.logerr("Missing required knowledge {}".format(k))
                 self._config_result.missing_field = k
                 self._config_result.message = v
                 return False
@@ -59,8 +79,8 @@ class Action(object):
 
     def configure(self, robot, config):
         rospy.logdebug("Configuring action {} with config {}.".format(self.__class__.__name__, config))
-        if not isinstance(config, dict):
-            rospy.logerr("Action: the specified config should be a dictionary! I received: %s" % str(config))
+        if not isinstance(config, ConfigurationData):
+            rospy.logerr("Action: the specified config should be ConfigurationData! I received: %s" % str(config))
             self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "
             return self._config_result
 

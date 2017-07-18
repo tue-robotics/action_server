@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 
 import threading
 import rospy
@@ -19,12 +19,12 @@ class ArmGoal(Action):
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
-        if config['side'] == 'left':
+        if config.semantics['side'] == 'left':
             self._arm = robot.leftArm
         else:
             self._arm = robot.rightArm
 
-        self._symbolic_goal = config["symbolic"]
+        self._symbolic_goal = config.semantics["symbolic"]
         self._config_result.succeeded = True
 
     def _start(self):
@@ -59,9 +59,9 @@ if __name__ == "__main__":
 
     action = ArmGoal()
 
-    config = {'action': 'arm_goal',
-              'side': 'right',
-              'symbolic': 'carrying_box_pose'}
+    semantics = {'action': 'arm_goal',
+                 'side': 'right',
+                 'symbolic': 'carrying_box_pose'}
 
-    action.configure(robot, config)
+    action.configure(robot, ConfigurationData(semantics))
     action.start()

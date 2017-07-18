@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 
 from util import entities_from_description
 
@@ -21,7 +21,7 @@ class Inspect(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
-        self._entity_description = config["entity"]
+        self._entity_description = config.semantics["entity"]
 
         self._config_result.succeeded = True
         return
@@ -73,8 +73,8 @@ if __name__ == "__main__":
 
     action = Inspect()
 
-    config = {'action': 'inspect',
-              'entity': {'id': 'cabinet'}}
+    config = ConfigurationData({'action': 'inspect',
+              'entity': {'id': 'cabinet'}})
 
     action.configure(robot, config)
     action.start()

@@ -1,4 +1,4 @@
-from action import Action
+from action import Action, ConfigurationData
 from util import entities_from_description
 
 import threading
@@ -22,7 +22,7 @@ class NavigateTo(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
-        self._entity_description = config['object']
+        self._entity_description = config.semantics['object']
         self._config_result.succeeded = True
         return
 
@@ -90,8 +90,8 @@ if __name__ == "__main__":
 
     action = NavigateTo()
 
-    config = {'action': 'navigate-to',
-              'object': {'id': 'cabinet'}}
+    config = ConfigurationData({'action': 'navigate-to',
+              'object': {'id': 'cabinet'}})
 
     action.configure(robot, config)
     action.start()
