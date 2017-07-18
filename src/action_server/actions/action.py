@@ -8,6 +8,10 @@ class ConfigurationData(object):
     The ConfigurationData class defines the input data structure for configuration of an action.
     '''
     def __init__(self, semantics, knowledge=None):
+        '''
+        :param semantics: Dictionary of the following structure: {'action': <action-name>, 'param1': <param-value>}.
+        :param knowledge: Dictionary of parameter names to knowledge provided by previous actions.
+        '''
         self.semantics = semantics
         self.knowledge = knowledge
 
