@@ -57,7 +57,7 @@ class Action(object):
                 return False
 
         for k, v in self._required_passed_knowledge.items():
-            if k not in self.knowledge:
+            if k not in config.knowledge:
                 rospy.logerr("Missing required knowledge {}".format(k))
                 self._config_result.missing_field = k
                 self._config_result.message = v
