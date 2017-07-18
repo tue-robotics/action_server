@@ -40,16 +40,15 @@ class Follow(Action):
         self._required_skills = ['base']
 
     def _configure(self, robot, config):
-        config = config.semantics
-        self._target = resolve_entity_description(config["target"])
+        self._target = resolve_entity_description(config.semantics["target"])
 
-        if not self._target.id == "operator" and not "location-from" in config:
+        if not self._target.id == "operator" and not "location-from" in config.semantics:
             self._config_result.missing_field = "location-from"
             self._config_result.message = " Where can I find {}? ".format(self._target.id)
             return
 
-        if "location-from" in config:
-            self._origin = resolve_entity_description(config["location-from"])
+        if "location-from" in config.semantics:
+            self._origin = resolve_entity_description(config.semantics["location-from"])
             self._find_action = Find()
             find_config = ConfigurationData({'location': {'id' : self._origin.id},
                            'object': {'type': 'person',
@@ -66,8 +65,8 @@ class Follow(Action):
         if self._target.id == "operator":
             self._target.id = "you"
 
-        if "location-to" in config:
-            self._goal = resolve_entity_description(config["location-to"])
+        if "location-to" in config.semantics:
+            self._goal = resolve_entity_description(config.semantics["location-to"])
         else:
             self._goal = None
 

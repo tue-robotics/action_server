@@ -50,10 +50,9 @@ class Find(Action):
         self._robot.rightArm.send_joint_goal('reset')
 
     def _configure(self, robot, config):
-        config = config.semantics
         self._robot = robot
-        self._object = resolve_entity_description(config['object'])
-        self._location = resolve_entity_description(config['location'])
+        self._object = resolve_entity_description(config.semantics['object'])
+        self._location = resolve_entity_description(config.semantics['location'])
 
         # If we need to find a manipulable item, the location should also be manipulable
         if not self._object.type == "person" and self._location.id not in self._knowledge.manipulation_locations:

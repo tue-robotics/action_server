@@ -20,9 +20,8 @@ class Inspect(Action):
         self._required_skills = ['head', 'ed', 'base']
 
     def _configure(self, robot, config):
-        config = config.semantics
         self._robot = robot
-        self._entity_description = config["entity"]
+        self._entity_description = config.semantics["entity"]
 
         self._config_result.succeeded = True
         return

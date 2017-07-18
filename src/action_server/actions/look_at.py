@@ -21,7 +21,7 @@ class LookAt(Action):
     def _configure(self, robot, config):
         self._robot = robot
 
-        (entities, error_msg) = entities_from_description(config["entity"], robot)
+        (entities, error_msg) = entities_from_description(config.semantics["entity"], robot)
         if not entities:
             rospy.logwarn(error_msg)
             return

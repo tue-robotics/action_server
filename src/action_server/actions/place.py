@@ -32,7 +32,6 @@ class Place(Action):
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
-        config = config.semantics
         # TODO: remove right and left
         if not hasattr(robot, 'rightArm') or not hasattr(robot, 'leftArm'):
             rospy.logerr("Robot {} does not have attribute 'speech'".format(robot.robot_name))
@@ -42,19 +41,19 @@ class Place(Action):
         self._robot = robot
 
         try:
-            self._goal_entity = resolve_entity_description(config["entity"])
+            self._goal_entity = resolve_entity_description(config.semantics["entity"])
         except KeyError:
             rospy.logwarn("Specify an 'entity' to place on")
             return
 
-        (entities, error_msg) = entities_from_description(config["entity"], robot)
+        (entities, error_msg) = entities_from_description(config.semantics["entity"], robot)
         if not entities:
             rospy.logwarn(error_msg)
             return
         self._place_entity = entities[0]
 
         try:
-            side = config["side"]
+            side = config.semantics["side"]
         except KeyError:
             side = "right"  # Default
 
@@ -66,12 +65,12 @@ class Place(Action):
             self._goal_y = -0.2
 
         try:
-            self._arm = config['arm-designator'].resolve()
+            self._arm = config.semantics['arm-designator'].resolve()
         except:
             pass
 
         try:
-            self._height = config["height"]
+            self._height = config.semantics["height"]
         except KeyError:
             self._height = 0.8
 
@@ -119,10 +118,10 @@ if __name__ == "__main__":
 
     action = Place()
 
-    config = ConfigurationData({'action': 'place',
-              'entity': {'id': 'cabinet'},
-              'side': 'left',
-              'height': 0.8})
+    semantics = {'action': 'place',
+                 'entity': {'id': 'cabinet'},
+                 'side': 'left',
+                 'height': 0.8}
 
-    action.configure(robot, config)
+    action.configure(robot, ConfigurationData(semantics))
     action.start()

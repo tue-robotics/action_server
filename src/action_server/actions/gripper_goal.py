@@ -18,15 +18,14 @@ class GripperGoal(Action):
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
-        config = config.semantics
-        side = config['side']
+        side = config.semantics['side']
         try:
             self._arm = robot.arms[side]
         except KeyError:
             self._config_result.message = " I don't have a {} arm with grippers to close. ".format(side)
             self._config_result.missing_skill = side + "Arm"
 
-        self._goal = config["goal"]
+        self._goal = config.semantics["goal"]
 
         self._config_result.succeeded = True
 

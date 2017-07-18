@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     action = ResetWM()
 
-    config = ConfigurationData({'action': 'reset_wm'})
+    config = ConfigurationData({'action': 'reset-wm'})
 
     action.configure(robot, config)
     action.start()

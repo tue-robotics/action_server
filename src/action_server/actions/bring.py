@@ -22,17 +22,16 @@ class Bring(Action):
         self._required_skills = ['base']
 
     def _configure(self, robot, config):
-        config = config.semantics
         self._robot = robot
 
-        self._source_location = resolve_entity_description(config['source-location'])
-        self._target_location = resolve_entity_description(config['target-location'])
-        self._object = resolve_entity_description(config['object'])
+        self._source_location = resolve_entity_description(config.semantics['source-location'])
+        self._target_location = resolve_entity_description(config.semantics['target-location'])
+        self._object = resolve_entity_description(config.semantics['object'])
 
         # TODO Passing on knowledge needs to be automated in the future...
         self._find_action = Find()
-        find_config = ConfigurationData({'object': config['object'],
-                       'location': config['source-location']})
+        find_config = ConfigurationData({'object': config.semantics['object'],
+                       'location': config.semantics['source-location']})
         find_config_result = self._find_action.configure(self._robot, find_config)
         if not find_config_result.succeeded:
             self._config_result.message = find_config_result.message
@@ -40,7 +39,7 @@ class Bring(Action):
         self._found_object_designator = find_config_result.resulting_knowledge['found-object-des']
 
         self._grab_action = PickUp()
-        grab_config = ConfigurationData({'object': config['object'], 'found-object-des': self._found_object_designator})
+        grab_config = ConfigurationData({'object': config.semantics['object'], 'found-object-des': self._found_object_designator})
         grab_config_result = self._grab_action.configure(self._robot, grab_config)
         if not grab_config_result.succeeded:
             self._config_result.message = grab_config_result.message
@@ -48,20 +47,20 @@ class Bring(Action):
         self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
 
         self._nav_action = NavigateTo()
-        nav_config = ConfigurationData({'object': config['target-location']})
+        nav_config = ConfigurationData({'object': config.semantics['target-location']})
         nav_config_result = self._nav_action.configure(self._robot, nav_config)
         if not nav_config_result.succeeded:
             self._config_result.message = nav_config_result.message
             return
 
-        target_location = resolve_entity_description(config['target-location'])
+        target_location = resolve_entity_description(config.semantics['target-location'])
         self._drop_waypoint_after_find = False
         if target_location.type == "person":
             # TODO: Also handle bringing something to someone else than the operator
             self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(), type="waypoint")
         else:
             self._place_action = Place()
-            place_config = {'entity': config['target-location'],
+            place_config = {'entity': config.semantics['target-location'],
                             'arm-designator': self._arm_designator}
             place_config_result = self._place_action.configure(self._robot, place_config)
             if not place_config_result.succeeded:

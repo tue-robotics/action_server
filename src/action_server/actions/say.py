@@ -18,8 +18,7 @@ class Say(Action):
     def _configure(self, robot, config):
         self._robot = robot
 
-        config = config.semantics
-        self._sentence = config['sentence']
+        self._sentence = config.semantics['sentence']
 
         self._config_result.succeeded = True
         return

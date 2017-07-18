@@ -21,9 +21,8 @@ class NavigateTo(Action):
         self._required_skills = ['base']
 
     def _configure(self, robot, config):
-        config = config.semantics
         self._robot = robot
-        self._entity_description = config['object']
+        self._entity_description = config.semantics['object']
         self._config_result.succeeded = True
         return
 
