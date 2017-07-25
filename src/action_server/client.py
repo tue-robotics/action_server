@@ -91,20 +91,20 @@ class Client(object):
 
         if result.result == action_server.msg.TaskResult.RESULT_MISSING_INFORMATION:
             to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
-                             self._feedback)
+                             result.log_messages)
             to.missing_field = result.missing_field
             return to
 
         elif result.result == action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED:
             return TaskOutcome(TaskOutcome.RESULT_TASK_EXECUTION_FAILED,
-                               self._feedback)
+                               result.log_messages)
 
         elif result.result == action_server.msg.TaskResult.RESULT_UNKNOWN:
             return TaskOutcome(TaskOutcome.RESULT_UNKNOWN,
-                               self._feedback)
+                               result.log_messages)
 
         elif result.result == action_server.msg.TaskResult.RESULT_SUCCEEDED:
             return TaskOutcome(TaskOutcome.RESULT_SUCCEEDED,
-                               self._feedback)
+                               result.log_messages)
 
-        return TaskOutcome(messages=self._feedback)
+        return TaskOutcome(messages=result.log_messages)

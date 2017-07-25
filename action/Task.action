@@ -19,9 +19,9 @@ uint8 RESULT_SUCCEEDED=2
 uint8 RESULT_UNKNOWN=3
 
 uint8 result  # Result code as defined in the enum above
----
-# Feedback
 
 # Messages to report to the user about the task planning/
 # execution are returned as feedback in a list of log messages
 string[] log_messages
+---
+# Feedback
