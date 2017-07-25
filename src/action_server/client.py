@@ -47,12 +47,6 @@ class Client(object):
 
         self.get_actions_proxy = rospy.ServiceProxy('get_actions', action_server.srv.GetActions)
 
-        self._feedback = []
-
-    def _handle_feedback(self, feedback):
-        for message in feedback.log_messages:
-            self._feedback.append(message)
-
 
     def get_actions(self):
         """
@@ -78,33 +72,32 @@ class Client(object):
         and depending on the type of action, several parameter fields may be required.
         :return: True or false, and a message specifying the outcome of the task
         """
-        self._feedback = []
 
         recipe = semantics
 
         result = None
         while not result:
             goal = action_server.msg.TaskGoal(recipe=recipe)
-            self._action_client.send_goal(goal, feedback_cb=self._handle_feedback)
+            self._action_client.send_goal(goal)
             self._action_client.wait_for_result()
             result = self._action_client.get_result()
 
         if result.result == action_server.msg.TaskResult.RESULT_MISSING_INFORMATION:
             to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
-                             self._feedback)
+                             result.log_messages)
             to.missing_field = result.missing_field
             return to
 
         elif result.result == action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED:
             return TaskOutcome(TaskOutcome.RESULT_TASK_EXECUTION_FAILED,
-                               self._feedback)
+                               result.log_messages)
 
         elif result.result == action_server.msg.TaskResult.RESULT_UNKNOWN:
             return TaskOutcome(TaskOutcome.RESULT_UNKNOWN,
-                               self._feedback)
+                               result.log_messages)
 
         elif result.result == action_server.msg.TaskResult.RESULT_SUCCEEDED:
             return TaskOutcome(TaskOutcome.RESULT_SUCCEEDED,
-                               self._feedback)
+                               result.log_messages)
 
-        return TaskOutcome(messages=self._feedback)
+        return TaskOutcome(messages=result.log_messages)
