@@ -2,6 +2,7 @@ from action import Action
 
 import rospy
 from robocup_knowledge import load_knowledge
+import hmi
 
 
 class AnswerQuestion(Action):
@@ -32,13 +33,14 @@ class AnswerQuestion(Action):
 
         self._robot.speech.speak("What is your question?")
 
-        res = self._robot.hmi.query(description="",
-                                    grammar=self._speech_data.grammar,
-                                    target=self._speech_data.grammar_target)
-
-        if not res:
+        try:
+            res = self._robot.hmi.query(description="",
+                                        grammar=self._speech_data.grammar,
+                                        target=self._speech_data.grammar_target)
+        except hmi.TimeoutException:
             self._robot.speech.speak("My ears are not working properly, sorry!")
-            self._execute_result.message = "was unable to hear anything when listening for a challenge"
+            self._execute_result.message = " I was unable to hear anything when listening for a question, so I could " \
+                                           "not answer it. "
             return
 
         print res.semantics
@@ -46,11 +48,11 @@ class AnswerQuestion(Action):
         if res.semantics and "actions" in res.semantics:
             rospy.loginfo("Question was: '%s'?" % res.sentence)
             self._robot.speech.speak("The answer is %s" % res.semantics['actions'][0]['solution'])
-            self._execute_result.message = "answered the question {}".format(res.sentence)
+            self._execute_result.message = " I answered the question {}".format(res.sentence)
             self._execute_result.succeeded = True
         else:
             self._robot.speech.speak("Sorry, I did not understand your question.")
-            self._execute_result.message = "did not understand the question"
+            self._execute_result.message = " I did not understand the question"
 
     def _cancel(self):
         pass
