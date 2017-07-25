@@ -16,6 +16,11 @@ class TaskManager(object):
     def get_actions(self):
         return self._action_factory.get_action_names()
 
+    def clear(self):
+        self._task_string = None
+        self._action_sequence = []
+        self.done = True
+
     def set_up_state_machine(self, recipe):
         configuration_result = ConfigurationResult()
 
