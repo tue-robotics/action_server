@@ -41,12 +41,13 @@ class Place(Action):
         self._robot = robot
 
         try:
-            self._goal_entity = resolve_entity_description(config.semantics["entity"])
+            self._goal_entity = resolve_entity_description(config.semantics["location"])
         except KeyError:
-            rospy.logwarn("Specify an 'entity' to place on")
+            self._config_result.message = " Where should I place it? "
+            rospy.logwarn("Specify a 'location' to place.")
             return
 
-        (entities, error_msg) = entities_from_description(config.semantics["entity"], robot)
+        (entities, error_msg) = entities_from_description(config.semantics["location"], robot)
         if not entities:
             rospy.logwarn(error_msg)
             return
@@ -93,6 +94,8 @@ class Place(Action):
         self._thread.start()
 
         self._thread.join()
+        self._execute_result.message = " I placed the {} on the {}. ".format(item_to_place.resolve().type,
+                                                                             self._place_entity.id)
         self._execute_result.succeeded = True
 
     def _cancel(self):

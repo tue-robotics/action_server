@@ -36,13 +36,18 @@ class PickUp(Action):
             # If we don't know the object already, set up a find action to go and find it
             if not 'found-object-des' in config.semantics:
                 self._find_action = Find()
-                find_config = ConfigurationData(config.semantics)
+                find_config = ConfigurationData(config.semantics, config.knowledge)
                 find_config_result = self._find_action.configure(robot, find_config)
                 if not find_config_result.succeeded:
                     self._config_result = find_config_result
                     return
 
-                config.semantics['found-object-des'] = find_config_result.resulting_knowledge['found-object-des']
+                # Add the found object to the knowledge that is passed to the next task
+                self._config_result.resulting_knowledge['found-object-des'] = \
+                    find_config_result.resulting_knowledge['found-object-des']
+
+                # Add the found object to the knowledge that is used for the current pick-up task
+                config.knowledge['found-object-des'] = find_config_result.resulting_knowledge['found-object-des']
 
         self._robot = robot
 
@@ -60,10 +65,10 @@ class PickUp(Action):
         arm_des.lock()
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
-                                                 item=config.semantics['found-object-des'],
+                                                 item=config.knowledge['found-object-des'],
                                                  arm=arm_des)
 
-        self._config_result.resulting_knowledge = {'arm-designator' : arm_des}
+        self._config_result.resulting_knowledge['arm-designator'] = arm_des
         self._config_result.succeeded = True
 
     def _start(self):
@@ -78,7 +83,10 @@ class PickUp(Action):
 
         if fsm_result == "done":
             self._execute_result.succeeded = True
-            self._execute_result.message += " I picked up the {}. ".format(self._object.type)
+            if self._find_action:
+                self._execute_result.message += " And I picked it up. "
+            else:
+                self._execute_result.message += " I picked up the {}. ".format(self._object.type)
         else:
             self._execute_result.message += " I could not pick up the {}. ".format(self._object_type)
 
