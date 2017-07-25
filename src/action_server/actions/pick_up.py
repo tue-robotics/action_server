@@ -16,7 +16,7 @@ class PickUp(Action):
 
     Parameters to pass to the configure() method are:
      - `object` (required): the id of the object to grab
-     - `found-object-des` (required): a designator resolving to the object to grab
+     - `object-designator` (required): a designator resolving to the object to grab
     '''
     def __init__(self):
         Action.__init__(self)
@@ -24,30 +24,66 @@ class PickUp(Action):
         self._find_action = None
 
     def _configure(self, robot, config):
-        if not 'found-object-des' in config.semantics:
-            # If we know where to look, and we know what to find, let's first see if we already know of such an object
-            if 'location' in config.semantics and 'object' in config.semantics:
-                entity_description = {'type': config.semantics['object']['type'],
-                                      'location': config.semantics['location']}
-                grab_entities, _ = entities_from_description(entity_description, robot)
-                if grab_entities:
-                    config.semantics['found-object-des'] = EdEntityDesignator(id=grab_entities[0].id, robot=robot)
+        # Check if the task included an object to grab, otherwise try to get the information from previous actions'
+        # knowledge.
+        object = {}
+        if 'object' in config.semantics:
+            if config.semantics['object']['type'] == 'reference':
+                if 'object-designator' in config.knowledge:
+                    pass
+                else:
+                    self._config_result.missing_field = 'object'
+                    self._config_result.message = " What would you like me to pick up? "
+                    return
+            else:
+                object = config.semantics['object']['type']
+        else:
+            self._config_result.missing_field = 'object'
+            self._config_result.message = " What would you like me to pick up? "
+            return
 
-            # If we don't know the object already, set up a find action to go and find it
-            if not 'found-object-des' in config.semantics:
+        # Check if the task included a location to grasp from, otherwise try to get the information from previous
+        # actions' knowledge.
+        location = {}
+        if 'location' in config.semantics:
+            location = config.semantics['location']
+        elif 'location-designator' in config.knowledge:
+            pass
+        else:
+            self._config_result.missing_field = 'location'
+            self._config_result.message = " Where would you like me to pick that up? "
+            return
+
+        # If we don't have an id yet, let's see if we already know of such an object
+        if not 'id' in object:
+            entity_description = {'type': object['type'],
+                                  'location': location}
+            # TODO: check if we can get entities from a description involving a location
+            grab_entities, _ = entities_from_description(entity_description, robot)
+            if grab_entities:
+                config.knowledge['object-designator'] = EdEntityDesignator(id=grab_entities[0].id, robot=robot)
+                self._config_result.resulting_knowledge['object-designator'] = config.knowledge['object-designator']
+
+            # Otherwise we need to go and find the object
+            else:
                 self._find_action = Find()
                 find_config = ConfigurationData(config.semantics, config.knowledge)
                 find_config_result = self._find_action.configure(robot, find_config)
+                config.knowledge['object-designator'] = find_config_result.resulting_knowledge['object-designator']
                 if not find_config_result.succeeded:
                     self._config_result = find_config_result
+                    self._config_result.message += " so I could not grasp it "
                     return
 
                 # Add the found object to the knowledge that is passed to the next task
-                self._config_result.resulting_knowledge['found-object-des'] = \
-                    find_config_result.resulting_knowledge['found-object-des']
+                self._config_result.resulting_knowledge['object-designator'] = \
+                    find_config_result.resulting_knowledge['object-designator']
 
+
+
+        if not 'object-designator' in config.knowledge:
                 # Add the found object to the knowledge that is used for the current pick-up task
-                config.knowledge['found-object-des'] = find_config_result.resulting_knowledge['found-object-des']
+
 
         self._robot = robot
 
@@ -65,7 +101,7 @@ class PickUp(Action):
         arm_des.lock()
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
-                                                 item=config.knowledge['found-object-des'],
+                                                 item=config.knowledge['object-designator'],
                                                  arm=arm_des)
 
         self._config_result.resulting_knowledge['arm-designator'] = arm_des
