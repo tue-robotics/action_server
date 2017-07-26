@@ -16,30 +16,48 @@ class Bring(Action):
     """
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'source-location': " Where would you like me to get it? ",
-                                        'target-location': " Where would you like me to take it? ",
+        self._required_field_prompts = {'target-location': " Where would you like me to take it? ",
                                         'object' : " What would you like me to bring, exactly? "}
         self._required_skills = ['base']
 
     def _configure(self, robot, config):
         self._robot = robot
-
-        self._source_location = resolve_entity_description(config.semantics['source-location'])
-        self._target_location = resolve_entity_description(config.semantics['target-location'])
+        self._source_location = None
         self._object = resolve_entity_description(config.semantics['object'])
+        self._find_action = None
 
-        # TODO Passing on knowledge needs to be automated in the future...
-        self._find_action = Find()
-        find_config = ConfigurationData({'object': config.semantics['object'],
-                       'location': config.semantics['source-location']})
-        find_config_result = self._find_action.configure(self._robot, find_config)
-        if not find_config_result.succeeded:
-            self._config_result.message = find_config_result.message
+        # If we got a source location in the semantics, use that to find the object
+        if 'source-location' in config.semantics or 'location-designator' in config.knowledge:
+            self._find_action = Find()
+
+            # Put the knowledge passed to the bring action to the find action.
+            find_config = ConfigurationData(config.semantics, config.knowledge)
+            find_config_result = self._find_action.configure(self._robot, find_config)
+            if not find_config_result.succeeded:
+                self._config_result.message = find_config_result.message
+                return
+
+            # Use the object designator from the find action to resolve to the object we want to bring
+            self._found_object_designator = find_config_result.resulting_knowledge['object-designator']
+            self._source_location = resolve_entity_description(config.semantics['source-location'])
+
+        # If the task is something like "... and bring it to me", the "it" refers to something we already found or even
+        # grasped the past, meaning we don't need to do a find action, but we need to use that object.
+        elif config.semantics['object']['type'] == 'reference' and 'object-designator' in config.knowledge:
+            rospy.loginfo("object is a reference, but I have an object designator")
+            self._found_object_designator = config.knowledge['object-designator']
+        else:
+            rospy.loginfo("I really don't know where to get this thing. ")
+            self._config_result.message = " Where would you like me to get it? "
+            self._config_result.missing_field = 'source-location'
+            self._config_result.succeeded = False
             return
-        self._found_object_designator = find_config_result.resulting_knowledge['found-object-des']
+
+        self._target_location = resolve_entity_description(config.semantics['target-location'])
 
         self._grab_action = PickUp()
-        grab_config = ConfigurationData({'object': config.semantics['object'], 'found-object-des': self._found_object_designator})
+        grab_config = ConfigurationData({'object': config.semantics['object']},
+                                        {'object-designator': self._found_object_designator})
         grab_config_result = self._grab_action.configure(self._robot, grab_config)
         if not grab_config_result.succeeded:
             self._config_result.message = grab_config_result.message
@@ -97,11 +115,17 @@ class Bring(Action):
         self._robot.speech.speak("Bring the action!")
 
         # Find
-        find_result = self._find_action.start()
+        if self._find_action:
+            find_result = self._find_action.start()
 
-        if not find_result.succeeded:
-            self._execute_result.message = " I was unable to find the {}. ".format(self._object.type)
-            return
+            if not find_result.succeeded:
+                if self._object.type == "reference":
+                    self._object.type = self._found_object_designator.resolve().type
+                self._execute_result.message = " I was unable to find the {}. ".format(self._object.type)
+                return
+
+        if self._object.type == "reference":
+            self._object.type = self._found_object_designator.resolve().type
 
         # Grab
         grab_result = self._grab_action.start()
@@ -127,9 +151,13 @@ class Bring(Action):
                 return
 
         self._execute_result.succeeded = True
-        self._execute_result.message += " I brought a {} from {} to {}. ".format(self._object.type,
-                                                                                self._source_location.id,
-                                                                                self._target_location.id)
+        if self._source_location:
+            self._execute_result.message += " I brought a {} from {} to {}. ".format(self._object.type,
+                                                                                     self._source_location.id,
+                                                                                     self._target_location.id)
+        else:
+            self._execute_result.message += " I brought a {} to {}. ".format(self._object.type,
+                                                                             self._target_location.id)
 
 if __name__ == "__main__":
     rospy.init_node('bring_test')
