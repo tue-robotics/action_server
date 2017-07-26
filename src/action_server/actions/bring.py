@@ -83,8 +83,8 @@ class Bring(Action):
             self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(), type="waypoint")
         else:
             self._place_action = Place()
-            place_config = {'entity': config.semantics['target-location'],
-                            'arm-designator': self._arm_designator}
+            place_config = ConfigurationData({'entity': config.semantics['target-location']},
+                                             {'arm-designator': self._arm_designator})
             place_config_result = self._place_action.configure(self._robot, place_config)
             if not place_config_result.succeeded:
                 self._config_result = place_config_result
