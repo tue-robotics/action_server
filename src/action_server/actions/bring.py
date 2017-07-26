@@ -25,49 +25,57 @@ class Bring(Action):
         self._source_location = None
         self._object = resolve_entity_description(config.semantics['object'])
         self._find_action = None
+        self._grab_action = None
 
-        # If we got a source location in the semantics, use that to find the object
-        if 'source-location' in config.semantics or 'location-designator' in config.knowledge:
-            self._find_action = Find()
+        if 'arm-designator' in config.knowledge:
+            self._arm_designator = config.knowledge['arm-designator']
+            if 'object-designator' in config.knowledge:
+                self._found_object_designator = config.knowledge['object-designator']
+            else:
+                rospy.logfatal("No object designator while there is an arm designator. How can this be happening?!")
+                self._config_result.message = "No object designator while there is an arm designator. How can this be happening?!"
+                return
+        else:
+            # If we got a source location in the semantics, use that to find the object
+            if 'source-location' in config.semantics or 'location-designator' in config.knowledge:
+                self._find_action = Find()
 
-            # Put the knowledge passed to the bring action to the find action.
-            find_semantics = {}
-            if 'source-location' in config.semantics:
-                find_semantics['location'] = config.semantics['source-location']
-            find_semantics['object'] = config.semantics['object']
+                # Put the knowledge passed to the bring action to the find action.
+                find_semantics = {}
+                if 'source-location' in config.semantics:
+                    find_semantics['location'] = config.semantics['source-location']
+                find_semantics['object'] = config.semantics['object']
 
-            find_config = ConfigurationData(find_semantics, config.knowledge)
-            find_config_result = self._find_action.configure(self._robot, find_config)
-            if not find_config_result.succeeded:
-                self._config_result = find_config_result
+                find_config = ConfigurationData(find_semantics, config.knowledge)
+                find_config_result = self._find_action.configure(self._robot, find_config)
+                if not find_config_result.succeeded:
+                    self._config_result = find_config_result
+                    return
+
+                # Use the object designator from the find action to resolve to the object we want to bring
+                self._found_object_designator = find_config_result.resulting_knowledge['object-designator']
+                self._source_location = resolve_entity_description(config.semantics['source-location'])
+
+            # If the task is something like "... and bring it to me", the "it" refers to something we already found or even
+            # grasped the past, meaning we don't need to do a find action, but we need to use that object.
+            elif config.semantics['object']['type'] == 'reference' and 'object-designator' in config.knowledge:
+                rospy.loginfo("object is a reference, but I have an object designator")
+                self._found_object_designator = config.knowledge['object-designator']
+            else:
+                rospy.loginfo("I really don't know where to get this thing. ")
+                self._config_result.message = " Where would you like me to get it? "
+                self._config_result.missing_field = 'source-location'
+                self._config_result.succeeded = False
                 return
 
-            # Use the object designator from the find action to resolve to the object we want to bring
-            self._found_object_designator = find_config_result.resulting_knowledge['object-designator']
-            self._source_location = resolve_entity_description(config.semantics['source-location'])
-
-        # If the task is something like "... and bring it to me", the "it" refers to something we already found or even
-        # grasped the past, meaning we don't need to do a find action, but we need to use that object.
-        elif config.semantics['object']['type'] == 'reference' and 'object-designator' in config.knowledge:
-            rospy.loginfo("object is a reference, but I have an object designator")
-            self._found_object_designator = config.knowledge['object-designator']
-        else:
-            rospy.loginfo("I really don't know where to get this thing. ")
-            self._config_result.message = " Where would you like me to get it? "
-            self._config_result.missing_field = 'source-location'
-            self._config_result.succeeded = False
-            return
-
-        self._target_location = resolve_entity_description(config.semantics['target-location'])
-
-        self._grab_action = PickUp()
-        grab_config = ConfigurationData({'object': config.semantics['object']},
-                                        {'object-designator': self._found_object_designator})
-        grab_config_result = self._grab_action.configure(self._robot, grab_config)
-        if not grab_config_result.succeeded:
-            self._config_result = grab_config_result
-            return
-        self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
+            self._grab_action = PickUp()
+            grab_config = ConfigurationData({'object': config.semantics['object']},
+                                            {'object-designator': self._found_object_designator})
+            grab_config_result = self._grab_action.configure(self._robot, grab_config)
+            if not grab_config_result.succeeded:
+                self._config_result = grab_config_result
+                return
+            self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
 
         self._nav_action = NavigateTo()
         nav_config = ConfigurationData({'object': config.semantics['target-location']})
@@ -76,9 +84,9 @@ class Bring(Action):
             self._config_result = nav_config_result
             return
 
-        target_location = resolve_entity_description(config.semantics['target-location'])
+        self._target_location = resolve_entity_description(config.semantics['target-location'])
         self._drop_waypoint_after_find = False
-        if target_location.type == "person":
+        if self._target_location.type == "person":
             # TODO: Also handle bringing something to someone else than the operator
             self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(), type="waypoint")
         else:
@@ -134,11 +142,12 @@ class Bring(Action):
             self._object.type = self._found_object_designator.resolve().type
 
         # Grab
-        grab_result = self._grab_action.start()
+        if self._grab_action:
+            grab_result = self._grab_action.start()
 
-        if not grab_result.succeeded:
-            self._execute_result.message = " I was unable to grab the {}. ".format(self._object.type)
-            return
+            if not grab_result.succeeded:
+                self._execute_result.message = " I was unable to grab the {}. ".format(self._object.type)
+                return
 
         # Navigate
         nav_result = self._nav_action.start()
