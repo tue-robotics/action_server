@@ -38,6 +38,7 @@ class PickUp(Action):
                     return
             else:
                 pass
+
         else:
             self._config_result.missing_field = 'object'
             self._config_result.message = " What would you like me to pick up? "
@@ -50,11 +51,15 @@ class PickUp(Action):
                 pass
             elif 'location-designator' in config.knowledge:
                 pass
+            elif 'object-designator' in config.knowledge:
+                using_knowledge_for_object = True
+                pass
             else:
                 self._config_result.missing_field = 'location'
                 self._config_result.message = " Where would you like me to pick that up? "
                 return
 
+        if not using_knowledge_for_object:
             # Only filter to entities that can be picked up, e.g not furniture etc
             manipulable_object_types = [o['name'] for o in self._knowledge.objects]
             if not config.semantics['object']['type'] in manipulable_object_types:
