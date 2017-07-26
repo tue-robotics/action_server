@@ -13,7 +13,10 @@ class ConfigurationData(object):
         :param knowledge: Dictionary of parameter names to knowledge provided by previous actions.
         '''
         self.semantics = semantics
-        self.knowledge = knowledge
+        if knowledge:
+            self.knowledge = knowledge
+        else:
+            self.knowledge = {}
 
 
 class ConfigurationResult(object):
