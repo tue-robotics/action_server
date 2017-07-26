@@ -106,12 +106,19 @@ class PickUp(Action):
             self._execute_result.succeeded = True
             if self._find_action:
                 self._execute_result.message += " And I picked it up. "
+            elif not self._config_result.resulting_knowledge['object-designator'].resolve():
+                self._execute_result.message += " I could not pick anything up. ".\
+                    format(self._config_result.resulting_knowledge)
             else:
                 self._execute_result.message += " I picked up the {}. ".\
                     format(self._config_result.resulting_knowledge['object-designator'].resolve().type)
         else:
-            self._execute_result.message += " I could not pick up the {}. ".\
-                format(self._config_result.resulting_knowledge['object-designator'].resolve().type)
+            if not self._config_result.resulting_knowledge['object-designator'].resolve():
+                self._execute_result.message += " I could not pick anything up. ". \
+                    format(self._config_result.resulting_knowledge)
+            else:
+                self._execute_result.message += " I could not pick up the {}. ".\
+                    format(self._config_result.resulting_knowledge['object-designator'].resolve().type)
 
     def _cancel(self):
         if self._fsm.is_running:
