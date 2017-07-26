@@ -31,10 +31,15 @@ class Bring(Action):
             self._find_action = Find()
 
             # Put the knowledge passed to the bring action to the find action.
-            find_config = ConfigurationData(config.semantics, config.knowledge)
+            find_semantics = {}
+            if 'source-location' in config.semantics:
+                find_semantics['location'] = config.semantics['source-location']
+            find_semantics['object'] = config.semantics['object']
+
+            find_config = ConfigurationData(find_semantics, config.knowledge)
             find_config_result = self._find_action.configure(self._robot, find_config)
             if not find_config_result.succeeded:
-                self._config_result.message = find_config_result.message
+                self._config_result = find_config_result
                 return
 
             # Use the object designator from the find action to resolve to the object we want to bring
@@ -60,7 +65,7 @@ class Bring(Action):
                                         {'object-designator': self._found_object_designator})
         grab_config_result = self._grab_action.configure(self._robot, grab_config)
         if not grab_config_result.succeeded:
-            self._config_result.message = grab_config_result.message
+            self._config_result = grab_config_result
             return
         self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
 
@@ -68,7 +73,7 @@ class Bring(Action):
         nav_config = ConfigurationData({'object': config.semantics['target-location']})
         nav_config_result = self._nav_action.configure(self._robot, nav_config)
         if not nav_config_result.succeeded:
-            self._config_result.message = nav_config_result.message
+            self._config_result = nav_config_result
             return
 
         target_location = resolve_entity_description(config.semantics['target-location'])
@@ -82,7 +87,7 @@ class Bring(Action):
                             'arm-designator': self._arm_designator}
             place_config_result = self._place_action.configure(self._robot, place_config)
             if not place_config_result.succeeded:
-                self._config_result.message = place_config_result.message
+                self._config_result = place_config_result
                 return
 
         self._config_result.succeeded = True
