@@ -1,5 +1,6 @@
 from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
+from entity_description import resolve_entity_description, EntityDescription
+from util import entities_from_description
 
 import rospy
 import math
@@ -21,8 +22,7 @@ class Find(Action):
     def __init__(self):
         Action.__init__(self)
         # TODO: change this to a python dictionary schema
-        self._required_field_prompts = {'object': " What exactly would you like me to find? ",
-                                        'location': " Where should I look? "}
+        self._required_field_prompts = {'object': " What exactly would you like me to find? "}
         self._required_skills = ['head', 'base', 'rightArm', 'speech']
 
     def _point_at_person(self, person):
@@ -52,7 +52,24 @@ class Find(Action):
     def _configure(self, robot, config):
         self._robot = robot
         self._object = resolve_entity_description(config.semantics['object'])
-        self._location = resolve_entity_description(config.semantics['location'])
+        self._location = EntityDescription()
+
+        if 'location' in config.semantics:
+            self._location = resolve_entity_description(config.semantics['location'])
+        elif 'location-designator' in config.knowledge:
+            e = config.knowledge['location-designator'].resolve()
+            if not e:
+                if self._object.id:
+                    self._config_result.message = " Where should I look for the {}?".format(self._object.id)
+                else:
+                    self._config_result.message = " Where should I look for the {}?".format(self._object.type)
+                self._config_result.missing_field = 'location'
+                return
+            self._location.id = e.id
+        else:
+            self._config_result.message = " Where should I look for the {}?".format(self._object.id)
+            self._config_result.missing_field = 'location'
+            return
 
         # If we need to find a manipulable item, the location should also be manipulable
         if not self._object.type == "person" and self._location.id not in self._knowledge.manipulation_locations:
@@ -79,15 +96,13 @@ class Find(Action):
         self._area_designator = VariableDesignator(self._area)
 
         # Set up the designator with the object description
-        self._description_designator = VariableDesignator({'type': self._object.type})
+        entity_description = {'type': self._object.type}
+        self._description_designator = VariableDesignator(entity_description)
 
         # Set up designator to be filled with the found entity
         self._found_entity_designator = VariableDesignator(resolve_type=Entity)
 
         self._navigation_area_designator = VariableDesignator(self._nav_area)
-
-        # Set the resulting knowledge of the Find action to this found object designator
-        self._config_result.resulting_knowledge['found_entity'] = self._found_entity_designator
 
         # Set up the Find state machine
         self._fsm = states.Find(robot=self._robot,
@@ -97,11 +112,23 @@ class Find(Action):
                                 navigation_area_designator=self._navigation_area_designator,
                                 found_entity_designator=self._found_entity_designator)
 
-        self._config_result.resulting_knowledge = {"found-object-des" : self._found_entity_designator}
+        # If we can already find an entity using the current description, use that
+        (entities, error_msg) = entities_from_description(entity_description, robot)
+        if entities:
+            self._found_entity_designator = EdEntityDesignator(id=entities[0].id, robot=robot)
+
+        self._config_result.resulting_knowledge['object-designator'] = self._found_entity_designator
 
         self._config_result.succeeded = True
 
     def _start(self):
+        e = self._found_entity_designator.resolve()
+        if e:
+            self._execute_result.message = " I already knew where to find {}. ".format(
+                self._object.id if self._object.id else "a " + self._object.type)
+            self._execute_result.succeeded = True
+            return
+
         res = self._fsm.execute()
 
         if res == 'succeeded':
