@@ -23,6 +23,7 @@ class NavigateTo(Action):
     def _configure(self, robot, config):
         self._robot = robot
         self._goal_name = ""
+        self._fsm = None
 
         entity_description = config.semantics['object']
 
