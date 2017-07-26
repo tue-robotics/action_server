@@ -26,6 +26,8 @@ class Bring(Action):
         self._object = resolve_entity_description(config.semantics['object'])
         self._find_action = None
         self._grab_action = None
+        self._nav_action = None
+        self._find_person_action = None
 
         if 'arm-designator' in config.knowledge:
             self._arm_designator = config.knowledge['arm-designator']
@@ -77,22 +79,46 @@ class Bring(Action):
                 return
             self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
 
-        self._nav_action = NavigateTo()
-        nav_config = ConfigurationData({'object': config.semantics['target-location']})
-        nav_config_result = self._nav_action.configure(self._robot, nav_config)
-        if not nav_config_result.succeeded:
-            self._config_result = nav_config_result
-            return
 
         self._target_location = resolve_entity_description(config.semantics['target-location'])
-        self._drop_waypoint_after_find = False
         if self._target_location.type == "person":
-            # TODO: Also handle bringing something to someone else than the operator
-            self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(), type="waypoint")
+            print self._target_location.type
+            print self._target_location.id
+            print self._target_location.location
+            if self._target_location.id and self._target_location.id == "operator":
+                self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(),
+                                             type="waypoint")
+                self._nav_action = NavigateTo()
+                nav_config = ConfigurationData({'object': config.semantics['target-location']})
+                nav_config_result = self._nav_action.configure(self._robot, nav_config)
+                if not nav_config_result.succeeded:
+                    self._config_result = nav_config_result
+                    return
+
+            # If we need to bring to someone else than the operator, we need to go and find that person
+            elif self._target_location.id and self._target_location.location:
+                self._find_person_action = Find()
+
+                find_person_semantics = {}
+                find_person_semantics['location'] = {'id' : self._target_location.location.id}
+                find_person_semantics['object'] = {'id' : self._target_location.id,
+                                                   'type' : self._target_location.type}
+
+                find_person_config = ConfigurationData(find_person_semantics)
+                find_person_config_result = self._find_person_action.configure(self._robot, find_person_config)
+                if not find_person_config_result.succeeded:
+                    self._config_result = find_person_config_result
+                    return
+            elif self._target_location.id:
+                self._config_result.message = \
+                    "Please give me the assignment again and then also tell me were to find {}".\
+                        format(self._target_location.id)
+                return
         else:
             self._place_action = Place()
-            place_config = ConfigurationData({'entity': config.semantics['target-location']},
-                                             {'arm-designator': self._arm_designator})
+            place_config = ConfigurationData({'location': config.semantics['target-location']},
+                                             {'arm-designator': self._arm_designator,
+                                              'object-designator': self._found_object_designator})
             place_config_result = self._place_action.configure(self._robot, place_config)
             if not place_config_result.succeeded:
                 self._config_result = place_config_result
@@ -150,10 +176,16 @@ class Bring(Action):
                 return
 
         # Navigate
-        nav_result = self._nav_action.start()
+        if self._nav_action:
+            nav_result = self._nav_action.start()
 
-        if not nav_result.succeeded:
-            self._execute_result.message = " I was unable to go to the {}. ".format(self._target_location.id)
+            if not nav_result.succeeded:
+                self._execute_result.message = " I was unable to go to the {}. ".format(self._target_location.id)
+        elif self._find_person_action:
+            find_person_result = self._find_person_action.start()
+
+            if not find_person_result.succeeded:
+                self._execute_result.message = " I was unable to find {}. ".format(self._target_location.id)
 
         # Handover or place
         if self._target_location.type == "person":
