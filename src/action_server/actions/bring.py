@@ -108,6 +108,7 @@ class Bring(Action):
 
         self._robot.speech.speak("I will open my gripper now.", block=False)
 
+        self._robot.ed.update_entity(id=arm.occupied_by.id, action='remove')
         arm.send_gripper_goal('open')
         arm.wait_for_motion_done()
 
