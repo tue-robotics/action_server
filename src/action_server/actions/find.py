@@ -91,7 +91,7 @@ class Find(Action):
         else:
             # TODO: inspect other areas of the same object
             self._nav_area = "in_front_of"
-            self._area = "on_top_of"
+            self._area = self._knowledge.get_inspect_areas(self._location.id)[0]
 
         self._area_designator = VariableDesignator(self._area)
 
