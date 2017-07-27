@@ -64,24 +64,17 @@ class Bring(Action):
                 rospy.loginfo("object is a reference, but I have an object designator")
                 self._found_object_designator = config.knowledge['object-designator']
             else:
+                rospy.loginfo("No source given, trying to find at default location.")
                 self._find_action = Find()
 
                 # Put the knowledge passed to the bring action to the find action.
                 find_semantics = {}
                 if config.semantics['object']['type'] in self._knowledge.object_categories:
-                    rospy.loginfo(config.semantics['object']['type'])
-                    rospy.loginfo(self._knowledge.object_categories)
                     category = config.semantics['object']['type']
                 else:
-                    rospy.loginfo(config.semantics['object']['type'])
-                    rospy.loginfo(self._knowledge.object_categories)
                     category = self._knowledge.get_object_category(config.semantics['object']['type'])
 
-                rospy.loginfo(category)
-
                 expected_object_location = self._knowledge.get_object_category_location(category)[0]
-
-                rospy.loginfo(expected_object_location)
 
                 find_semantics['location'] = expected_object_location
                 find_semantics['object'] = config.semantics['object']
