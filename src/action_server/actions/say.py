@@ -1,4 +1,5 @@
-from action import Action
+from action import Action, ConfigurationData
+from find import Find
 
 import rospy
 import random
@@ -20,10 +21,35 @@ class Say(Action):
 
         self._sentence = config.semantics['sentence']
 
+        # If a person is specified in the task description, we need to go and find that person first
+        if 'target-person' in config.semantics:
+            self._find_action = Find()
+            location_id = config.semantics['target-person']['loc']
+            find_semantics = {'object': config.semantics['target-person'],
+                              'location': {'id': location_id,
+                                           'type': "furniture" if self._knowledge.is_location(location_id)
+                                           else "room"}}
+            find_config = ConfigurationData(find_semantics, config.knowledge)
+            find_config_result = self._find_action.configure(robot, find_config)
+            if not find_config_result.succeeded:
+                self._config_result = find_config_result
+                return
+        else:
+            self._find_action = None
+
         self._config_result.succeeded = True
         return
 
     def _start(self):
+        if self._find_action:
+            find_exec_res = self._find_action.start()
+            if not find_exec_res.succeeded:
+                self._execute_result = find_exec_res
+                return
+
+        self._robot.head.look_at_standing_person()
+        self._robot.head.wait_for_motion_done()
+
         rospy.loginfo('Answering {}'.format(self._sentence))
 
         # TODO: This knowledge should be somehow returned by the robot object
