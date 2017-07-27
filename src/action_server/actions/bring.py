@@ -64,11 +64,42 @@ class Bring(Action):
                 rospy.loginfo("object is a reference, but I have an object designator")
                 self._found_object_designator = config.knowledge['object-designator']
             else:
-                rospy.loginfo("I really don't know where to get this thing. ")
-                self._config_result.message = " Where would you like me to get it? "
-                self._config_result.missing_field = 'source-location'
-                self._config_result.succeeded = False
-                return
+                self._find_action = Find()
+
+                # Put the knowledge passed to the bring action to the find action.
+                find_semantics = {}
+                if config.semantics['object']['type'] in self._knowledge.object_categories:
+                    rospy.loginfo(config.semantics['object']['type'])
+                    rospy.loginfo(self._knowledge.object_categories)
+                    category = config.semantics['object']['type']
+                else:
+                    rospy.loginfo(config.semantics['object']['type'])
+                    rospy.loginfo(self._knowledge.object_categories)
+                    category = self._knowledge.get_object_category(config.semantics['object']['type'])
+
+                rospy.loginfo(category)
+
+                expected_object_location = self._knowledge.get_object_category_location(category)[0]
+
+                rospy.loginfo(expected_object_location)
+
+                find_semantics['location'] = expected_object_location
+                find_semantics['object'] = config.semantics['object']
+
+                find_config = ConfigurationData(find_semantics)
+                find_config_result = self._find_action.configure(self._robot, find_config)
+                if not find_config_result.succeeded:
+                    self._config_result = find_config_result
+                    return
+
+                # Use the object designator from the find action to resolve to the object we want to bring
+                self._found_object_designator = find_config_result.resulting_knowledge['object-designator']
+
+                # rospy.loginfo("I really don't know where to get this thing. ")
+                # self._config_result.message = " Where would you like me to get it? "
+                # self._config_result.missing_field = 'source-location'
+                # self._config_result.succeeded = False
+                # return
 
             self._grab_action = PickUp()
             grab_config = ConfigurationData({'object': config.semantics['object']},
