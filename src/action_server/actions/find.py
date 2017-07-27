@@ -143,9 +143,11 @@ class Find(Action):
             return
         elif res == 'not_found':
             if self._object.type == "person":
-                self._robot.speech.speak(" I don't see anyone here. ")
+                # self._robot.speech.speak(" I don't see anyone here. ")
+                pass
             else:
                 self._robot.speech.speak("I don't see what I am looking for here.")
+
             self._execute_result.message = " I couldn't find {} {} the {} ".format(
                 self._object.id if self._object.id and not self._object.id == "None" else "a " + self._object.type,
                 "in" if self._location.id in self._knowledge.location_rooms else "at",
