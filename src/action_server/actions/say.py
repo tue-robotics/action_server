@@ -78,6 +78,15 @@ class Say(Action):
                 "A blind man walks into a bar. And a table. And a chair.",
                 "It's color is yellow and when you push the button, it turns red?         A chick in the blender"
             ])
+            self._execute_result.message = " I told a joke. "
+        elif self._sentence == 'SOMETHING_ABOUT_SELF':
+            line = random.choice([
+                "I once dragged a person across the floor for meters.",
+                "I am still a bit insecure about my gender with my manly voice and my white dress.",
+                "I've been to tournaments in seven countries already, and still counting. However, I feel like I'm getting a little too old for this shit.",
+                "I once tripped over the border of a Middle Size League soccer field at full speed."
+            ])
+            self._execute_result.message = " I told something about myself. "
         else:
             line = self._sentence
 
