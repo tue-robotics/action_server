@@ -21,7 +21,7 @@ class AnswerQuestion(Action):
     def _configure(self, robot, config):
         self._robot = robot
 
-        self._speech_data = load_knowledge('challenge_spr')
+        self._speech_data = load_knowledge('challenge_gpsr')
         if not self._speech_data:
             rospy.logerr("Failed to load speech data for 'AnswerQuestion' action")
             return
@@ -63,13 +63,14 @@ class AnswerQuestion(Action):
         while tries < 3:
             try:
                 res = self._robot.hmi.query(description="",
-                                            grammar=self._speech_data.grammar,
-                                            target=self._speech_data.grammar_target)
+                                            grammar=self._speech_data.question_grammar,
+                                            target=self._speech_data.question_grammar_target)
             except hmi.TimeoutException:
                 self._robot.speech.speak("My ears are not working properly, sorry!")
-                self._execute_result.message = " I was unable to hear anything when listening for a question, so I could " \
-                                               "not answer it. "
-                return
+                self._execute_result.message = " I was unable to hear anything when listening for a question, so I " \
+                                               "could not answer it. "
+                tries += 1
+                continue
 
             print res.semantics
 
