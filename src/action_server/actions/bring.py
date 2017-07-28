@@ -209,7 +209,7 @@ class Bring(Action):
             find_person_result = self._find_person_action.start()
 
             if not find_person_result.succeeded:
-                self._execute_result.message = " I was unable to find {}. ".format(self._target_location.id)
+                self._execute_result.message = " I found {}. ".format(self._target_location.id)
 
         # Handover or place
         if self._target_location.type == "person":
