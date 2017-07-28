@@ -98,7 +98,7 @@ class NavigateTo(Action):
 
         if result == 'arrived':
             self._execute_result.succeeded = True
-            self._execute_result.message = " I successfully navigated to the {}".format(self._goal_name)
+            self._execute_result.message = " I successfully navigated to the {}.".format(self._goal_name)
             self._robot.speech.speak("I arrived at the {}".format(self._goal_name))
         elif result == 'unreachable':
             self._execute_result.message = " I was unable to get to the {} because my path was blocked. ".\
