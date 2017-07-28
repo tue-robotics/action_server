@@ -30,7 +30,15 @@ class NavigateTo(Action):
         (entities, error_msg) = entities_from_description(entity_description, self._robot)
 
         # Check if we got any entities already...
-        if not entities:
+        if entity_description['type'] == "reference" and 'object-designator' in config.knowledge:
+            entity_designator = config.knowledge['object-designator']
+
+            area = "near"
+            self._fsm = NavigateToSymbolic(self._robot,
+                                           entity_designator_area_name_map={entity_designator: area},
+                                           entity_lookat_designator=entity_designator)
+
+        elif not entities:
             # If not, check if we at least know a type...
             if entity_description['type']:
                 # If we have a type, return succeeded, because that may resolve to an ID later. But remember to check
@@ -45,32 +53,31 @@ class NavigateTo(Action):
                 self._config_result.message = " I have no knowledge of a {} in my world model. ".format(
                     entity_description["id"])
             return
-
-        # Take the best match and set up the state machine
-        e = entities[0]
-
-        self._goal_name = e.id
-
-        entity_designator = EdEntityDesignator(self._robot, id=e.id)
-
-        if e.is_a("waypoint"):
-            self._fsm = NavigateToWaypoint(self._robot,
-                                           waypoint_designator=entity_designator,
-                                           radius=0.1)
-            rospy.loginfo("Navigation set up for a waypoint")
         else:
-            if e.is_a("room"):
-                area = "in"
-                rospy.loginfo("Navigation set up for a room")
-            elif e.is_a("furniture"):
-                area = "in_front_of"
-                rospy.loginfo("Navigation set up for a piece of furniture")
-            else:
-                area = "near"
+            # Take the best match and set up the state machine
+            e = entities[0]
+            entity_designator = EdEntityDesignator(self._robot, id=e.id)
 
-            self._fsm = NavigateToSymbolic(self._robot,
-                                           entity_designator_area_name_map={entity_designator: area},
-                                           entity_lookat_designator=entity_designator)
+            self._goal_name = e.id
+
+            if e.is_a("waypoint"):
+                self._fsm = NavigateToWaypoint(self._robot,
+                                               waypoint_designator=entity_designator,
+                                               radius=0.1)
+                rospy.loginfo("Navigation set up for a waypoint")
+            else:
+                if e.is_a("room"):
+                    area = "in"
+                    rospy.loginfo("Navigation set up for a room")
+                elif e.is_a("furniture"):
+                    area = "in_front_of"
+                    rospy.loginfo("Navigation set up for a piece of furniture")
+                else:
+                    area = "near"
+
+                self._fsm = NavigateToSymbolic(self._robot,
+                                               entity_designator_area_name_map={entity_designator: area},
+                                               entity_lookat_designator=entity_designator)
 
         self._config_result.resulting_knowledge['location-designator'] = entity_designator
         self._config_result.succeeded = True
