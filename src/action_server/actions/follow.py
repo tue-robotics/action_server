@@ -47,20 +47,8 @@ class Follow(Action):
         self._find_action = None
 
         if self._target.type == "reference":
-            self._target_designator = config.knowledge['object-designator']
-
-            self._nav_action = NavigateTo()
-            nav_config = ConfigurationData({'object': {"type": "reference"}},
-                                           {'object-designator': self._target_designator})
-            nav_config_result = self._nav_action.configure(robot, nav_config)
-            if not nav_config_result.succeeded:
-                print "nav config did not succeed: {}".format(nav_config_result.message)
-                self._config_result.missing_field = "location-from"
-                self._config_result.message = " Where can I find {}? ".format(self._target.id)
-                return
+            pass
         else:
-            self._nav_action = None
-
             if not self._target.id == "operator" and not "location-from" in config.semantics:
                 self._config_result.missing_field = "location-from"
                 self._config_result.message = " Where can I find {}? ".format(self._target.id)
@@ -91,13 +79,6 @@ class Follow(Action):
         self._config_result.succeeded = True
 
     def _start(self):
-        # If we need to navigate to some origin location, do that first TODO: Use the find action for this
-        if self._nav_action:
-            nav_result = self._nav_action.start()
-            self._execute_result.message += nav_result.message
-            if not nav_result.succeeded:
-                return
-
         if self._find_action:
             find_result = self._find_action.start()
             self._execute_result.message += find_result.message
