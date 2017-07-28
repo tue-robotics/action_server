@@ -1,4 +1,5 @@
 from action import Action, ConfigurationData
+
 from entity_description import resolve_entity_description, EntityDescription
 from util import entities_from_description
 
@@ -72,53 +73,60 @@ class Find(Action):
             return
 
         # If we need to find a manipulable item, the location should also be manipulable
-        if not self._object.type == "person" and self._location.id not in self._knowledge.manipulation_locations:
-            if self._location.id in self._knowledge.location_rooms:
-                self._location.id = self._knowledge.get_location_from_room(self._location.id)
-            else:
-                self._config_result.message = " I can't grasp anything from the {}".format(self._location.id)
-                return
+        if not self._object.type == "person" and self._location.id not in self._knowledge.manipulation_locations \
+            and self._location.id not in self._knowledge.location_rooms:
+            self._config_result.message = " I can't grasp anything from the {}".format(self._location.id)
+            return
 
-        self._location_designator = EdEntityDesignator(self._robot, id=self._location.id)
-
-        # Set up designator for area
+        # Set up designator for areas
+        self._areas = {}
+        self._nav_areas = {}
         if self._location.id in self._knowledge.location_rooms:
-            self._area = "in"
-            self._nav_area = self._area
-        elif self._object.type == "person":
-            self._area = "near"
-            self._nav_area = self._area
-        else:
-            # TODO: inspect other areas of the same object
-            self._nav_area = "in_front_of"
-            self._area = self._knowledge.get_inspect_areas(self._location.id)[0]
+            locations = self._knowledge.get_locations(self._location.id)
+            print locations
+            for location in locations:
+                self._areas[location] = self._knowledge.get_inspect_areas(location)
+                self._nav_areas[location] = self._knowledge.get_inspect_position(location)
 
-        self._area_designator = VariableDesignator(self._area)
+        elif self._object.type == "person":
+            self._areas["person"] = ["near"]
+            self._nav_areas = self._areas
+        else:
+            print "getting here"
+            self._areas[self._location.id] = self._knowledge.get_inspect_areas(self._location.id)
+            self._nav_areas[self._location.id] = self._knowledge.get_inspect_position(self._location.id)
 
         # Set up the designator with the object description
         entity_description = {'type': self._object.type}
-        self._description_designator = VariableDesignator(entity_description)
-
-        # Set up designator to be filled with the found entity
-        self._found_entity_designator = VariableDesignator(resolve_type=Entity)
-
-        self._navigation_area_designator = VariableDesignator(self._nav_area)
-
-        # Set up the Find state machine
-        self._fsm = states.Find(robot=self._robot,
-                                source_entity_designator=self._location_designator,
-                                description_designator=self._description_designator,
-                                area_name_designator=self._area_designator,
-                                navigation_area_designator=self._navigation_area_designator,
-                                found_entity_designator=self._found_entity_designator)
+        description_designator = VariableDesignator(entity_description)
 
         # If we can already find an entity using the current description, use that
         (entities, error_msg) = entities_from_description(entity_description, robot)
         if entities:
             self._found_entity_designator = EdEntityDesignator(id=entities[0].id, robot=robot)
+        else:
+            # Set up designator to be filled with the found entity
+            self._found_entity_designator = VariableDesignator(resolve_type=Entity)
+
+            self._find_sms = []
+            for loc, areas in self._areas.iteritems():
+                location_designator = EdEntityDesignator(self._robot, id=loc)
+                nav_area = self._nav_areas[loc]
+                for area in areas:
+                    area_designator = VariableDesignator(area)
+
+                    navigation_area_designator = VariableDesignator(nav_area)
+
+                    # Set up the Find state machine
+                    print "Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area, nav_area)
+                    self._find_sms.append(states.Find(robot=self._robot,
+                                                      source_entity_designator=location_designator,
+                                                      description_designator=description_designator,
+                                                      area_name_designator=area_designator,
+                                                      navigation_area_designator=navigation_area_designator,
+                                                      found_entity_designator=self._found_entity_designator))
 
         self._config_result.resulting_knowledge['object-designator'] = self._found_entity_designator
-
         self._config_result.succeeded = True
 
     def _start(self):
@@ -129,36 +137,37 @@ class Find(Action):
             self._execute_result.succeeded = True
             return
 
-        res = self._fsm.execute()
+        for fsm in self._find_sms:
+            res = fsm.execute()
 
-        if res == 'succeeded':
-            self._execute_result.message = " I found {}. ".format(
-                self._object.id if self._object.id else "a " + self._object.type)
-            self._execute_result.succeeded = True
+            if res == 'succeeded':
+                self._execute_result.message = " I found {}. ".format(
+                    self._object.id if self._object.id else "a " + self._object.type)
+                self._execute_result.succeeded = True
 
-            if self._object.type == "person":
-                self._point_at_person(self._found_entity_designator.resolve())
+                if self._object.type == "person":
+                    self._point_at_person(self._found_entity_designator.resolve())
+                else:
+                    self._robot.speech.speak("Hey, I found a {}!".format(self._object.type))
+                return
+            elif res == 'not_found':
+                if self._object.type == "person":
+                    # self._robot.speech.speak(" I don't see anyone here. ")
+                    pass
+                else:
+                    self._robot.speech.speak("I don't see what I am looking for here.")
+
+                self._execute_result.message = " I couldn't find {} {} the {} ".format(
+                    self._object.id if self._object.id and not self._object.id == "None" else "a " + self._object.type,
+                    "in" if self._location.id in self._knowledge.location_rooms else "at",
+                    self._location.id
+                )
             else:
-                self._robot.speech.speak("Hey, I found a {}!".format(self._object.type))
-            return
-        elif res == 'not_found':
-            if self._object.type == "person":
-                # self._robot.speech.speak(" I don't see anyone here. ")
-                pass
-            else:
-                self._robot.speech.speak("I don't see what I am looking for here.")
-
-            self._execute_result.message = " I couldn't find {} {} the {} ".format(
-                self._object.id if self._object.id and not self._object.id == "None" else "a " + self._object.type,
-                "in" if self._location.id in self._knowledge.location_rooms else "at",
-                self._location.id
-            )
-        else:
-            self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._location.id))
-            self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
-                self._location.id,
-                self._object.id if self._object.id else "a " + self._object.type
-            )
+                self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._location.id))
+                self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
+                    self._location.id,
+                    self._object.id if self._object.id else "a " + self._object.type
+                )
 
     def _cancel(self):
         pass
