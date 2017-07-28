@@ -30,7 +30,8 @@ class NavigateTo(Action):
         (entities, error_msg) = entities_from_description(entity_description, self._robot)
 
         # Check if we got any entities already...
-        if entity_description['type'] == "reference" and 'object-designator' in config.knowledge:
+        if 'type' in entity_description and entity_description['type'] == "reference" and \
+                'object-designator' in config.knowledge:
             entity_designator = config.knowledge['object-designator']
 
             area = "near"
@@ -40,7 +41,7 @@ class NavigateTo(Action):
 
         elif not entities:
             # If not, check if we at least know a type...
-            if entity_description['type']:
+            if 'type' in entity_description:
                 # If we have a type, return succeeded, because that may resolve to an ID later. But remember to check
                 # again before actually executing the task.
                 rospy.loginfo("No knowledge of a {} in the world model yet, but who knows what I will encounter.".
