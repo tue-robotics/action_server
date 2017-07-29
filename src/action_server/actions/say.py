@@ -58,6 +58,12 @@ class Say(Action):
             minutes = datetime.now().minute
             line = "The time is {} {}".format(hours, minutes)
             self._execute_result.message = " I told the time. "
+        elif self._sentence == "TEAM_NAME":
+            line = "My team's name is Tech United Eindhoven"
+            self._execute_result.message = " I told my team's name. "
+        elif self._sentence == "TEAM_AFFILIATION":
+            line = "My team is affiliated with the University of Technology Eindhoven"
+            self._execute_result.message = " I told my team's affiliation. "
         elif self._sentence == "ROBOT_NAME":
             line = 'My name is {}'.format(self._robot.robot_name)
             self._execute_result.message = " I told my name. "
