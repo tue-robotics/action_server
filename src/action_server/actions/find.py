@@ -82,15 +82,18 @@ class Find(Action):
         self._areas = {}
         self._nav_areas = {}
         if self._location.id in self._knowledge.location_rooms:
-            locations = self._knowledge.get_locations(self._location.id)
-            print locations
-            for location in locations:
-                self._areas[location] = self._knowledge.get_inspect_areas(location)
-                self._nav_areas[location] = self._knowledge.get_inspect_position(location)
-
+            if not self._object.type == "person":
+                locations = self._knowledge.get_locations(self._location.id)
+                print locations
+                for location in locations:
+                    self._areas[location] = self._knowledge.get_inspect_areas(location)
+                    self._nav_areas[location] = self._knowledge.get_inspect_position(location)
+            else:
+                self._areas[self._location.id] = ["in"]
+                self._nav_areas[self._location.id] = "in"
         elif self._object.type == "person":
-            self._areas["person"] = ["near"]
-            self._nav_areas = self._areas
+            self._areas[self._location.id] = ["near"]
+            self._nav_areas[self._location.id] = "near"
         else:
             print "getting here"
             self._areas[self._location.id] = self._knowledge.get_inspect_areas(self._location.id)
@@ -152,8 +155,7 @@ class Find(Action):
                 return
             elif res == 'not_found':
                 if self._object.type == "person":
-                    # self._robot.speech.speak(" I don't see anyone here. ")
-                    pass
+                    self._robot.speech.speak(" I don't see anyone here. ")
                 else:
                     self._robot.speech.speak("I don't see what I am looking for here.")
 
