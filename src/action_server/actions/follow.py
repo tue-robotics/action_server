@@ -1,5 +1,6 @@
 from action import Action, ConfigurationData
 from find import Find
+from navigate_to import NavigateTo
 from entity_description import resolve_entity_description
 
 from robot_smach_states import FollowOperator
@@ -42,25 +43,28 @@ class Follow(Action):
     def _configure(self, robot, config):
         self._target = resolve_entity_description(config.semantics["target"])
 
-        if not self._target.id == "operator" and not "location-from" in config.semantics:
-            self._config_result.missing_field = "location-from"
-            self._config_result.message = " Where can I find {}? ".format(self._target.id)
-            return
+        self._origin = None
+        self._find_action = None
 
-        if "location-from" in config.semantics:
-            self._origin = resolve_entity_description(config.semantics["location-from"])
-            self._find_action = Find()
-            find_config = ConfigurationData({'location': {'id' : self._origin.id},
-                           'object': {'type': 'person',
-                                      'id': self._target.id}})
-            find_config_result = self._find_action.configure(robot, find_config)
-            if not find_config_result.succeeded:
-                self._config_result.message = " I don't know how to find {} in the {}. ".format(self._origin.id,
-                                                                                                self._target.id)
-                return
+        if self._target.type == "reference":
+            pass
         else:
-            self._origin = None
-            self._find_action = None
+            if not self._target.id == "operator" and not "location-from" in config.semantics:
+                self._config_result.missing_field = "location-from"
+                self._config_result.message = " Where can I find {}? ".format(self._target.id)
+                return
+
+            if "location-from" in config.semantics:
+                self._origin = resolve_entity_description(config.semantics["location-from"])
+                self._find_action = Find()
+                find_config = ConfigurationData({'location': {'id' : self._origin.id},
+                               'object': {'type': 'person',
+                                          'id': self._target.id}})
+                find_config_result = self._find_action.configure(robot, find_config)
+                if not find_config_result.succeeded:
+                    self._config_result.message = " I don't know how to find {} in the {}. ".format(self._origin.id,
+                                                                                                    self._target.id)
+                    return
 
         if self._target.id == "operator":
             self._target.id = "you"
@@ -75,7 +79,6 @@ class Follow(Action):
         self._config_result.succeeded = True
 
     def _start(self):
-        # If we need to navigate to some origin location, do that first TODO: Use the find action for this
         if self._find_action:
             find_result = self._find_action.start()
             self._execute_result.message += find_result.message
@@ -97,7 +100,7 @@ class Follow(Action):
             else:
                 self._execute_result.message += " But I failed to follow {} ".format(self._target.id)
                 return
-
+        self._robot.speech.speak("Thank you for guiding me.")
         self._execute_result.message += " I successfully followed {} ".format(self._goal.id)
         if self._goal:
             self._execute_result.message += " to the {}".format(self._goal.id)

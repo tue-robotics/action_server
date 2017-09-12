@@ -6,6 +6,7 @@ from robot_skills.arms import Arm
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
+from robot_smach_states.util.designators import UnoccupiedArmDesignator, EdEntityDesignator
 
 import rospy
 import threading
@@ -26,8 +27,8 @@ class Place(Action):
 
         self._required_field_prompts = {'location': " Where should I leave the object? "}
 
-        self._required_passed_knowledge = {'arm-designator': " I won't be able to place anything before I grasped it. "
-                                                             "Please tell me what to get. "}
+        self._required_passed_knowledge = {'object-designator': " I won't be able to place anything before I grasped "
+                                                                "it. Please tell me what to get. "}
 
         self._required_skills = ['arms']
 
@@ -40,16 +41,14 @@ class Place(Action):
 
         self._robot = robot
 
-        try:
-            self._goal_entity = resolve_entity_description(config.semantics["location"])
-        except KeyError:
-            self._config_result.message = " Where should I place it? "
-            rospy.logwarn("Specify a 'location' to place.")
-            return
+        self._goal_entity = resolve_entity_description(config.semantics["location"])
 
         (entities, error_msg) = entities_from_description(config.semantics["location"], robot)
+
         if not entities:
             rospy.logwarn(error_msg)
+            self._config_result.message = " I have no knowledge of a {} in my world model. ".\
+                format(config.semantics['location']['id'])
             return
         self._place_entity = entities[0]
 
@@ -66,9 +65,11 @@ class Place(Action):
             self._goal_y = -0.2
 
         try:
-            self._arm = config.semantics['arm-designator'].resolve()
+            self._arm_designator = config.knowledge['arm-designator']
         except:
-            pass
+            self._arm_designator = None
+
+        self._object_designator = config.knowledge['object-designator']
 
         try:
             self._height = config.semantics["height"]
@@ -78,8 +79,38 @@ class Place(Action):
         self._config_result.succeeded = True
 
     def _start(self):
+        # Resolve the arm we want to place with
+        if self._arm_designator:
+            arm = self._arm_designator.resolve()
+            if arm:
+                self._arm = arm
+
         # Which item do we want to place? The object in the hand we indicated
         item_to_place = robot_smach_states.util.designators.Designator(self._arm.occupied_by, resolve_type=Entity)
+
+        # In the case of a task like "Find the coke and place it on the table" grasping is implied, so grasp it here
+        if item_to_place.resolve():
+            self._object_designator = item_to_place
+        else:
+            arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms['right']).lockable()
+            arm_des.lock()
+            self._grab_state_machine = robot_smach_states.grab.Grab(self._robot,
+                                                                    item=self._object_designator,
+                                                                    arm=arm_des)
+
+            self._grab_state_machine.execute()
+
+            self._arm = arm_des.resolve()
+            if not self._arm:
+                self._execute_result.message += \
+                    ' I was unable to grasp the object because I believe that my grippers were occupied. '
+                self._execute_result.succeeded = False
+                return
+
+            if not self._object_designator.resolve():
+                self._execute_result.message += ' I was unable to grasp the object because I lost it while grasping. '
+                self._execute_result.succeeded = False
+                return
 
         # No need for ArmHoldingEntityDesignator, we already know that from the config
         arm_with_item_designator = robot_smach_states.util.designators.Designator(self._arm, resolve_type=Arm)
@@ -88,13 +119,13 @@ class Place(Action):
             robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self._place_entity.id)
         )
 
-        self._place = PlaceSmachState(self._robot, item_to_place, place_position, arm_with_item_designator)
+        self._place = PlaceSmachState(self._robot, self._object_designator, place_position, arm_with_item_designator)
 
         self._thread = threading.Thread(name='grab', target=self._place.execute)
         self._thread.start()
 
         self._thread.join()
-        self._execute_result.message = " I placed the {} on the {}. ".format(item_to_place.resolve().type,
+        self._execute_result.message = " I placed the {} on the {}. ".format(self._object_designator.resolve().type,
                                                                              self._place_entity.id)
         self._execute_result.succeeded = True
 

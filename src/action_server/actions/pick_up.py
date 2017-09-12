@@ -16,7 +16,7 @@ class PickUp(Action):
 
     Parameters to pass to the configure() method are:
      - `object` (required): the id of the object to grab
-     - `found-object-des` (required): a designator resolving to the object to grab
+     - `object-designator` (required): a designator resolving to the object to grab
     '''
     def __init__(self):
         Action.__init__(self)
@@ -24,40 +24,61 @@ class PickUp(Action):
         self._find_action = None
 
     def _configure(self, robot, config):
-        if not 'found-object-des' in config.semantics:
-            # If we know where to look, and we know what to find, let's first see if we already know of such an object
-            if 'location' in config.semantics and 'object' in config.semantics:
-                entity_description = {'type': config.semantics['object']['type'],
-                                      'location': config.semantics['location']}
-                grab_entities, _ = entities_from_description(entity_description, robot)
-                if grab_entities:
-                    config.semantics['found-object-des'] = EdEntityDesignator(id=grab_entities[0].id, robot=robot)
-
-            # If we don't know the object already, set up a find action to go and find it
-            if not 'found-object-des' in config.semantics:
-                self._find_action = Find()
-                find_config = ConfigurationData(config.semantics, config.knowledge)
-                find_config_result = self._find_action.configure(robot, find_config)
-                if not find_config_result.succeeded:
-                    self._config_result = find_config_result
+        # Check if the task included an object to grab, otherwise try to get the information from previous actions'
+        # knowledge.
+        using_knowledge_for_object = False
+        if 'object' in config.semantics:
+            if config.semantics['object']['type'] == 'reference':
+                if 'object-designator' in config.knowledge:
+                    using_knowledge_for_object = True
+                    pass
+                else:
+                    self._config_result.missing_field = 'object'
+                    self._config_result.message = " What would you like me to pick up? "
                     return
+            else:
+                pass
 
-                # Add the found object to the knowledge that is passed to the next task
-                self._config_result.resulting_knowledge['found-object-des'] = \
-                    find_config_result.resulting_knowledge['found-object-des']
+        else:
+            self._config_result.missing_field = 'object'
+            self._config_result.message = " What would you like me to pick up? "
+            return
 
-                # Add the found object to the knowledge that is used for the current pick-up task
-                config.knowledge['found-object-des'] = find_config_result.resulting_knowledge['found-object-des']
+        if not using_knowledge_for_object:
+            # Check if the task included a location to grasp from, otherwise try to get the information from previous
+            # actions' knowledge.
+            if 'location' in config.semantics:
+                pass
+            elif 'location-designator' in config.knowledge:
+                pass
+            elif 'object-designator' in config.knowledge:
+                using_knowledge_for_object = True
+                pass
+            else:
+                self._config_result.missing_field = 'location'
+                self._config_result.message = " Where would you like me to pick that up? "
+                return
+
+        if not using_knowledge_for_object:
+            # Only filter to entities that can be picked up, e.g not furniture etc
+            manipulable_object_types = [o['name'] for o in self._knowledge.objects]
+            if not config.semantics['object']['type'] in manipulable_object_types:
+                self._config_result.message = " A {} is not something I can pick up. ".\
+                    format(config.semantics['object']['type'])
+                return
+
+            self._find_action = Find()
+            find_config = ConfigurationData(config.semantics, config.knowledge)
+            find_config_result = self._find_action.configure(robot, find_config)
+            if not find_config_result.succeeded:
+                self._config_result = find_config_result
+                return
+            config.knowledge['object-designator'] = find_config_result.resulting_knowledge['object-designator']
+
+        # Add the found object to the knowledge that is passed to the next task
+        self._config_result.resulting_knowledge['object-designator'] = config.knowledge['object-designator']
 
         self._robot = robot
-
-        self._object = resolve_entity_description(config.semantics["object"])
-
-        # Only filter to entities that can be picked up, e.g not furniture etc
-        manipulable_object_types = [o['name'] for o in self._knowledge.objects]
-        if not self._object.type in manipulable_object_types:
-            self._config_result.message = " A {} is not something I can pick up. ".format(self._object.type)
-            return
 
         side = config.semantics['side'] if 'side' in config.semantics else 'right'
 
@@ -65,7 +86,7 @@ class PickUp(Action):
         arm_des.lock()
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
-                                                 item=config.knowledge['found-object-des'],
+                                                 item=config.knowledge['object-designator'],
                                                  arm=arm_des)
 
         self._config_result.resulting_knowledge['arm-designator'] = arm_des
@@ -85,10 +106,19 @@ class PickUp(Action):
             self._execute_result.succeeded = True
             if self._find_action:
                 self._execute_result.message += " And I picked it up. "
+            elif not self._config_result.resulting_knowledge['object-designator'].resolve():
+                self._execute_result.message += " I could not pick anything up. ".\
+                    format(self._config_result.resulting_knowledge)
             else:
-                self._execute_result.message += " I picked up the {}. ".format(self._object.type)
+                self._execute_result.message += " I picked up the {}. ".\
+                    format(self._config_result.resulting_knowledge['object-designator'].resolve().type)
         else:
-            self._execute_result.message += " I could not pick up the {}. ".format(self._object_type)
+            if not self._config_result.resulting_knowledge['object-designator'].resolve():
+                self._execute_result.message += " I could not pick anything up. ". \
+                    format(self._config_result.resulting_knowledge)
+            else:
+                self._execute_result.message += " I could not pick up the {}. ".\
+                    format(self._config_result.resulting_knowledge['object-designator'].resolve().type)
 
     def _cancel(self):
         if self._fsm.is_running:

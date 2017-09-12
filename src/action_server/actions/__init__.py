@@ -13,3 +13,5 @@ from reset_wm import ResetWM
 from find import Find
 from say import Say
 from follow import Follow
+from find_out_and_report import FindOutAndReport
+from guide import Guide

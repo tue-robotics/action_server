@@ -13,7 +13,10 @@ class ConfigurationData(object):
         :param knowledge: Dictionary of parameter names to knowledge provided by previous actions.
         '''
         self.semantics = semantics
-        self.knowledge = knowledge
+        if knowledge:
+            self.knowledge = knowledge
+        else:
+            self.knowledge = {}
 
 
 class ConfigurationResult(object):
@@ -78,7 +81,8 @@ class Action(object):
         return True
 
     def configure(self, robot, config):
-        rospy.logdebug("Configuring action {} with config {}.".format(self.__class__.__name__, config))
+        rospy.loginfo("Configuring action {} with semantics {} and knowledge {}.".
+                       format(self.__class__.__name__, config.semantics, config.knowledge))
         if not isinstance(config, ConfigurationData):
             rospy.logerr("Action: the specified config should be ConfigurationData! I received: %s" % str(config))
             self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "
@@ -91,6 +95,8 @@ class Action(object):
 
         if self._check_parameters(config) and self._check_skills(robot):
             self._configure(robot, config)
+
+        rospy.loginfo("Resulting knowledge = {}".format(self._config_result.resulting_knowledge))
 
         return self._config_result
 

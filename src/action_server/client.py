@@ -41,9 +41,9 @@ class Client(object):
         action_name = "/" + robot_name + "/action_server/task"
         self._action_client = actionlib.SimpleActionClient(action_name,
                                                            action_server.msg.TaskAction)
-        rospy.logdebug("Waiting for task action server...")
+        rospy.loginfo("Waiting for task action server to come online...")
         self._action_client.wait_for_server()
-        rospy.logdebug("Connected to task action server")
+        rospy.loginfo("Connected to task action server")
 
         self.get_actions_proxy = rospy.ServiceProxy('get_actions', action_server.srv.GetActions)
 
