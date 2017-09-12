@@ -26,9 +26,6 @@ class AnswerQuestion(Action):
             rospy.logerr("Failed to load speech data for 'AnswerQuestion' action")
             return
 
-        # TODO: If no target-person is given in semantics, check if there is someone else to answer the question to
-        # for example using a person from config.knowledge
-
         # If a person is specified in the task description, we need to go and find that person first
         if 'target-person' in config.semantics:
             self._find_action = Find()
