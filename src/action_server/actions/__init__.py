@@ -14,3 +14,4 @@ from find import Find
 from say import Say
 from follow import Follow
 from guide import Guide
+from demo_presentation import DemoPresentation
