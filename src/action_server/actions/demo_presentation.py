@@ -14,7 +14,11 @@ class DemoPresentation(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
-        self._presentation_sm = PresentationMachine(robot)
+        if 'language' in config.semantics:
+            language = config.semantics['language']
+        else:
+            language = 'en'
+        self._presentation_sm = PresentationMachine(robot, language=language)
         self._config_result.succeeded = True
         return
 
