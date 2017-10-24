@@ -18,6 +18,9 @@ class ConfigurationData(object):
         else:
             self.knowledge = {}
 
+    def __repr__(self):
+        return "ConfigurationData(semantics=%s, knowledge=%s)" % (self.semantics, self.knowledge)
+
 
 class ConfigurationResult(object):
     '''
