@@ -19,6 +19,11 @@ class TurnTowardSound(Action):
             rospy.sleep(rospy.Duration(1))
 
     def _configure(self, robot, config):
+        if 'duration' in config.semantics:
+            self._duration = rospy.Duration(int(config.semantics['duration']))
+        else:
+            self._duration = rospy.Duration(10)
+
         self._config_result.succeeded = True
         self._state_machine = SSLLookatAndRotate(robot)
         self._thread = threading.Thread(target=self.listen_and_rotate)
@@ -27,7 +32,7 @@ class TurnTowardSound(Action):
     def _start(self):
         rospy.loginfo('Starting TurnTowardSound action')
         self._thread.start()
-        rospy.sleep(rospy.Duration(10))
+        rospy.sleep(self._duration)
         self._cancel()
         self._thread.join()
         self._execute_result.succeeded = True
@@ -52,7 +57,8 @@ if __name__ == "__main__":
     action = TurnTowardSound()
 
     config = ConfigurationData(
-        semantics={'action': 'turn-toward-sound'}
+        semantics={'action': 'turn-toward-sound',
+                   'duration': '30'}
     )
 
     action.configure(robot, config)
