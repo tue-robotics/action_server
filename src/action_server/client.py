@@ -101,3 +101,8 @@ class Client(object):
                                result.log_messages)
 
         return TaskOutcome(messages=result.log_messages)
+
+    def cancel_all(self):
+        print "cancelling all goals..."
+        self._action_client.cancel_all_goals()
+        print "... all goals cancelled!"
