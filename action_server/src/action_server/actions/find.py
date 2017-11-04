@@ -53,7 +53,7 @@ class Find(Action):
     def _configure(self, robot, config):
         self._robot = robot
         self._object = resolve_entity_description(config.semantics['object'])
-        self._location = EntityDescription()
+        self._location = None
 
         if 'location' in config.semantics:
             self._location = resolve_entity_description(config.semantics['location'])
@@ -66,12 +66,13 @@ class Find(Action):
                     self._config_result.message = " Where should I look for the {}?".format(self._object.type)
                 self._config_result.missing_field = 'location'
                 return
-            self._location.id = e.id
+            self._location = EntityDescription(id=e.id)
         else:
             self._config_result.message = " Where should I look for the {}?".format(self._object.id)
             self._config_result.missing_field = 'location'
             return
 
+        # We (safely) assume that self._location is an EntityDescription object
         # If we need to find a manipulable item, the location should also be manipulable
         if not self._object.type == "person" and self._location.id not in self._knowledge.manipulation_locations \
             and self._location.id not in self._knowledge.location_rooms:
@@ -84,7 +85,6 @@ class Find(Action):
         if self._location.id in self._knowledge.location_rooms:
             if not self._object.type == "person":
                 locations = self._knowledge.get_locations(self._location.id)
-                print locations
                 for location in locations:
                     self._areas[location] = self._knowledge.get_inspect_areas(location)
                     self._nav_areas[location] = self._knowledge.get_inspect_position(location)
@@ -95,7 +95,6 @@ class Find(Action):
             self._areas[self._location.id] = ["near"]
             self._nav_areas[self._location.id] = "near"
         else:
-            print "getting here"
             self._areas[self._location.id] = self._knowledge.get_inspect_areas(self._location.id)
             self._nav_areas[self._location.id] = self._knowledge.get_inspect_position(self._location.id)
 
@@ -133,12 +132,12 @@ class Find(Action):
         self._config_result.succeeded = True
 
     def _start(self):
-        e = self._found_entity_designator.resolve()
-        if e:
-            self._execute_result.message = " I already knew where to find {}. ".format(
-                self._object.id if self._object.id else "a " + self._object.type)
-            self._execute_result.succeeded = True
-            return
+        # e = self._found_entity_designator.resolve()
+        # if e:
+        #     self._execute_result.message = " I already knew where to find {}. ".format(
+        #         self._object.id if self._object.id else "a " + self._object.type)
+        #     self._execute_result.succeeded = True
+        #     return
 
         for fsm in self._find_sms:
             res = fsm.execute()
