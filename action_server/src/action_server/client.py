@@ -9,7 +9,7 @@ class TaskOutcome(object):
     RESULT_TASK_EXECUTION_FAILED = 1
     RESULT_UNKNOWN = 2
     RESULT_SUCCEEDED = 3
-    RESULT_CANCELLED = 4
+    RESULT_CANCELED = 4
 
     def __init__(self, result=RESULT_UNKNOWN, messages=None, missing_field=""):
         if not messages:
@@ -83,11 +83,14 @@ class Client(object):
         try:
             self._action_client.wait_for_result()
             result = self._action_client.get_result()
+        except KeyboardInterrupt:
+            self.cancel_all()
+            return TaskOutcome(TaskOutcome.RESULT_CANCELED)
 
         # if user presses ctrl+C, stop waiting and cancel all goals
         except KeyboardInterrupt:
             self.cancel_all()
-            return TaskOutcome(TaskOutcome.RESULT_CANCELLED)
+            return TaskOutcome(TaskOutcome.RESULT_CANCELED)
 
         if result.result == action_server.msg.TaskResult.RESULT_MISSING_INFORMATION:
             to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
