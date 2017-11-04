@@ -12,6 +12,7 @@ class TaskManager(object):
         self._action_factory = ActionFactory()
         self._action_sequence = []
         self.done = True
+        self._active_action = None
 
     def get_actions(self):
         return self._action_factory.get_action_names()
@@ -20,6 +21,7 @@ class TaskManager(object):
         self._task_string = None
         self._action_sequence = []
         self.done = True
+        self._active_action = None
 
     def set_up_state_machine(self, recipe):
         configuration_result = ConfigurationResult()
@@ -57,7 +59,14 @@ class TaskManager(object):
         return configuration_result
 
     def execute_next_action(self):
-        result = self._action_sequence.pop(0).start()
+        self._active_action = self._action_sequence.pop(0)
+        result = self._active_action.start()
         if not self._action_sequence:
             self.done = True
         return result
+
+    def request_preempt(self):
+        self._action_sequence = []
+        if self._active_action:
+            self._active_action.cancel()
+        self.clear()

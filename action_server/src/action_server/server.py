@@ -18,6 +18,7 @@ class Server(object):
         self._action_name = "/" + self._robot.robot_name + "/action_server/task"
         self._action_server = actionlib.SimpleActionServer(self._action_name, action_server.msg.TaskAction,
                                                            execute_cb=self._add_action_cb, auto_start=False)
+        self._action_server.register_preempt_callback(cb=self._cancel)
         self._result = action_server.msg.TaskResult()
         self._action_server.start()
 
@@ -73,3 +74,6 @@ class Server(object):
         rospy.logdebug("Execution of state machine succeeded.")
         self._result.result = action_server.msg.TaskResult.RESULT_SUCCEEDED
         self._action_server.set_succeeded(self._result)
+
+    def _cancel(self):
+        self._task_manager.request_preempt()
