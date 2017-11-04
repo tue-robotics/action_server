@@ -83,9 +83,6 @@ class Client(object):
         try:
             self._action_client.wait_for_result()
             result = self._action_client.get_result()
-        except KeyboardInterrupt:
-            self.cancel_all()
-            return TaskOutcome(TaskOutcome.RESULT_CANCELED)
 
         # if user presses ctrl+C, stop waiting and cancel all goals
         except KeyboardInterrupt:
