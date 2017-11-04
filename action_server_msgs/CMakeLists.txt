@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(action_server)
+project(action_server_msgs)
 
 find_package(catkin REQUIRED COMPONENTS
     message_generation
@@ -7,8 +7,6 @@ find_package(catkin REQUIRED COMPONENTS
     actionlib_msgs
     actionlib
 )
-
-catkin_python_setup()
 
 # ------------------------------------------------------------------------------------------------
 #                                     ROS MESSAGES AND SERVICES
