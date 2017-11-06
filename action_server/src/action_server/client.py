@@ -1,8 +1,8 @@
 import rospy
 
 import actionlib
-import action_server.msg
-import action_server.srv
+import action_server_msgs.msg
+import action_server_msgs.srv
 
 class TaskOutcome(object):
     RESULT_MISSING_INFORMATION = 0
@@ -40,12 +40,12 @@ class Client(object):
     def __init__(self, robot_name):
         action_name = "/" + robot_name + "/action_server/task"
         self._action_client = actionlib.SimpleActionClient(action_name,
-                                                           action_server.msg.TaskAction)
+                                                           action_server_msgs.msg.TaskAction)
         rospy.loginfo("Waiting for task action server to come online...")
         self._action_client.wait_for_server()
         rospy.loginfo("Connected to task action server")
 
-        self.get_actions_proxy = rospy.ServiceProxy('get_actions', action_server.srv.GetActions)
+        self.get_actions_proxy = rospy.ServiceProxy('get_actions', action_server_msgs.srv.GetActions)
 
 
     def get_actions(self):
@@ -77,26 +77,26 @@ class Client(object):
 
         result = None
         while not result:
-            goal = action_server.msg.TaskGoal(recipe=recipe)
+            goal = action_server_msgs.msg.TaskGoal(recipe=recipe)
             self._action_client.send_goal(goal)
             self._action_client.wait_for_result()
             result = self._action_client.get_result()
 
-        if result.result == action_server.msg.TaskResult.RESULT_MISSING_INFORMATION:
+        if result.result == action_server_msgs.msg.TaskResult.RESULT_MISSING_INFORMATION:
             to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
                              result.log_messages)
             to.missing_field = result.missing_field
             return to
 
-        elif result.result == action_server.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED:
+        elif result.result == action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED:
             return TaskOutcome(TaskOutcome.RESULT_TASK_EXECUTION_FAILED,
                                result.log_messages)
 
-        elif result.result == action_server.msg.TaskResult.RESULT_UNKNOWN:
+        elif result.result == action_server_msgs.msg.TaskResult.RESULT_UNKNOWN:
             return TaskOutcome(TaskOutcome.RESULT_UNKNOWN,
                                result.log_messages)
 
-        elif result.result == action_server.msg.TaskResult.RESULT_SUCCEEDED:
+        elif result.result == action_server_msgs.msg.TaskResult.RESULT_SUCCEEDED:
             return TaskOutcome(TaskOutcome.RESULT_SUCCEEDED,
                                result.log_messages)
 
