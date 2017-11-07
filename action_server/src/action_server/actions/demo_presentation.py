@@ -35,7 +35,7 @@ class DemoPresentation(Action):
         return
 
     def _cancel(self):
-        pass
+        self._presentation_sm.request_preempt()
 
 
 if __name__ == "__main__":
