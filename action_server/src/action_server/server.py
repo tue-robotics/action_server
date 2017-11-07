@@ -18,7 +18,7 @@ class Server(object):
         self._action_name = "/" + self._robot.robot_name + "/action_server/task"
         self._action_server = actionlib.SimpleActionServer(self._action_name, action_server_msgs.msg.TaskAction,
                                                            execute_cb=self._add_action_cb, auto_start=False)
-        
+
         self._action_server.register_preempt_callback(cb=self._cancel)
         self._result = action_server_msgs.msg.TaskResult()
 
@@ -63,6 +63,11 @@ class Server(object):
             return
 
         while not self._task_manager.done:
+            # Pass feedback to client about what type of action is running
+            feedback = action_server_msgs.msg.TaskFeedback()
+            feedback.current_subtask = self._task_manager.get_next_action_name()
+            self._action_server.publish_feedback(feedback)
+
             action_result = self._task_manager.execute_next_action()
             rospy.logdebug("Result of action execution: {}".format(action_result))
             self._result.log_messages.append(action_result.message)

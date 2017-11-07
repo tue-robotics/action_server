@@ -58,6 +58,12 @@ class TaskManager(object):
 
         return configuration_result
 
+    def get_next_action_name(self):
+        if self._action_sequence:
+            return self._action_sequence[0].get_name()
+        else:
+            return None
+
     def execute_next_action(self):
         self._active_action = self._action_sequence.pop(0)
         result = self._active_action.start()
