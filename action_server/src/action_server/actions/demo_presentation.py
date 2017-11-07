@@ -10,7 +10,7 @@ class DemoPresentation(Action):
     """
     def __init__(self):
         Action.__init__(self)
-        # self._required_skills = ['speech', 'ears']
+        # self._required_skills = ['speech', 'hmi']
 
     def _configure(self, robot, config):
         self._robot = robot
