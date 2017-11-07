@@ -1,9 +1,9 @@
 from action import Action, ConfigurationData
 from find import Find
-from navigate_to import NavigateTo
 from entity_description import resolve_entity_description
+from robot_smach_states.navigation import NavigateToSymbolic
 
-from robot_smach_states import FollowOperator
+from robot_smach_states.navigation import FollowOperator
 from robot_smach_states.util.designators import EdEntityDesignator
 
 import rospy
@@ -76,6 +76,9 @@ class Follow(Action):
 
         self._robot = robot
 
+        self._follow_sm = FollowOperator(self._robot)
+
+        self.cancel_requested = False
         self._config_result.succeeded = True
 
     def _start(self):
@@ -87,8 +90,7 @@ class Follow(Action):
             # TODO: Navigate to the found person before following
 
         # Do some awesome following
-        follow_sm = FollowOperator(self._robot)
-        res = follow_sm.execute()
+        res = self._follow_sm.execute()
 
         # If we didn't succeed in following, navigate to the goal location if we have one
         if not res == "stopped":
@@ -108,7 +110,7 @@ class Follow(Action):
         self._execute_result.succeeded = True
 
     def _cancel(self):
-        pass
+        self._follow_sm.request_preempt()
 
 
 if __name__ == "__main__":
