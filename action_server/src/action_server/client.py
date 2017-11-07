@@ -76,13 +76,21 @@ class Client(object):
         recipe = semantics
 
         result = None
-        while not result:
-            goal = action_server_msgs.msg.TaskGoal(recipe=recipe)
-            self._action_client.send_goal(goal)
+
+        goal = action_server_msgs.msg.TaskGoal(recipe=recipe)
+        self._action_client.send_goal(goal)
+
+        try:
             self._action_client.wait_for_result()
             result = self._action_client.get_result()
 
+        # if user presses ctrl+C, stop waiting and cancel all goals
+        except KeyboardInterrupt:
+            self.cancel_all()
+            raise KeyboardInterrupt
+
         if result.result == action_server_msgs.msg.TaskResult.RESULT_MISSING_INFORMATION:
+
             to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
                              result.log_messages)
             to.missing_field = result.missing_field
@@ -101,3 +109,9 @@ class Client(object):
                                result.log_messages)
 
         return TaskOutcome(messages=result.log_messages)
+
+    def cancel_all(self):
+        rospy.logdebug("cancelling all goals...")
+        self._action_client.cancel_all_goals()
+        self._action_client.wait_for_result()
+        rospy.logdebug("... all goals cancelled!")
