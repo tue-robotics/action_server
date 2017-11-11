@@ -85,7 +85,7 @@ class Action(object):
 
     def configure(self, robot, config):
         rospy.loginfo("Configuring action {} with semantics {} and knowledge {}.".
-                       format(self.__class__.__name__, config.semantics, config.knowledge))
+                       format(self.get_name(), config.semantics, config.knowledge))
         if not isinstance(config, ConfigurationData):
             rospy.logerr("Action: the specified config should be ConfigurationData! I received: %s" % str(config))
             self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "
@@ -107,7 +107,7 @@ class Action(object):
         raise NotImplementedError
 
     def start(self):
-        rospy.loginfo("Starting executing of action {}.".format(self.__class__.__name__))
+        rospy.loginfo("Starting executing of action {}.".format(self.get_name()))
         self._start()
         return self._execute_result
 
@@ -115,8 +115,11 @@ class Action(object):
         raise NotImplementedError
 
     def cancel(self):
-        rospy.loginfo("Canceling executing of action {}.".format(self.__class__.__name__))
+        rospy.loginfo("Canceling executing of action {}.".format(self.get_name()))
         return self._cancel()
 
     def _cancel(self):
         raise NotImplementedError
+
+    def get_name(self):
+        return self.__class__.__name__
