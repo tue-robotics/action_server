@@ -78,7 +78,6 @@ class Follow(Action):
 
         self._follow_sm = FollowOperator(self._robot)
 
-        self.cancel_requested = False
         self._config_result.succeeded = True
 
     def _start(self):
