@@ -115,7 +115,7 @@ class Find(Action):
                 navigation_area_designator = VariableDesignator(nav_area)
 
                 # Set up the Find state machine
-                print "Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area, nav_area)
+                rospy.loginfo("Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area, nav_area))
                 self._find_state_machines.append(states.Find(robot=self._robot,
                                                              source_entity_designator=location_designator,
                                                              description_designator=description_designator,
