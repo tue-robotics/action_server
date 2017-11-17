@@ -102,31 +102,26 @@ class Find(Action):
         entity_description = {'type': self._object.type}
         description_designator = VariableDesignator(entity_description)
 
-        # If we can already find an entity using the current description, use that
-        (entities, error_msg) = entities_from_description(entity_description, robot)
-        if entities:
-            self._found_entity_designator = EdEntityDesignator(id=entities[0].id, robot=robot)
-        else:
-            # Set up designator to be filled with the found entity
-            self._found_entity_designator = VariableDesignator(resolve_type=Entity)
+        # Set up designator to be filled with the found entity
+        self._found_entity_designator = VariableDesignator(resolve_type=Entity)
 
-            self._find_sms = []
-            for loc, areas in self._areas.iteritems():
-                location_designator = EdEntityDesignator(self._robot, id=loc)
-                nav_area = self._nav_areas[loc]
-                for area in areas:
-                    area_designator = VariableDesignator(area)
+        self._find_state_machines = []
+        for loc, areas in self._areas.iteritems():
+            location_designator = EdEntityDesignator(self._robot, id=loc)
+            nav_area = self._nav_areas[loc]
+            for area in areas:
+                area_designator = VariableDesignator(area)
 
-                    navigation_area_designator = VariableDesignator(nav_area)
+                navigation_area_designator = VariableDesignator(nav_area)
 
-                    # Set up the Find state machine
-                    print "Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area, nav_area)
-                    self._find_sms.append(states.Find(robot=self._robot,
-                                                      source_entity_designator=location_designator,
-                                                      description_designator=description_designator,
-                                                      area_name_designator=area_designator,
-                                                      navigation_area_designator=navigation_area_designator,
-                                                      found_entity_designator=self._found_entity_designator))
+                # Set up the Find state machine
+                rospy.loginfo("Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area, nav_area))
+                self._find_state_machines.append(states.Find(robot=self._robot,
+                                                             source_entity_designator=location_designator,
+                                                             description_designator=description_designator,
+                                                             area_name_designator=area_designator,
+                                                             navigation_area_designator=navigation_area_designator,
+                                                             found_entity_designator=self._found_entity_designator))
 
         self._config_result.resulting_knowledge['object-designator'] = self._found_entity_designator
         self._config_result.succeeded = True
@@ -139,7 +134,7 @@ class Find(Action):
         #     self._execute_result.succeeded = True
         #     return
 
-        for fsm in self._find_sms:
+        for fsm in self._find_state_machines:
             res = fsm.execute()
 
             if res == 'succeeded':
