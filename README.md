@@ -27,35 +27,35 @@ assume our client takes the high level natural language task *"Go to the
 kitchen, find a coke, and bring it to me."*
 With a good natural language parser, we can parse this to the following json
 object:
-```
+```json
 {
-  'actions' :
+  "actions" :
   [
     {
-      'action': 'navigate-to',
-      'object':
+      "action": "navigate-to",
+      "object":
       {
-        'type' : 'room',
-        'name' : 'kitchen'
+        "type" : "room",
+        "name" : "kitchen"
       }
     },
     {
-      'action': 'find',
-      'object':
+      "action": "find",
+      "object":
       {
-        'type': 'coke'
+        "type": "coke"
       }
     },
     {
-      'action': 'bring',
-      'object':
+      "action": "bring",
+      "object":
       {
-        'type': 'reference'
+        "type": "reference"
       },
-      'target-location':
+      "target-location":
       {
-        'type': 'person',
-        'id': 'operator'
+        "type": "person",
+        "id": "operator"
       }
     }
   ]
