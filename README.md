@@ -100,10 +100,22 @@ action will not be executed.
 ## The Action life cycle
 The Action life cycle consists of the following phases:
  - Instantiation:
-    - checking of resources independent of task semantics
+    - initializing member variables (explained further in `example_action`):
+      - `_config_result`
+      - `_execute_result`
+      - `_required_field_prompts`
+      - `_required_passed_knowledge`
+      - `_required_skills`
+      - `_knowledge`
+    - the Action's implementation may add checks for static resources. E.g.
+      - knowledge availability
+      - server availability
+      - etc.
  - Configuration
-    - checking information in the task semantics
-    - passing knowledge from one action to another
+    - checking task semantics using `_required_field_prompts`
+    - checking passed knowledge using using `_required_passed_knowledge`
+    - checking robot for required skills using `_required_skills`
+    - calling the implementation's `_configure`
  - Execution
     - performing the actual action
 
