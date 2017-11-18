@@ -91,7 +91,8 @@ class Action(object):
         :type robot: Robot
         :param config: The configuration data. Contains semantics from input and implied knowledge from previous tasks.
         :type config: ConfigurationData
-        :return: ConfigurationResult
+        :return: The result of configuration
+        :rtype: ConfigurationResult
         """
         rospy.loginfo("Configuring action {} with semantics {} and knowledge {}.".
                       format(self.get_name(), config.semantics, config.knowledge))
