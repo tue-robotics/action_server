@@ -58,8 +58,12 @@ class ExampleAction(Action):
         In another example, 'Find Ava', we may want to search differently than when the task is to find an object. All
         such checking can be done in the configure step.
 
-        Be careful when querying the world model here, because information may be added to that during execution of
-        earlier actions, which is done later.
+        If a command is composed out of multiple actions (go to the kitchen and find the coffee), all actions in the
+        command are first configured before the first is started. This is done to make sure the complete command makes
+        sense, and the robot will not find out it doesn't make sense halfway through the execution.
+
+        This does mean that any resulting information from earlier actions in the command is not available in the world
+        model yet, in this stage.
         """
 
         """
