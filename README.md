@@ -13,6 +13,7 @@ A client implementation is provided as abstraction from the raw actionlib client
 Current examples of clients to the action server are:
  - The GPSR challenge
  - The Natural Language Console
+
 Consult one of these implementations, or the Client docstring for example usage of the Client class.
 
 Aside from the actionlib SimpleActionServer, the Action Server holds an instance of the Task Manager.
@@ -114,6 +115,7 @@ Basic steps for implementing an action are as follows:
     - implement the \_cancel method
   - Add your new action to the actions module [here](action_server/src/action_server/actions/__init__.py).
   - Add a command resolving to the required semantics to the grammar you want to test your action with, and test your Action using the natural language console configured with that grammar.
+
 For a detailed guide on the internals of an Action implementation and instructions on how to implement your own Action, take a look at the example implementation: `example_action`.
 This contains a lot of documentation and explanation on the details of Actions.
 
