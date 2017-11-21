@@ -122,12 +122,12 @@ This contains a lot of documentation and explanation on the details of Actions.
 ## FAQ
 
  - **Why json?**
-   - I know, it hurts to put a json string in a ROS message.
+   - I know, it hurts to put a [json](https://en.wikipedia.org/wiki/JSON) string in a ROS message.
    But every action has its own semantics, its own parameters and its own structure in these parameters.
    This means it doesn't fit in a static ROS message a client can send to the action server. The ugliest part is: there is no clear interface definition between client and server.
    The client side normally uses a grammar to parse natural language commands, so the grammar specifies the client side of the interface.
    On the server side, the action specifies the required structure of the semantics.
    So the Action implementation defines the server side of the interface.
    It would be nice if we could at least verify that these structures agree on startup, instead of getting weird behavior or crashes during task execution.
-   One of the open issues for improvement is to use json schemas to let the Action implementation specify the interface.
+   One of the open issues for improvement is to use [json schemas](http://json-schema.org/) to let the Action implementation specify the interface.
    We can then let the client query this interface specification, so that it can verify its source of task semantics.
