@@ -106,7 +106,16 @@ The Action life cycle consists of the following phases:
  - Execution
     - performing the actual action
 
-For a detailed guide on the internals of an Action implementation and instructions on how to implement your own Action, take a look at the `example_action`, which contains a lot of documentation and explanation on the details of Actions.
+## Implementing your own Action
+Basic steps for implementing an action are as follows:
+  - Create a class that inherits from the Action base class [here](action_server/src/action_server/actions):
+    - implement the \_configure method
+    - implement the \_start method
+    - implement the \_cancel method
+  - Add your new action to the actions module [here](action_server/src/action_server/actions/__init__.py).
+  - Add a command resolving to the required semantics to the grammar you want to test your action with, and test your Action using the natural language console configured with that grammar.
+For a detailed guide on the internals of an Action implementation and instructions on how to implement your own Action, take a look at the example implementation: `example_action`.
+This contains a lot of documentation and explanation on the details of Actions.
 
 ## FAQ
 
