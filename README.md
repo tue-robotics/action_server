@@ -4,6 +4,8 @@ The action server is an actionlib server for managing the execution of high leve
 It takes actionlib goals describing series of high level tasks in json form, checks the consistency of the semantics, and executes them.
 This readme explains the architecture of the action server, the procedure of handling a goal and the lifecycle of an action.
 
+You should already know about [ROS](http://wiki.ros.org/ROS/Tutorials), specifically [actionlib](http://wiki.ros.org/actionlib_tutorials/Tutorials), and a bit of [json](https://en.wikipedia.org/wiki/JSON).
+
 ## Architecture
 
 ![Action Server architecture](doc/action_server_architecture.jpg)
