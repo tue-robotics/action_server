@@ -1,18 +1,19 @@
 # Action Server
 
-The action server is an actionlib server for managing the execution of high level tasks and their semantic chaining.
+The Action Server is an actionlib server for managing the execution of high level tasks and their semantic chaining.
 It takes actionlib goals describing series of high level tasks in json form, checks the consistency of the semantics, and executes them.
-This readme explains the architecture of the action server, the procedure of handling a goal and the lifecycle of an action.
+This readme explains the architecture of the Action Server, the procedure of handling a goal and the lifecycle of an action.
 
 You should already know about [ROS](http://wiki.ros.org/ROS/Tutorials), specifically [actionlib](http://wiki.ros.org/actionlib_tutorials/Tutorials), and a bit of [json](https://en.wikipedia.org/wiki/JSON).
+You should also know about the [robot skills](https://github.com/tue-robotics/tue_robocup/tree/master/robot_skills) and [robot_smach_states](https://github.com/tue-robotics/tue_robocup/tree/master/robot_smach_states).
 
 ## Architecture
 
 ![Action Server architecture](doc/action_server_architecture.jpg)
 
-The action server uses an actionlib interface for communication with its clients.
+The Action Server uses an actionlib interface for communication with its clients.
 A client implementation is provided as abstraction from the raw actionlib client.
-Current examples of clients to the action server are:
+Current examples of clients to the Action Server are:
  - The GPSR challenge
  - The Natural Language Console
 
@@ -21,9 +22,15 @@ Consult one of these implementations, or the Client docstring for example usage 
 Aside from the actionlib SimpleActionServer, the Action Server holds an instance of the Task Manager.
 As the name suggests, this is the component that does the actual managing of the task (including its subtasks) for us.
 
+A Task contains a recipe for execution, which is a sequence of action names with their configurations.
+The Task Manager collects the correct action implementations, configures them and executes them.
+This process is explained in section Procedure.
+Actions manage the semantics of the task, references from one subtask to another and reasoning about the ability of the robot to execute before starting the execution.
+After this process is performed, they should rely on robot skills or robot smach states to execute the actual behavior by wrapping the relevant ones.
+
 ## Procedure
 
-Let's see what happens when a client sends a goal to the action server.
+Let's see what happens when a client sends a goal to the Action Server in a little more detail.
 Let's assume our client takes the high level natural language task *"Go to the kitchen, find a coke, and bring it to me."*
 With a good natural language parser, we can parse this to the following json object:
 ```json
@@ -60,12 +67,12 @@ With a good natural language parser, we can parse this to the following json obj
   ]
 }
 ```
-This json object can be sent to the action server.
+This json object can be sent to the Action Server.
 
 ### Configuration
 
-The server parses the object and passes the resulting Python dictionary (the `recipe`) to the task manager (`set_up_state_machine(recipe)`).
-The task manager then goes through the list of actions, instantiates actions and tries to chain their semantics.
+The server parses the object and passes the resulting Python dictionary (the `recipe`) to the Task Manager (`set_up_state_machine(recipe)`).
+The Task Manager then goes through the list of actions, instantiates actions and tries to chain their semantics.
 It does this by calling the `configure` method on every action.
 
 For example, the second action (*find a coke*) results in knowledge of a coke.
@@ -81,8 +88,8 @@ The server will notify the client of this result so that it can ask the user for
 
 ### Execution
 
-When all actions are successfully configured, the task manager is ready to start executing the actions.
-To do this, the action server calls `task_manager.execute_next_action()` while there are still remaining actions.
+When all actions are successfully configured, the Task Manager is ready to start executing the actions.
+To do this, the Action Server calls `task_manager.execute_next_action()` while there are still remaining actions.
 It will return early if an action fails.
 In our example: if the `find` action fails (so no coke is found), the `bring` action will not be executed.
 
@@ -126,7 +133,7 @@ This contains a lot of documentation and explanation on the details of Actions.
  - **Why json?**
    - I know, it hurts to put a [json](https://en.wikipedia.org/wiki/JSON) string in a ROS message.
    But every action has its own semantics, its own parameters and its own structure in these parameters.
-   This means it doesn't fit in a static ROS message a client can send to the action server. The ugliest part is: there is no clear interface definition between client and server.
+   This means it doesn't fit in a static ROS message a client can send to the Action Server. The ugliest part is: there is no clear interface definition between client and server.
    The client side normally uses a grammar to parse natural language commands, so the grammar specifies the client side of the interface.
    On the server side, the action specifies the required structure of the semantics.
    So the Action implementation defines the server side of the interface.
