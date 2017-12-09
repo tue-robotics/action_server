@@ -117,24 +117,17 @@ In our example: if the `find` action fails (so no coke is found), the `bring` ac
 
 The Action life cycle consists of the following phases:
  - Instantiation:
-    - initializing member variables (explained further in `example_action`):
-      - `_config_result`
-      - `_execute_result`
-      - `_required_field_prompts`
-      - `_required_passed_knowledge`
-      - `_required_skills`
-      - `_knowledge`
     - the Action's implementation may add checks for static resources. E.g.
-      - knowledge availability
-      - server availability
-      - etc.
+      - common (or challenge) knowledge availability
  - Configuration
-    - checking task semantics using `_required_field_prompts`
-    - checking passed knowledge using using `_required_passed_knowledge`
-    - checking robot for required skills using `_required_skills`
-    - calling the implementation's `_configure`
+    - sanity checking task semantics
+    - checking knowledge passed from the previous to the current Action
+    - availability of the interfaces required for executing the behavior
+      - robot skills
+      - (actionlib) servers
  - Execution
-    - performing the actual action
+    - performing the actual behavior
+    - checking the result and returning appropriate information
 
 ## FAQ
 
