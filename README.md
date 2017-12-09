@@ -44,8 +44,11 @@ After this process is performed, they should rely on robot skills or robot smach
 ## Procedure
 
 Let's see what happens when a client sends a goal to the Action Server in a little more detail.
+
+### Client side
+
 Let's assume our client takes the high level natural language task *"Go to the kitchen, find a coke, and bring it to me."*
-With a good natural language parser, we can parse this to the following json object:
+With a good natural language parser, it can parse this to the following json object:
 ```json
 {
   "actions" :
@@ -80,9 +83,13 @@ With a good natural language parser, we can parse this to the following json obj
   ]
 }
 ```
-This json object can be sent to the Action Server.
+This json object (the task recipe) can be sent to the Action Server.
+While the server is working on the task, the client receives feedback when a new Action is started.
+The client can cancel the running task Server.
 
-### Configuration
+### Server side
+
+#### Configuration
 
 The server parses the object and passes the resulting Python dictionary (the `recipe`) to the Task Manager (`set_up_state_machine(recipe)`).
 The Task Manager then goes through the list of actions, instantiates actions and tries to chain their semantics.
@@ -99,7 +106,7 @@ In our example, this knowledge is available, so the `bring` action will grab the
 When the required knowledge is not available, the action may return a ConfigurationResult specifying that information is missing.
 The server will notify the client of this result so that it can ask the user for more information.
 
-### Execution
+#### Execution
 
 When all actions are successfully configured, the Task Manager is ready to start executing the actions.
 To do this, the Action Server calls `task_manager.execute_next_action()` while there are still remaining actions.
