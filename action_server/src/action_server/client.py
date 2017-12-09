@@ -33,10 +33,15 @@ class TaskOutcome(object):
 
 
 class Client(object):
-    ''' A client for the action server
+    """ A client for the action server
 
     Wraps the client side of the actionlib interface so that it can be easily used in client side applications.
-    '''
+
+    Example:
+        client = Client('amigo')
+        semantics = "{'actions': [{'action': 'say', 'sentence': 'ROBOT_NAME'}]}"
+        client.send_task(semantics)
+    """
     def __init__(self, robot_name):
         action_name = "/" + robot_name + "/action_server/task"
         self._action_client = actionlib.SimpleActionClient(action_name,

@@ -3,15 +3,16 @@ import rospy
 from robot_skills.robot import Robot
 from robocup_knowledge import load_knowledge
 
+
 class ConfigurationData(object):
-    '''
+    """
     The ConfigurationData class defines the input data structure for configuration of an action.
-    '''
+    """
     def __init__(self, semantics, knowledge=None):
-        '''
+        """
         :param semantics: Dictionary of the following structure: {'action': <action-name>, 'param1': <param-value>}.
         :param knowledge: Dictionary of parameter names to knowledge provided by previous actions.
-        '''
+        """
         self.semantics = semantics
         if knowledge:
             self.knowledge = knowledge
@@ -23,9 +24,9 @@ class ConfigurationData(object):
 
 
 class ConfigurationResult(object):
-    '''
+    """
     The ConfigurationResult class defines the data structure that is returned by the configure() methods of actions
-    '''
+    """
     def __init__(self, succeeded=False, resulting_knowledge=None):
         if resulting_knowledge is None:
             resulting_knowledge = {}
@@ -36,20 +37,28 @@ class ConfigurationResult(object):
         self.missing_skill = None
         self.message = ""
 
+    def __repr__(self):
+        return "ConfigurationResult(succeeded=%s, resulting_knowledge=%s, missing_field=%s, missing_skill=%s, " \
+               "message=%s)" % (self.succeeded, self.resulting_knowledge, self.missing_field, self.missing_skill,
+                                self.message)
+
 
 class ActionResult(object):
-    '''
+    """
     The ActionResult class defines the data structure that is returned by the run() methods of actions.
-    '''
+    """
     def __init__(self, succeeded=False, message=""):
         self.succeeded = succeeded
         self.message = message
 
+    def __repr__(self):
+        return "ActionResult(succeeded=%s, message=%s)" % (self.succeeded, self.message)
+
 
 class Action(object):
-    '''
+    """
     The Action class defines the interface of actions that can be configured and started by the task_manager.
-    '''
+    """
     def __init__(self):
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
@@ -84,8 +93,17 @@ class Action(object):
         return True
 
     def configure(self, robot, config):
+        """
+        Configure the action with a robot and configuration data
+        :param robot: The robot to use for this action
+        :type robot: Robot
+        :param config: The configuration data. Contains semantics from input and implied knowledge from previous tasks.
+        :type config: ConfigurationData
+        :return: The result of configuration
+        :rtype: ConfigurationResult
+        """
         rospy.loginfo("Configuring action {} with semantics {} and knowledge {}.".
-                       format(self.get_name(), config.semantics, config.knowledge))
+                      format(self.get_name(), config.semantics, config.knowledge))
         if not isinstance(config, ConfigurationData):
             rospy.logerr("Action: the specified config should be ConfigurationData! I received: %s" % str(config))
             self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "
@@ -104,22 +122,29 @@ class Action(object):
         return self._config_result
 
     def _configure(self, robot, config):
-        raise NotImplementedError
+        raise NotImplementedError("Implement me in {}.".format(self.get_name()))
 
     def start(self):
+        """
+        Runs the execution of the action. Blocks until the action is finished or canceled.
+        :return: ActionResult
+        """
         rospy.loginfo("Starting executing of action {}.".format(self.get_name()))
         self._start()
         return self._execute_result
 
     def _start(self):
-        raise NotImplementedError
+        raise NotImplementedError("Implement me in {}.".format(self.get_name()))
 
     def cancel(self):
+        """
+        Cancels the execution of the action.
+        """
         rospy.loginfo("Canceling executing of action {}.".format(self.get_name()))
-        return self._cancel()
+        self._cancel()
 
     def _cancel(self):
-        raise NotImplementedError
+        raise NotImplementedError("Implement me in {}.".format(self.get_name()))
 
     def get_name(self):
         return self.__class__.__name__
