@@ -13,7 +13,9 @@ class ExampleAction(Action):
         The base class constructor initializes the following fields:
          - self._config_result = ConfigurationResult()
          - self._execute_result = ActionResult()
-        Their fields should be assigned meaningful values for the caller to give decent feedback to the user.
+        Their fields should be assigned meaningful values in the _configure and _start methods, respectively, by the
+        implementation so the (typically the task manager) can give decent feedback to the user about the result of the
+        action.
 
         Here, you can specify which robot skills are required to perform this action, you can specify what fields are
         required in the semantics of the task, and what information from previous tasks is required.
