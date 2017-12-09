@@ -114,7 +114,7 @@ class Action(object):
         return self._config_result
 
     def _configure(self, robot, config):
-        raise NotImplementedError
+        raise NotImplementedError("Implement me in {}.".format(self.get_name()))
 
     def start(self):
         """
@@ -126,7 +126,7 @@ class Action(object):
         return self._execute_result
 
     def _start(self):
-        raise NotImplementedError
+        raise NotImplementedError("Implement me in {}.".format(self.get_name()))
 
     def cancel(self):
         """
@@ -136,7 +136,7 @@ class Action(object):
         self._cancel()
 
     def _cancel(self):
-        raise NotImplementedError
+        raise NotImplementedError("Implement me in {}.".format(self.get_name()))
 
     def get_name(self):
         return self.__class__.__name__
