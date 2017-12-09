@@ -37,6 +37,11 @@ class ConfigurationResult(object):
         self.missing_skill = None
         self.message = ""
 
+    def __repr__(self):
+        return "ConfigurationResult(succeeded=%s, resulting_knowledge=%s, missing_field=%s, missing_skill=%s, " \
+               "message=%s)" % (self.succeeded, self.resulting_knowledge, self.missing_field, self.missing_skill,
+                                self.message)
+
 
 class ActionResult(object):
     """
@@ -45,6 +50,9 @@ class ActionResult(object):
     def __init__(self, succeeded=False, message=""):
         self.succeeded = succeeded
         self.message = message
+
+    def __repr__(self):
+        return "ActionResult(succeeded=%s, message=%s)" % (self.succeeded, self.message)
 
 
 class Action(object):
