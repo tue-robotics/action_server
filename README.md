@@ -2,10 +2,23 @@
 
 The Action Server is an actionlib server for managing the execution of high level tasks and their semantic chaining.
 It takes actionlib goals describing series of high level tasks in json form, checks the consistency of the semantics, and executes them.
-This readme explains the architecture of the Action Server, the procedure of handling a goal and the lifecycle of an action.
+This readme starts by explaining how to implement your own Action, as most people will find this most relevant.
+For some more background, read on after that, to learn about the architecture of the Action Server, the procedure of handling a goal and the lifecycle of an action.
 
 You should already know about [ROS](http://wiki.ros.org/ROS/Tutorials), specifically [actionlib](http://wiki.ros.org/actionlib_tutorials/Tutorials), and a bit of [json](https://en.wikipedia.org/wiki/JSON).
 You should also know about the [robot skills](https://github.com/tue-robotics/tue_robocup/tree/master/robot_skills) and [robot_smach_states](https://github.com/tue-robotics/tue_robocup/tree/master/robot_smach_states).
+
+## Implementing your own Action
+Basic steps for implementing an action are as follows:
+  - Create a class that inherits from the Action base class [here](action_server/src/action_server/actions):
+    - implement the \_configure method
+    - implement the \_start method
+    - implement the \_cancel method
+  - Add your new action to the actions module [here](action_server/src/action_server/actions/__init__.py).
+  - Add a command resolving to the required semantics to the grammar you want to test your action with, and test your Action using the natural language console configured with that grammar.
+
+For a detailed guide on the internals of an Action implementation and instructions on how to implement your own Action, take a look at the example implementation: `example_action`.
+This contains a lot of documentation and explanation on the details of Actions.
 
 ## Architecture
 
@@ -115,18 +128,6 @@ The Action life cycle consists of the following phases:
     - calling the implementation's `_configure`
  - Execution
     - performing the actual action
-
-## Implementing your own Action
-Basic steps for implementing an action are as follows:
-  - Create a class that inherits from the Action base class [here](action_server/src/action_server/actions):
-    - implement the \_configure method
-    - implement the \_start method
-    - implement the \_cancel method
-  - Add your new action to the actions module [here](action_server/src/action_server/actions/__init__.py).
-  - Add a command resolving to the required semantics to the grammar you want to test your action with, and test your Action using the natural language console configured with that grammar.
-
-For a detailed guide on the internals of an Action implementation and instructions on how to implement your own Action, take a look at the example implementation: `example_action`.
-This contains a lot of documentation and explanation on the details of Actions.
 
 ## FAQ
 
