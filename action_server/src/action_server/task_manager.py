@@ -1,9 +1,11 @@
+import rospy
 from action_factory import ActionFactory
 from actions.action import ConfigurationResult, ConfigurationData
 
 '''
 The TaskManager sets up a state machine according to a task recipe and executes it.
 '''
+
 
 class TaskManager(object):
     def __init__(self, robot):
@@ -41,7 +43,14 @@ class TaskManager(object):
             config_data = ConfigurationData(instruction, configuration_result.resulting_knowledge)
 
             # Try to configure the action
-            configuration_result = action.configure(self._robot, config_data)
+            try:
+                configuration_result = action.configure(self._robot, config_data)
+            except Exception as e:
+                # if the action crashes, assume that the other actions in the sequence become invalid,
+                # so clear the action sequence before re-raising the exception
+                rospy.logerr('Action configuration crashed, requesting preempt of action sequence')
+                self.request_preempt()
+                raise
 
             # If action configuration succeeded, append configured action to action sequence
             if configuration_result.succeeded:
@@ -66,7 +75,15 @@ class TaskManager(object):
 
     def execute_next_action(self):
         self._active_action = self._action_sequence.pop(0)
-        result = self._active_action.start()
+        try:
+            result = self._active_action.start()
+        except Exception as e:
+            # if the action crashes, assume that the other actions in the sequence become invalid,
+            # so clear the action sequence before re-raising the exception
+            rospy.logerr('Action execution crashed, requesting preempt of action sequence')
+            self.request_preempt()
+            raise
+
         if not self._action_sequence:
             self.done = True
         return result

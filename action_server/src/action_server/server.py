@@ -4,6 +4,7 @@ import actionlib
 import action_server_msgs.msg
 from action_server_msgs.srv import GetActions, GetActionsResponse
 from task_manager import TaskManager
+from actions.action import ConfigurationResult
 
 
 class Server(object):
@@ -38,7 +39,15 @@ class Server(object):
         rospy.logdebug("Received action recipe: {}".format(goal.recipe))
 
         try:
-            configuration_result = self._task_manager.set_up_state_machine(recipe['actions'])
+            # check if we have a recipe that makes sense, otherwise set result to failed
+            # note that python uses lazy evaluation of boolean conditions
+            if isinstance(recipe, dict) and 'actions' in recipe and recipe['actions']:
+                configuration_result = self._task_manager.set_up_state_machine(recipe['actions'])
+            else:
+                rospy.logerr("Recipe does not contain actions, setting configuration result to failed")
+                configuration_result = ConfigurationResult()
+                configuration_result.succeeded = False
+                configuration_result.message = "I do not understand your command."
             rospy.logdebug("Result of state machine setup: {}".format(configuration_result))
 
             self._result.log_messages = []
@@ -52,8 +61,7 @@ class Server(object):
                     self._result.log_messages.append(" I don't have enough information to perform that task.")
                     self._result.log_messages.append(configuration_result.message)
                 elif configuration_result.message:
-                    # TODO: this task result should not be RESULT_UNKNOWN
-                    self._result.result = action_server_msgs.msg.TaskResult.RESULT_UNKNOWN
+                    self._result.result = action_server_msgs.msg.TaskResult.RESULT_TASK_CONFIGURATION_FAILED
                     self._result.log_messages.append(configuration_result.message)
                 else:
                     self._result.result = action_server_msgs.msg.TaskResult.RESULT_UNKNOWN
