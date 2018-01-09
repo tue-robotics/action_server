@@ -116,12 +116,13 @@ class Find(Action):
 
                 # Set up the Find state machine
                 rospy.loginfo("Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area, nav_area))
-                self._find_state_machines.append(states.Find(robot=self._robot,
-                                                             source_entity_designator=location_designator,
-                                                             description_designator=description_designator,
-                                                             area_name_designator=area_designator,
-                                                             navigation_area_designator=navigation_area_designator,
-                                                             found_entity_designator=self._found_entity_designator))
+                self._find_state_machines.append(
+                    states.FindObject(robot=self._robot,
+                                      source_entity_designator=location_designator,
+                                      description_designator=description_designator,
+                                      area_name_designator=area_designator,
+                                      navigation_area_designator=navigation_area_designator,
+                                      found_entity_designator=self._found_entity_designator))
 
         self._config_result.resulting_knowledge['object-designator'] = self._found_entity_designator
         self._config_result.succeeded = True
