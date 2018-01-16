@@ -25,6 +25,11 @@ class NavigateTo(Action):
         self._goal_name = ""
         self._fsm = None
 
+        # If we need to navigate to "me", which resolves to "operator", plant a waypoint at the current position to
+        # navigate to.
+        # self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(),
+        #                              type="waypoint")
+
         entity_description = config.semantics['object']
 
         (entities, error_msg) = entities_from_description(entity_description, self._robot)
