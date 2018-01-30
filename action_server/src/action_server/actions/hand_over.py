@@ -84,7 +84,7 @@ class HandOver(Action):
             self._config_result._required_prior_action = {'action': 'pick-up',
                                                           'object': self.semantics.object}
             self._pick_action = PickUp()
-            pick_up_configuration_data = ConfigurationData({'object': self.semantics.object}, config.knowledge)
+            pick_up_configuration_data = ConfigurationData(config.semantics, config.knowledge)
             pick_up_configuration_result = self._pick_action.configure(self._robot, pick_up_configuration_data)
             if not pick_up_configuration_result.succeeded:
                 self._config_result = pick_up_configuration_result
