@@ -47,7 +47,7 @@ class PickUp(Action):
         if not using_knowledge_for_object:
             # Check if the task included a location to grasp from, otherwise try to get the information from previous
             # actions' knowledge.
-            if 'location' in config.semantics:
+            if 'source-location' in config.semantics:
                 pass
             elif 'location-designator' in config.knowledge:
                 pass
@@ -55,7 +55,7 @@ class PickUp(Action):
                 using_knowledge_for_object = True
                 pass
             else:
-                self._config_result.missing_field = 'location'
+                self._config_result.missing_field = 'source-location'
                 self._config_result.message = " Where would you like me to pick that up? "
                 return
 

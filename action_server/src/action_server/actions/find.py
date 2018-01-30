@@ -55,8 +55,8 @@ class Find(Action):
         self._object = resolve_entity_description(config.semantics['object'])
         self._location = None
 
-        if 'location' in config.semantics:
-            self._location = resolve_entity_description(config.semantics['location'])
+        if 'source-location' in config.semantics:
+            self._location = resolve_entity_description(config.semantics['source-location'])
         elif 'location-designator' in config.knowledge:
             e = config.knowledge['location-designator'].resolve()
             if not e:
@@ -64,12 +64,12 @@ class Find(Action):
                     self._config_result.message = " Where should I look for the {}?".format(self._object.id)
                 else:
                     self._config_result.message = " Where should I look for the {}?".format(self._object.type)
-                self._config_result.missing_field = 'location'
+                self._config_result.missing_field = 'source-location'
                 return
             self._location = EntityDescription(id=e.id)
         else:
             self._config_result.message = " Where should I look for the {}?".format(self._object.id)
-            self._config_result.missing_field = 'location'
+            self._config_result.missing_field = 'source-location'
             return
 
         # We (safely) assume that self._location is an EntityDescription object
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     action = Find()
 
     config = ConfigurationData({'action': 'find',
-              'location': {'id': 'cabinet',
+              'source-location': {'id': 'cabinet',
                            'area': 'on_top_of'},
               'object': {'type': 'coke'}})
 
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     action.start()
 
     config = ConfigurationData({'action': 'find',
-              'location': {'id': 'livingroom',
+              'source-location': {'id': 'livingroom',
                            'area': 'in'},
               'object': {'type': 'person'}})
 
