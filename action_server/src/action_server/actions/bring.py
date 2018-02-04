@@ -55,7 +55,7 @@ class Bring(Action):
                     return
 
                 # Use the object designator from the find action to resolve to the object we want to bring
-                self._found_object_designator = find_config_result.resulting_knowledge['object-designator']
+                self._found_object_designator = find_config_result.context['object-designator']
                 self._source_location = resolve_entity_description(config.semantics['source-location'])
 
             # If the task is something like "... and bring it to me", the "it" refers to something we already found or even
@@ -86,7 +86,7 @@ class Bring(Action):
                     return
 
                 # Use the object designator from the find action to resolve to the object we want to bring
-                self._found_object_designator = find_config_result.resulting_knowledge['object-designator']
+                self._found_object_designator = find_config_result.context['object-designator']
 
                 # rospy.loginfo("I really don't know where to get this thing. ")
                 # self._config_result.message = " Where would you like me to get it? "
@@ -101,7 +101,7 @@ class Bring(Action):
             if not grab_config_result.succeeded:
                 self._config_result = grab_config_result
                 return
-            self._arm_designator = grab_config_result.resulting_knowledge['arm-designator']
+            self._arm_designator = grab_config_result.context['arm-designator']
 
 
         self._target_location = resolve_entity_description(config.semantics['target-location'])

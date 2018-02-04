@@ -57,8 +57,8 @@ class Find(Action):
 
         if 'source-location' in config.semantics:
             self._location = resolve_entity_description(config.semantics['source-location'])
-        elif 'location-designator' in config.knowledge:
-            e = config.knowledge['location-designator'].resolve()
+        elif 'location-designator' in config.context:
+            e = config.context['location-designator'].resolve()
             if not e:
                 if self._object.id:
                     self._config_result.message = " Where should I look for the {}?".format(self._object.id)
@@ -123,7 +123,7 @@ class Find(Action):
                                                              navigation_area_designator=navigation_area_designator,
                                                              found_entity_designator=self._found_entity_designator))
 
-        self._config_result.resulting_knowledge['object-designator'] = self._found_entity_designator
+        self._config_result.context['object-designator'] = self._found_entity_designator
         self._config_result.succeeded = True
 
     def _start(self):

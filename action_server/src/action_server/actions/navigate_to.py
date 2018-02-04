@@ -27,8 +27,8 @@ class NavigateTo(Action):
 
         # If we need to navigate to "me", which resolves to "operator", plant a waypoint at the current position to
         # navigate to.
-        # self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(),
-        #                              type="waypoint")
+        self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(),
+                                     type="waypoint")
 
         entity_description = config.semantics['object']
 
@@ -58,7 +58,6 @@ class NavigateTo(Action):
                 rospy.loginfo("No knowledge of a {} in the world model.".format(entity_description['id']))
                 self._config_result.message = " I have no knowledge of a {} in my world model. ".format(
                     entity_description["id"])
-            return
         else:
             # Take the best match and set up the state machine
             e = entities[0]
@@ -85,8 +84,10 @@ class NavigateTo(Action):
                                                entity_designator_area_name_map={entity_designator: area},
                                                entity_lookat_designator=entity_designator)
 
-        self._config_result.resulting_knowledge['location-designator'] = entity_designator
+        self._config_result.context['location-designator'] = entity_designator
+        self._config_result.context['location'] = config.semantics['object']
         self._config_result.succeeded = True
+        return
 
 
     def _start(self):

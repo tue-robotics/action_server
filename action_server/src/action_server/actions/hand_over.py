@@ -1,8 +1,4 @@
 from action import Action, ConfigurationData
-from find import Find
-from pick_up import PickUp
-from navigate_to import NavigateTo
-from place import Place
 from entity_description import resolve_entity_description
 
 import rospy
@@ -39,71 +35,70 @@ class HandOver(Action):
 
         return semantics
 
-    class Knowledge:
+    class Context:
         def __init__(self):
             self.arm_designator = None
             self.object_designator = None
             self.object_type = None
             self.location_designator = None
+            self.location = None
 
     @staticmethod
-    def _parse_knowledge(knowledge_dict):
-        knowledge = HandOver.Knowledge()
+    def _parse_context(context_dict):
+        context = HandOver.Context()
 
-        if 'arm-designator' in knowledge_dict:
-            knowledge.arm_designator = knowledge_dict['arm-designator']
+        if 'arm-designator' in context_dict:
+            context.arm_designator = context_dict['arm-designator']
 
-        if 'object-designator' in knowledge_dict:
-            knowledge.arm_designator = knowledge_dict['object-designator']
+        if 'object-designator' in context_dict:
+            context.object_designator = context_dict['object-designator']
 
-        if 'object-type' in knowledge_dict:
-            knowledge.object_type = knowledge_dict['object-type']
+        if 'object-type' in context_dict:
+            context.object_type = context_dict['object-type']
 
-        if 'location-designator' in knowledge_dict:
-            knowledge.location_designator = knowledge_dict['location-designator']
+        if 'location-designator' in context_dict:
+            context.location_designator = context_dict['location-designator']
 
-        return knowledge
+        if 'location' in context_dict:
+            context.location = resolve_entity_description(context_dict['location'])
+
+        return context
 
     def _configure(self, robot, config):
         self._robot = robot
         self._pick_action = None
         self._nav_action = None
 
-        # Parse semantics and knowledge to a convenient object
+        # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
-        self.knowledge = self._parse_knowledge(config.knowledge)
+        self.context = self._parse_context(config.context)
 
+        # Express the initial conditions in rules based on input
         # We assume we already got the object if previous action passed an arm, an object and this object has the
         # required type, or the required type is a reference.
         got_object = (
-            self.knowledge.arm_designator is not None and (self.knowledge.object_type == self.semantics.object.type or
-                                                           self.semantics.object.type == 'reference'))
+            self.context.arm_designator is not None and (self.context.object_type == self.semantics.object.type or
+                                                         self.semantics.object.type == 'reference'))
 
+        # If precondition not met, request prior action from the task manager
         if not got_object:
             # Request pick_up action
-            self._config_result._required_prior_action = {'action': 'pick-up',
-                                                          'object': self.semantics.object}
-            self._pick_action = PickUp()
-            pick_up_configuration_data = ConfigurationData(config.semantics, config.knowledge)
-            pick_up_configuration_result = self._pick_action.configure(self._robot, pick_up_configuration_data)
-            if not pick_up_configuration_result.succeeded:
-                self._config_result = pick_up_configuration_result
-                return
-            self.knowledge.arm_designator = pick_up_configuration_result.resulting_knowledge['arm-designator']
-
+            self._config_result.required_context = {'action': 'pick-up',
+                                                    'object': config.semantics['object'],
+                                                    'source-location': config.semantics['source-location']}
+            return
         # Now we can assume we picked up the item!
 
-        at_destination = False  # TODO: Replace this hack with a decent check for the planned location of the robot.
+        # We should have navigated to the place where we should hand over
+        at_destination = (self.context.location is not None and
+                          (self.context.location == self.semantics.target_location or
+                           self.semantics.target_location.type == 'reference'))
 
         if not at_destination:
             # Request navigation action
-            self._nav_action = NavigateTo()
-            nav_config = ConfigurationData({'object': config.semantics['target-location']})
-            nav_config_result = self._nav_action.configure(self._robot, nav_config)
-            if not nav_config_result.succeeded:
-                self._config_result = nav_config_result
-                return
-
+            self._config_result.required_context = {'action': 'navigate-to',
+                                                    'object': config.semantics['target-location']}
+            return
         # We can now assume that we are at the destination for handover!
 
         self._config_result.succeeded = True
@@ -111,7 +106,7 @@ class HandOver(Action):
     def _handover(self):
         # TODO: Move this code to the handover smach state
         self._robot.speech.speak("I will hand over the {} now".format(self.semantics.object.type))
-        arm = self.knowledge.arm_designator.resolve()
+        arm = self.context.arm_designator.resolve()
         arm.send_joint_goal('handover_to_human')
         arm.wait_for_motion_done()
 
@@ -135,22 +130,6 @@ class HandOver(Action):
         arm.occupied_by = None
 
     def _start(self):
-        # Grab
-        if self._pick_action:
-            grab_result = self._pick_action.start()
-
-            if not grab_result.succeeded:
-                self._execute_result.message = grab_result.message
-                return
-
-        # Navigate
-        if self._nav_action:
-            nav_result = self._nav_action.start()
-
-            if not nav_result.succeeded:
-                self._execute_result.message = " I was unable to go to the {}. ".format(
-                    self.semantics.target_location.id)
-
         # Handover
         self._handover()
 

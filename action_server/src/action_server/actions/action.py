@@ -8,39 +8,40 @@ class ConfigurationData(object):
     """
     The ConfigurationData class defines the input data structure for configuration of an action.
     """
-    def __init__(self, semantics, knowledge=None):
+    def __init__(self, semantics, context=None):
         """
         :param semantics: Dictionary of the following structure: {'action': <action-name>, 'param1': <param-value>}.
-        :param knowledge: Dictionary of parameter names to knowledge provided by previous actions.
+        :param context: Dictionary of parameter names to context provided by previous actions.
         """
         self.semantics = semantics
-        if knowledge:
-            self.knowledge = knowledge
+        if context:
+            self.context = context
         else:
-            self.knowledge = {}
+            self.context = {}
 
     def __repr__(self):
-        return "ConfigurationData(semantics=%s, knowledge=%s)" % (self.semantics, self.knowledge)
+        return "ConfigurationData(semantics={}, context={})".format(self.semantics, self.context)
 
 
 class ConfigurationResult(object):
     """
     The ConfigurationResult class defines the data structure that is returned by the configure() methods of actions
     """
-    def __init__(self, succeeded=False, resulting_knowledge=None):
-        if resulting_knowledge is None:
-            resulting_knowledge = {}
+    def __init__(self, succeeded=False, context=None):
+        if context is None:
+            context = {}
 
         self.succeeded = succeeded
-        self.resulting_knowledge = resulting_knowledge
+        self.context = context
+        self.required_context = None
         self.missing_field = ""
         self.missing_skill = None
         self.message = ""
 
     def __repr__(self):
-        return "ConfigurationResult(succeeded=%s, resulting_knowledge=%s, missing_field=%s, missing_skill=%s, " \
-               "message=%s)" % (self.succeeded, self.resulting_knowledge, self.missing_field, self.missing_skill,
-                                self.message)
+        return "ConfigurationResult(succeeded={}, context={}, required_context={}, missing_field={}, " \
+               "missing_skill={}, message={})".format(self.succeeded, self.context, self.required_context,
+                                                  self.missing_field, self.missing_skill, self.message)
 
 
 class ActionResult(object):
@@ -76,8 +77,8 @@ class Action(object):
                 return False
 
         for k, v in self._required_passed_knowledge.items():
-            if k not in config.knowledge:
-                rospy.logerr("Missing required knowledge {}".format(k))
+            if k not in config.context:
+                rospy.logerr("Missing required context {}".format(k))
                 self._config_result.missing_field = k
                 self._config_result.message = v
                 return False
@@ -97,17 +98,20 @@ class Action(object):
         Configure the action with a robot and configuration data
         :param robot: The robot to use for this action
         :type robot: Robot
-        :param config: The configuration data. Contains semantics from input and implied knowledge from previous tasks.
+        :param config: The configuration data. Contains semantics from input and implied context from previous tasks.
         :type config: ConfigurationData
         :return: The result of configuration
         :rtype: ConfigurationResult
         """
-        rospy.loginfo("Configuring action {} with semantics {} and knowledge {}.".
-                      format(self.get_name(), config.semantics, config.knowledge))
+        self._config_result = ConfigurationResult()
+
         if not isinstance(config, ConfigurationData):
             rospy.logerr("Action: the specified config should be ConfigurationData! I received: %s" % str(config))
             self._config_result.message = " Something's wrong with my wiring. I'm so sorry, but I cannot do this. "
             return self._config_result
+
+        rospy.loginfo("Configuring action {} with semantics {} and context {}.".
+                      format(self.get_name(), config.semantics, config.context))
 
         if not isinstance(robot, Robot):
             rospy.logerr("Action: the specified robot should be a Robot! I received: %s" % str(robot))
@@ -117,7 +121,7 @@ class Action(object):
         if self._check_parameters(config) and self._check_skills(robot):
             self._configure(robot, config)
 
-        rospy.loginfo("Resulting knowledge = {}".format(self._config_result.resulting_knowledge))
+        rospy.loginfo("Resulting context = {}".format(self._config_result.context))
 
         return self._config_result
 
