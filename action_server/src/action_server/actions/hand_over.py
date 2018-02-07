@@ -38,7 +38,7 @@ class HandOver(Action):
     class Context:
         def __init__(self):
             self.arm_designator = None
-            self.object_designator = None
+            self.object_designator = None  # TODO: bundle object_designator and object (as a description and a ref)
             self.object_type = None
             self.location_designator = None
             self.location = None
@@ -66,8 +66,6 @@ class HandOver(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
-        self._pick_action = None
-        self._nav_action = None
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
