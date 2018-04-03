@@ -35,5 +35,7 @@ def resolve_entity_description(parameters):
             description.type = parameters["type"]
         if "loc" in parameters:
             description.location = resolve_entity_description(parameters["loc"])
+        if "designator" in parameters:
+            description.designator = parameters["designator"]
 
     return description

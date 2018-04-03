@@ -95,7 +95,7 @@ class HandOver(Action):
         if not at_destination:
             # Request navigation action
             self._config_result.required_context = {'action': 'navigate-to',
-                                                    'object': config.semantics['target-location']}
+                                                    'target-location': config.semantics['target-location']}
             return
         # We can now assume that we are at the destination for handover!
 
