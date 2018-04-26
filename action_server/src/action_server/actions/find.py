@@ -29,7 +29,7 @@ class Find(Action):
     def _point_at_person(self, person):
         pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',
                                                         self._robot.tf_listener)
-        pose_base_link = kdl.kdlFrameStampedToPoseStampedMsg(pose_base_link_kdl)
+        pose_base_link = kdl.kdl_frame_stamped_to_pose_stamped_msg(pose_base_link_kdl)
 
         x = pose_base_link.pose.position.x
         y = pose_base_link.pose.position.y
@@ -124,6 +124,7 @@ class Find(Action):
                                                              found_entity_designator=self._found_entity_designator))
 
         self._config_result.context['object-designator'] = self._found_entity_designator
+        self._config_result.context['location-designator'] = location_designator
         self._config_result.succeeded = True
 
     def _start(self):
