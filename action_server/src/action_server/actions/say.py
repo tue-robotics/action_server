@@ -93,11 +93,20 @@ class Say(Action):
             ])
             self._execute_result.message = " I told a joke. "
         elif self._sentence == 'SOMETHING_ABOUT_SELF':
-            line = random.choice([
-                "I once dragged a person across the floor for meters.",
-                "I've been to tournaments in seven countries already, and still counting. However, I feel like I'm getting a little too old for this shit.",
-                "I once tripped over the border of a Middle Size League soccer field at full speed."
-            ])
+            if self._robot.robot_name == 'amigo':
+                line = random.choice([
+                    "I once dragged a person across the floor for meters.",
+                    "I've been to tournaments in seven countries already, and still counting.",
+                    "I once tripped over the border of a Middle Size League soccer field at full speed."
+                ])
+            elif self._robot.robot_name == 'sergio':
+                line = random.choice([
+                    "I am very proud of my older brother Amigo. He has been competing in Robocup for a long time.",
+                    "I have ankles, knees and hips to reach to the floor as well as the ceiling. "
+                    "Although that would be hard here. ",
+                    "Sometimes I feel a little tense. But then I touch something metal and it helps me discharge and "
+                    "relax."
+                ])
             self._execute_result.message = " I told something about myself. "
         else:
             line = self._sentence
