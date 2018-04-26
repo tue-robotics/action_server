@@ -28,6 +28,7 @@ def navigate(robot, entity_description):
     )
     return navigation_sm.execute() == "succeeded"
 
+
 class Follow(Action):
     ''' The Follow class implements the action to follow a person.
 
@@ -54,17 +55,13 @@ class Follow(Action):
                 self._config_result.message = " Where can I find {}? ".format(self._target.id)
                 return
 
-            if "location-from" in config.semantics:
+            if "location-from" in config.semantics and "location-designator" not in config.context:
                 self._origin = resolve_entity_description(config.semantics["location-from"])
-                self._find_action = Find()
-                find_config = ConfigurationData({'location': {'id' : self._origin.id},
-                               'object': {'type': 'person',
-                                          'id': self._target.id}})
-                find_config_result = self._find_action.configure(robot, find_config)
-                if not find_config_result.succeeded:
-                    self._config_result.message = " I don't know how to find {} in the {}. ".format(self._origin.id,
-                                                                                                    self._target.id)
-                    return
+                self._config_result.required_context = {'action': 'find',
+                                                        'source-location': {'id': self._origin.id},
+                                                        'object': {'type': 'person',
+                                                                   'id': self._target.id}}
+                return
 
         if self._target.id == "operator":
             self._target.id = "you"
@@ -81,13 +78,6 @@ class Follow(Action):
         self._config_result.succeeded = True
 
     def _start(self):
-        if self._find_action:
-            find_result = self._find_action.start()
-            self._execute_result.message += find_result.message
-            if not find_result.succeeded:
-                return
-            # TODO: Navigate to the found person before following
-
         # Do some awesome following
         res = self._follow_sm.execute()
 
