@@ -1,15 +1,13 @@
 from action import Action, ConfigurationData
-from util import entities_from_description
 from entity_description import resolve_entity_description
 
 from robot_skills.arms import Arm
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
-from robot_smach_states.util.designators import UnoccupiedArmDesignator, EdEntityDesignator
+from robot_smach_states.util.designators import ArmDesignator, EdEntityDesignator
 
 import rospy
-import threading
 
 
 class Place(Action):
@@ -89,17 +87,30 @@ class Place(Action):
         # Express the initial conditions in rules based on input
         # We assume we already got the object if previous action passed an arm, an object and this object has the
         # required type, or the required type is a reference.
-        got_object = (
+        got_object_in_task = (
             self.context.arm_designator is not None and (self.context.object_type == self.semantics.object.type or
                                                          self.semantics.object.type == 'reference'))
-        got_object = got_object or [arm_name for arm_name, arm in self._robot.arms.iteritems() if arm.occupied_by]
+
+        object_in_gripper = False
+        if not got_object_in_task:
+            object_to_arm_dict = {arm.occupied_by.type: arm for arm_name, arm in self._robot.arms.iteritems() if
+                                  arm.occupied_by and arm.occupied_by.is_a(self.semantics.object.type)}
+
+            if bool(object_to_arm_dict):
+                object_in_gripper = True
+                arm = object_to_arm_dict[self.semantics.object.type]
+                self.context.arm_designator = \
+                    ArmDesignator({arm.side: arm})
+
+        got_object = got_object_in_task or object_in_gripper
 
         # If precondition not met, request prior action from the task manager
         if not got_object:
             # Request pick_up action
             self._config_result.required_context = {'action': 'pick-up',
-                                                    'object': config.semantics['object'],
-                                                    'source-location': config.semantics['source-location']}
+                                                    'object': config.semantics['object']}
+            if 'source-location' in config.semantics:
+                self._config_result.required_context['source-location'] = config.semantics['source-location']
             return
         # Now we can assume we picked up the item!
 
@@ -111,7 +122,7 @@ class Place(Action):
         if not at_destination:
             # Request navigation action
             self._config_result.required_context = {'action': 'navigate-to',
-                                                    'object': config.semantics['target-location']}
+                                                    'target-location': config.semantics['target-location']}
             return
         # We can now assume that we are at the destination for handover!
 
@@ -119,6 +130,8 @@ class Place(Action):
         return
 
     def _start(self):
+        self._robot.speech.speak("Bring the action!")
+
         # We either got an arm, or we know which arm to place with
         arm_designator = None
         if self.semantics.arm:
@@ -141,16 +154,20 @@ class Place(Action):
 
         place_position = robot_smach_states.util.designators.EmptySpotDesignator(
             self._robot,
-            robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id)
+            robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id),
+            area="on_top_of"
         )
 
         self._place = PlaceSmachState(self._robot, item_to_place, place_position,
                                       arm_designator)
 
-        self._place.execute()
-
-        self._execute_result.message = " I placed successfully. "
-        self._execute_result.succeeded = True
+        state_machine_result = self._place.execute()
+        if state_machine_result == 'done':
+            self._execute_result.message = " I placed successfully. "
+            self._execute_result.succeeded = True
+        else:
+            self._execute_result.message = " I failed to place. "
+            self._execute_result.succeeded = True
 
     def _cancel(self):
         if self._place.is_running:
