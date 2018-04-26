@@ -3,6 +3,7 @@ from find import Find
 
 import rospy
 from robocup_knowledge import load_knowledge
+import challenge_spr
 import hmi
 
 
@@ -21,7 +22,7 @@ class AnswerQuestion(Action):
     def _configure(self, robot, config):
         self._robot = robot
 
-        self._speech_data = load_knowledge('challenge_gpsr')
+        self._speech_data = load_knowledge('challenge_spr')
         if not self._speech_data:
             rospy.logerr("Failed to load speech data for 'AnswerQuestion' action")
             return
@@ -60,8 +61,8 @@ class AnswerQuestion(Action):
         while tries < 3:
             try:
                 res = self._robot.hmi.query(description="",
-                                            grammar=self._speech_data.question_grammar,
-                                            target=self._speech_data.question_grammar_target)
+                                            grammar=self._speech_data.grammar,
+                                            target=self._speech_data.grammar_target)
             except hmi.TimeoutException:
                 self._robot.speech.speak("My ears are not working properly, sorry!")
                 self._execute_result.message = " I was unable to hear anything when listening for a question, so I " \
@@ -69,14 +70,18 @@ class AnswerQuestion(Action):
                 tries += 1
                 continue
 
-            print res.semantics
-
             if res.semantics and "actions" in res.semantics:
-                rospy.loginfo("Question was: '%s'?" % res.sentence)
-                self._robot.speech.speak("The answer is %s" % res.semantics['actions'][0]['solution'])
-                self._execute_result.message = " I answered the question {}".format(res.sentence)
-                self._execute_result.succeeded = True
-                return
+                try:
+                    # TODO: remove this from challenge states, because apparently, this is more generic.
+                    challenge_spr.riddle_game.answer(self._robot, res, None)
+                    self._execute_result.message = " I answered the question {}".format(res.sentence)
+                    self._execute_result.succeeded = True
+                    return
+                except ValueError:
+                    self._robot.speech.speak("I don't know these people you are talking about. ")
+                    self._execute_result.message = " I couldn't answer the question about the crowd."
+                    tries += 1
+                    continue
             else:
                 if tries < 2:
                     self._robot.speech.speak("Sorry, I did not understand your question, try another one.")
