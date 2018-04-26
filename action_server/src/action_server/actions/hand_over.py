@@ -128,6 +128,7 @@ class HandOver(Action):
         arm.occupied_by = None
 
     def _start(self):
+        self._robot.speech.speak("Bring the action!")
         # Handover
         self._handover()
 
