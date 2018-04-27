@@ -59,18 +59,24 @@ class NavigateTo(Action):
         semantics = self._parse_semantics(config.semantics)
         context = self._parse_context(config.context)
 
-        know_target = (semantics.target_location.id or
-                       (semantics.target_location.type == 'reference' and context.object))
+        know_target = (semantics.target_location.id and semantics.target_location.type != 'person' or
+                       (semantics.target_location.type == 'reference' and context.object) or
+                       (semantics.target_location.type == 'person' and context.object))
 
         if not know_target:
             # Request find action
             self._config_result.required_context = {'action': 'find',
-                                                    'object': config.semantics['object'],
-                                                    'source-location': config.semantics['source-location']}
+                                                    'object': config.semantics['target-location']}
+            if 'type' in config.semantics['target-location'] and \
+                config.semantics['target-location']['type'] == 'person' and \
+                    'location' in config.semantics['target-location']:
+                self._config_result.required_context['source-location'] = {'id': config.semantics['target-location']['location']}
+            elif 'source-location' in config.semantics:
+                self._config_result.required_context['source-location'] = config.semantics['source-location']
             return
         # Now we can assume we know the navigation goal entity!
 
-        if semantics.target_location.id:
+        if semantics.target_location.id and semantics.target_location.type != 'person':
             entity_designator = EntityByIdDesignator(self._robot, id=semantics.target_location.id)
             e = entity_designator.resolve()
 
