@@ -61,6 +61,9 @@ class Say(Action):
         elif self._sentence == "TEAM_NAME":
             line = "My team's name is Tech United Eindhoven"
             self._execute_result.message = " I told my team's name. "
+        elif self._sentence == "COUNTRY":
+            line = "My team is from the Netherlands, also known as Holland."
+            self._execute_result.message = " I told my team's name. "
         elif self._sentence == "TEAM_AFFILIATION":
             line = "My team is affiliated with the University of Technology Eindhoven"
             self._execute_result.message = " I told my team's affiliation. "
