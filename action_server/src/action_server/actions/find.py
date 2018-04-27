@@ -155,7 +155,8 @@ class Find(Action):
                     self._robot.speech.speak("I don't see what I am looking for here.")
 
                 self._execute_result.message = " I couldn't find {} {} the {} ".format(
-                    self._object.id if self._object.id and not self._object.id == "None" else "a " + self._object.type,
+                    self._object.id if self._object.id and not self._object.id == "None" else \
+                        "a " + self._object.type if self._object.type else "a " + self._object.category,
                     "in" if self._location.id in self._knowledge.location_rooms else "at",
                     self._location.id
                 )
@@ -163,7 +164,8 @@ class Find(Action):
                 self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._location.id))
                 self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
                     self._location.id,
-                    self._object.id if self._object.id else "a " + self._object.type
+                    self._object.id if self._object.id else "a " + self._object.type if self._object.type else \
+                        "a " + self._object.category
                 )
 
     def _cancel(self):
