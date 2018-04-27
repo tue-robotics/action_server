@@ -82,8 +82,9 @@ class HandOver(Action):
         if not got_object:
             # Request pick_up action
             self._config_result.required_context = {'action': 'pick-up',
-                                                    'object': config.semantics['object'],
-                                                    'source-location': config.semantics['source-location']}
+                                                    'object': config.semantics['object']}
+            if 'source-location' in config.semantics:
+                self._config_result.required_context['source-location'] = config.semantics['source-location']
             return
         # Now we can assume we picked up the item!
 
