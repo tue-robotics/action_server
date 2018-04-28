@@ -33,6 +33,7 @@ class Guide(Action):
         follower_designator = ds.EntityByIdDesignator(robot, id=self.follower_id)
 
         self._guide_state_machine = states.Guide(robot=robot, target_location=target_location_designator, follower=follower_designator)
+        # self._config_result.context['location-designator'] = target_location_designator
         self._config_result.succeeded = True
 
     def _start(self):
