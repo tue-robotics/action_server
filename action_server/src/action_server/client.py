@@ -4,6 +4,7 @@ import actionlib
 import action_server_msgs.msg
 import action_server_msgs.srv
 
+
 class TaskOutcome(object):
     RESULT_MISSING_INFORMATION = 0
     RESULT_TASK_EXECUTION_FAILED = 1
@@ -28,8 +29,8 @@ class TaskOutcome(object):
 
     def __repr__(self):
         return "TaskOutcome(result={}, messages={}, missing_field='{}')".format(self.result,
-                                                                             self.messages,
-                                                                             self.missing_field)
+                                                                                self.messages,
+                                                                                self.missing_field)
 
 
 class Client(object):
@@ -52,7 +53,6 @@ class Client(object):
 
         self.get_actions_proxy = rospy.ServiceProxy('get_actions', action_server_msgs.srv.GetActions)
 
-
     def get_actions(self):
         """
         Query the available actions from the action server.
@@ -67,6 +67,18 @@ class Client(object):
 
         return res.actions
 
+    def send_async_task(self, semantics, done_cb, feedback_cb):
+        """ Send a task to the action server and return immediately. A task is composed of one or multiple actions.
+
+        :param semantics: A json string with a list of dicts, every dict in the list has at least an 'action' field,
+        and depending on the type of action, several parameter fields may be required.
+        :param done_cb:	(callable) Callback that gets called on transitions to Done. The callback should take two
+        parameters: the terminal state (as an integer from actionlib_msgs/GoalStatus) and the result.
+        :param feedback_cb: (callable)Callback that gets called whenever feedback for this goal is received. Takes one
+        parameter: the feedback.
+        """
+        goal = action_server_msgs.msg.TaskGoal(recipe=semantics)
+        self._action_client.send_goal(goal=goal, done_cb=done_cb, feedback_cb=feedback_cb)
 
     def send_task(self, semantics):
         """
@@ -77,12 +89,7 @@ class Client(object):
         and depending on the type of action, several parameter fields may be required.
         :return: True or false, and a message specifying the outcome of the task
         """
-
-        recipe = semantics
-
-        result = None
-
-        goal = action_server_msgs.msg.TaskGoal(recipe=recipe)
+        goal = action_server_msgs.msg.TaskGoal(recipe=semantics)
         self._action_client.send_goal(goal)
 
         try:
@@ -94,6 +101,7 @@ class Client(object):
             self.cancel_all()
             raise KeyboardInterrupt
 
+        # Check result to return the correct outcome
         if result.result == action_server_msgs.msg.TaskResult.RESULT_MISSING_INFORMATION:
 
             to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
@@ -116,6 +124,8 @@ class Client(object):
         return TaskOutcome(messages=result.log_messages)
 
     def cancel_all(self):
+        """ Cancels all goals of the action client
+        """
         rospy.logdebug("cancelling all goals...")
         self._action_client.cancel_all_goals()
         self._action_client.wait_for_result()
