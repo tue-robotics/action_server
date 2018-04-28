@@ -17,14 +17,14 @@ def navigate(robot, entity_description):
     else:
         origin_area = "near"
 
-    origin_entity_designator = EdEntityDesignator(id=entity_description.id)
+    origin_entity_designator = EdEntityDesignator(robot, id=entity_description.id)
     navigation_sm = NavigateToSymbolic(
         robot=robot,
         entity_designator_area_name_map=
         {
             origin_entity_designator: origin_area
         },
-        lookat_entity_designator=origin_entity_designator
+        entity_lookat_designator=origin_entity_designator
     )
     return navigation_sm.execute() == "succeeded"
 
