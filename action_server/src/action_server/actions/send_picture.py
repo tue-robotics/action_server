@@ -1,8 +1,6 @@
 from action import Action, ConfigurationData
 import rospy
-import threading
-
-import robot_smach_states
+import robot_smach_states as states
 
 from entity_description import resolve_entity_description
 
@@ -54,16 +52,31 @@ class SendPicture(Action):
             return
         # We can now assume we arrived at the place to take the picture from.
 
+        self.detect_face_state_machine = states.DetectFace(self._robot)
+
         self._config_result.succeeded = True
         return
 
     def _start(self):
-        self._robot.speech.speak("I should be taking a picture and sending it to you now. ")
-        self._execute_result.message = " I took a picture at {} "
-        self._execute_result.succeeded = True
+        self._robot.speech.speak("I will take a picture and send it to my operator now. ")
+        r = rospy.Rate(1.0)
+        i = 0
+        result = None
+        while result is not 'succeeded' and i < 10:
+            self.detect_face_state_machine.execute(self._robot)
+            r.sleep()
+            i += 1
+
+        if result == 'failed':
+            self._execute_result.message = " I didn't see anyone. "
+            self._execute_result.succeeded = False
+        else:
+            self._execute_result.message = " I found someone at the door. "
+            self._execute_result.succeeded = True
 
     def _cancel(self):
-        pass
+        if self.detect_face_state_machine:
+            self.detect_face_state_machine.request_preempt()
 
 
 if __name__ == "__main__":
