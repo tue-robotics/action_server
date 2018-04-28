@@ -148,3 +148,9 @@ class Client(object):
         self._action_client.cancel_all_goals()
         self._action_client.wait_for_result()
         rospy.logdebug("... all goals cancelled!")
+
+    def cancel_all_async(self):
+        """ Cancels all goals of the action client and returns directly without waiting for the result
+        """
+        rospy.logdebug("cancelling all goals async...")
+        self._action_client.cancel_all_goals()
