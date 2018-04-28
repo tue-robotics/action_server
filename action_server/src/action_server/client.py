@@ -96,7 +96,7 @@ class Client(object):
 
         return res.actions
 
-    def send_async_task(self, semantics, done_cb, feedback_cb):
+    def send_async_task(self, semantics, done_cb=None, feedback_cb=None):
         """ Send a task to the action server and return immediately. A task is composed of one or multiple actions.
 
         :param semantics: A json string with a list of dicts, every dict in the list has at least an 'action' field,
@@ -106,11 +106,17 @@ class Client(object):
         :param feedback_cb: (callable)Callback that gets called whenever feedback for this goal is received. Takes one
         parameter: the feedback.
         """
+        # Define the wrapped done callback
         def _wrapped_done_cb(_, result):
             taskoutcome = task_outcome_from_result(result=result)
             return done_cb(taskoutcome)
+
+        # The wrapped done callback is only used if the provided done callback is callable. Otherwise it's useless
+        _done_cb = _wrapped_done_cb if callable(done_cb) else None
+
+        # Create and send the goal
         goal = action_server_msgs.msg.TaskGoal(recipe=semantics)
-        self._action_client.send_goal(goal=goal, done_cb=_wrapped_done_cb, feedback_cb=feedback_cb)
+        self._action_client.send_goal(goal=goal, done_cb=_done_cb, feedback_cb=feedback_cb)
 
     def send_task(self, semantics):
         """
