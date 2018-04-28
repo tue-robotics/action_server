@@ -33,6 +33,35 @@ class TaskOutcome(object):
                                                                                 self.missing_field)
 
 
+def task_outcome_from_result(result):
+    """ Converts action_server_msgs.msg.TaskResult to TaskOutcome class
+
+    :param result: (action_server_msgs.msg.TaskResult) result input
+    :return: (TaskOutcome) result output
+    """
+    # Check result to return the correct outcome
+    if result.result == action_server_msgs.msg.TaskResult.RESULT_MISSING_INFORMATION:
+
+        to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
+                         result.log_messages)
+        to.missing_field = result.missing_field
+        return to
+
+    elif result.result == action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED:
+        return TaskOutcome(TaskOutcome.RESULT_TASK_EXECUTION_FAILED,
+                           result.log_messages)
+
+    elif result.result == action_server_msgs.msg.TaskResult.RESULT_UNKNOWN:
+        return TaskOutcome(TaskOutcome.RESULT_UNKNOWN,
+                           result.log_messages)
+
+    elif result.result == action_server_msgs.msg.TaskResult.RESULT_SUCCEEDED:
+        return TaskOutcome(TaskOutcome.RESULT_SUCCEEDED,
+                           result.log_messages)
+
+    return TaskOutcome(messages=result.log_messages)
+
+
 class Client(object):
     """ A client for the action server
 
@@ -72,13 +101,16 @@ class Client(object):
 
         :param semantics: A json string with a list of dicts, every dict in the list has at least an 'action' field,
         and depending on the type of action, several parameter fields may be required.
-        :param done_cb:	(callable) Callback that gets called on transitions to Done. The callback should take two
-        parameters: the terminal state (as an integer from actionlib_msgs/GoalStatus) and the result.
+        :param done_cb:	(callable) Callback that gets called on transitions to Done. The callback should take one
+        parameter: TaskOutCome
         :param feedback_cb: (callable)Callback that gets called whenever feedback for this goal is received. Takes one
         parameter: the feedback.
         """
+        def _wrapped_done_cb(_, result):
+            taskoutcome = task_outcome_from_result(result=result)
+            return done_cb(taskoutcome)
         goal = action_server_msgs.msg.TaskGoal(recipe=semantics)
-        self._action_client.send_goal(goal=goal, done_cb=done_cb, feedback_cb=feedback_cb)
+        self._action_client.send_goal(goal=goal, done_cb=_wrapped_done_cb, feedback_cb=feedback_cb)
 
     def send_task(self, semantics):
         """
@@ -101,27 +133,7 @@ class Client(object):
             self.cancel_all()
             raise KeyboardInterrupt
 
-        # Check result to return the correct outcome
-        if result.result == action_server_msgs.msg.TaskResult.RESULT_MISSING_INFORMATION:
-
-            to = TaskOutcome(TaskOutcome.RESULT_MISSING_INFORMATION,
-                             result.log_messages)
-            to.missing_field = result.missing_field
-            return to
-
-        elif result.result == action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED:
-            return TaskOutcome(TaskOutcome.RESULT_TASK_EXECUTION_FAILED,
-                               result.log_messages)
-
-        elif result.result == action_server_msgs.msg.TaskResult.RESULT_UNKNOWN:
-            return TaskOutcome(TaskOutcome.RESULT_UNKNOWN,
-                               result.log_messages)
-
-        elif result.result == action_server_msgs.msg.TaskResult.RESULT_SUCCEEDED:
-            return TaskOutcome(TaskOutcome.RESULT_SUCCEEDED,
-                               result.log_messages)
-
-        return TaskOutcome(messages=result.log_messages)
+        return task_outcome_from_result(result=result)
 
     def cancel_all(self):
         """ Cancels all goals of the action client
