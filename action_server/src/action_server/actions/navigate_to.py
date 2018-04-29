@@ -59,8 +59,15 @@ class NavigateTo(Action):
         semantics = self._parse_semantics(config.semantics)
         context = self._parse_context(config.context)
 
-        know_target = (semantics.target_location.id and semantics.target_location.type != 'person' or
-                       (semantics.target_location.type == 'reference' and context.object) or
+        if semantics.target_location.id == 'this_guy' and semantics.target_location.location is None:
+            rospy.logerr("Missing required parameter {}".format('target-location.location'))
+            self._config_result.missing_field = 'target-location.location'
+            self._config_result.message = ' Where should I look for this guy? '
+            self._config_result.succeeded = False
+            return
+
+        know_target = (semantics.target_location.id and semantics.target_location.type != 'person' or  # We're talking about some piece of furniture or object
+                       (semantics.target_location.type == 'reference' and context.object) or  # navigate to "it"
                        (semantics.target_location.type == 'person' and context.object))
 
         if not know_target:

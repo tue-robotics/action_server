@@ -40,5 +40,7 @@ def resolve_entity_description(parameters):
             description.location = resolve_entity_description(parameters["loc"])
         if "designator" in parameters:
             description.designator = parameters["designator"]
+        if "location" in parameters:
+            description.location = EntityDescription(id=parameters["location"])
 
     return description
