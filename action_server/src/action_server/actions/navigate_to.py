@@ -66,7 +66,8 @@ class NavigateTo(Action):
             self._config_result.succeeded = False
             return
 
-        know_target = (semantics.target_location.id and semantics.target_location.type != 'person' or  # We're talking about some piece of furniture or object
+        know_target = (semantics.target_location.id and
+                       (semantics.target_location.type != 'person' or semantics.target_location.id == 'lars') or  # We're talking about some piece of furniture or object
                        (semantics.target_location.type == 'reference' and context.object) or  # navigate to "it"
                        (semantics.target_location.type == 'person' and context.object))
 
@@ -83,7 +84,8 @@ class NavigateTo(Action):
             return
         # Now we can assume we know the navigation goal entity!
 
-        if semantics.target_location.id and semantics.target_location.type != 'person':
+        if semantics.target_location.id and \
+            (semantics.target_location.type != 'person' or semantics.target_location.id == 'lars'):
             entity_designator = EntityByIdDesignator(self._robot, id=semantics.target_location.id)
             e = entity_designator.resolve()
 
