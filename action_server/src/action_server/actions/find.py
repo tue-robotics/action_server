@@ -79,6 +79,9 @@ class Find(Action):
             self._config_result.message = " I can't grasp anything from the {}".format(self._location.id)
             return
 
+        # Set up designator to be filled with the found entity
+        self._found_entity_designator = VariableDesignator(resolve_type=Entity)
+
         # Set up designator for areas
         self._areas = {}
         self._nav_areas = {}
@@ -89,8 +92,14 @@ class Find(Action):
                     self._areas[location] = self._knowledge.get_inspect_areas(location)
                     self._nav_areas[location] = self._knowledge.get_inspect_position(location)
             else:
+                # person in room
+                self._find_state_machines = [states.FindPersonInRoom(robot, self._location.id, self._object.id)]
                 self._areas[self._location.id] = ["in"]
                 self._nav_areas[self._location.id] = "in"
+                self._config_result.context['object-designator'] = self._found_entity_designator
+                self._config_result.context['location-designator'] = EdEntityDesignator(self._robot, id=self._location.id)
+                self._config_result.succeeded = True
+                return
         elif self._object.type == "person":
             self._areas[self._location.id] = ["near"]
             self._nav_areas[self._location.id] = "near"
@@ -101,9 +110,6 @@ class Find(Action):
         # Set up the designator with the object description
         entity_description = {'type': self._object.type}
         description_designator = VariableDesignator(entity_description)
-
-        # Set up designator to be filled with the found entity
-        self._found_entity_designator = VariableDesignator(resolve_type=Entity)
 
         self._find_state_machines = []
         for loc, areas in self._areas.iteritems():
