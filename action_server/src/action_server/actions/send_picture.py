@@ -63,7 +63,7 @@ class SendPicture(Action):
         i = 0
         result = None
         while result is not 'succeeded' and i < 10:
-            self.detect_face_state_machine.execute(self._robot)
+            result = self.detect_face_state_machine.execute(self._robot)
             r.sleep()
             i += 1
 
