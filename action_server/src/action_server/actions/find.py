@@ -144,14 +144,12 @@ class Find(Action):
         for fsm in self._find_state_machines:
             res = fsm.execute()
 
-            if res == 'succeeded':
+            if res in ['succeeded', 'found']:
                 self._execute_result.message = " I found {}. ".format(
                     self._object.id if self._object.id else "a " + self._object.type)
                 self._execute_result.succeeded = True
 
-                if self._object.type == "person":
-                    self._point_at_person(self._found_entity_designator.resolve())
-                else:
+                if not self._object.type == "person":
                     self._robot.speech.speak("Hey, I found a {}!".format(self._object.type))
                 return
             elif res == 'not_found':
