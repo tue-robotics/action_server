@@ -1,7 +1,6 @@
 from action import Action, ConfigurationData
 
 from entity_description import resolve_entity_description, EntityDescription
-from util import entities_from_description
 
 import rospy
 import math
