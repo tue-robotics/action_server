@@ -1,6 +1,7 @@
 from action import Action, ConfigurationData
 import robot_smach_states as states
 import robot_smach_states.util.designators as ds
+from entity_description import resolve_entity_description
 
 import rospy
 
@@ -15,25 +16,65 @@ class Guide(Action):
         Action.__init__(self)
         self._required_field_prompts = {'object': " What exactly would you like me to find? "}
         self._required_skills = ['head', 'base', 'rightArm', 'speech']
+        self._follower_id = None
+        self._target_id = None
+
+    class Semantics:
+        def __init__(self):
+            self.follower = None
+            self.source_location = None
+            self.target_location = None
+
+    @staticmethod
+    def _parse_semantics(semantics_dict):
+        semantics = Guide.Semantics()
+
+        if 'object' in semantics_dict:
+            semantics.follower = resolve_entity_description(semantics_dict['object'])
+
+        if 'source-location' in semantics_dict:
+            semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
+
+        if 'target-location' in semantics_dict:
+            semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
+
+        return semantics
+
+    class Context:
+        def __init__(self):
+            self.person_designator = None
+
+    @staticmethod
+    def _parse_context(context_dict):
+        context = Guide.Context()
+
+        if 'person-designator' in context_dict:
+            context.person_designator = context_dict['person-designator']
+
+        return context
 
     def _configure(self, robot, config):
-        if 'object' in config.semantics and 'id' in config.semantics['object']:
-            self.follower_id = config.semantics['object']['id']
-        else:
-            # TODO: HUUUUGE Robocup hack!
-            self.follower_id = "lars"
+        # We start by parsing semantics and context
+        self._semantics = Guide._parse_semantics(config.semantics)
+        self._context = Guide._parse_context(config.context)
 
-        if 'target-location' in config.semantics and 'id' in config.semantics['target-location']:
-            self.target_location_id = config.semantics['target-location']['id']
-        else:
-            # TODO: HUUUUGE Robocup hack!
-            self.target_location_id = "bar"
+        # Before we start guiding, we need to know we're at the person we should guide
+        # we check this by checking if we found a person earlier
+        if not self._context.person_designator:
+            self._config_result.required_context = {
+                'action': 'find',
+                'object': config.semantics['object'],
+                'source-location': config.semantics['source-location']
+            }
+            print "I'll need to find someone first!"
+            return
 
-        target_location_designator = ds.EntityByIdDesignator(robot, id=self.target_location_id)
-        follower_designator = ds.EntityByIdDesignator(robot, id=self.follower_id)
+        target_location_designator = ds.EntityByIdDesignator(robot, id=self._semantics.target_location.id)
 
-        self._guide_state_machine = states.Guide(robot=robot, target_location=target_location_designator, follower=follower_designator)
-        # self._config_result.context['location-designator'] = target_location_designator
+        self._guide_state_machine = states.Guide(robot=robot,
+                                                 target_location=target_location_designator,
+                                                 follower=self._context.person_designator)
+
         self._config_result.succeeded = True
 
     def _start(self):
