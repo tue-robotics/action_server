@@ -80,7 +80,7 @@ class SendPicture(Action):
 
 
 if __name__ == "__main__":
-    rospy.init_node('inspect_test')
+    rospy.init_node('send_picture_test')
 
     import sys
     robot_name = sys.argv[1]
@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
     action = SendPicture()
 
-    config = ConfigurationData({'action': 'inspect',
+    config = ConfigurationData({'action': 'send-picture',
                                 'target-location': {'id': 'cabinet'}})
 
     action.configure(robot, config)
