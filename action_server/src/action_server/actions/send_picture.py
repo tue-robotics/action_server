@@ -70,7 +70,7 @@ class SendPicture(Action):
             self._execute_result.succeeded = True
 
     def _cancel(self):
-        if self.detect_face_state_machine:
+        if self.detect_face_state_machine.is_running:
             self.detect_face_state_machine.request_preempt()
 
 
