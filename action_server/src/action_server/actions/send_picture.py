@@ -59,13 +59,8 @@ class SendPicture(Action):
 
     def _start(self):
         self._robot.speech.speak("I will take a picture and send it to my operator now. ")
-        r = rospy.Rate(1.0)
-        i = 0
-        result = None
-        while result is not 'succeeded' and i < 10:
-            result = self.detect_face_state_machine.execute(self._robot)
-            r.sleep()
-            i += 1
+
+        result = self.detect_face_state_machine.execute(self._robot)
 
         if result == 'failed':
             self._execute_result.message = " I didn't see anyone. "
