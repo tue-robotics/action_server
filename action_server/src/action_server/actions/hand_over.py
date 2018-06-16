@@ -1,64 +1,51 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-from robot_skills.arms import Arm
-import robot_smach_states
-from robot_smach_states.manipulation import Place as PlaceSmachState
-from robot_skills.util.entity import Entity
-from robot_smach_states.util.designators import ArmDesignator, EdEntityDesignator
-
 import rospy
 
 
-class Place(Action):
-    ''' The Place class implements the action to place something on an object.
+class HandOver(Action):
+    """
+    The HandOver class implements the action to hand over an object to a person.
 
-    Parameters to pass to the configure() method are:
-     - `entity` (required): Entity to place the object on;
-     - `arm-designator` (required): Designator resolving to the arm to place with
-    '''
+    Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
+    an object to bring (required).
+    """
     def __init__(self):
         Action.__init__(self)
-
-        self._required_field_prompts = {'target-location': " Where should I leave the object? "}
-
-        self._required_skills = ['arms']
+        self._required_field_prompts = {'target-location': " Who would you like me to hand the object? ",
+                                        'object': " What would you like me to hand over? "}
+        self._required_skills = ['base']
 
     class Semantics:
         def __init__(self):
             self.target_location = None
             self.object = None
             self.source_location = None
-            self.arm = None
 
     @staticmethod
     def _parse_semantics(semantics_dict):
-        semantics = Place.Semantics()
+        semantics = HandOver.Semantics()
 
         semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
-
-        if 'object' in semantics_dict:
-            semantics.object = resolve_entity_description(semantics_dict['object'])
+        semantics.object = resolve_entity_description(semantics_dict['object'])
 
         if 'source-location' in semantics_dict:
             semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
-
-        if 'arm' in semantics_dict:
-            semantics.arm = semantics_dict['arm']
 
         return semantics
 
     class Context:
         def __init__(self):
             self.arm_designator = None
-            self.object_designator = None
+            self.object_designator = None  # TODO: bundle object_designator and object (as a description and a ref)
             self.object_type = None
             self.location_designator = None
             self.location = None
 
     @staticmethod
     def _parse_context(context_dict):
-        context = Place.Context()
+        context = HandOver.Context()
 
         if 'arm-designator' in context_dict:
             context.arm_designator = context_dict['arm-designator']
@@ -87,22 +74,9 @@ class Place(Action):
         # Express the initial conditions in rules based on input
         # We assume we already got the object if previous action passed an arm, an object and this object has the
         # required type, or the required type is a reference.
-        got_object_in_task = (
+        got_object = (
             self.context.arm_designator is not None and (self.context.object_type == self.semantics.object.type or
                                                          self.semantics.object.type == 'reference'))
-
-        object_in_gripper = False
-        if not got_object_in_task:
-            object_to_arm_dict = {arm.occupied_by.type: arm for arm_name, arm in self._robot.arms.iteritems() if
-                                  arm.occupied_by and arm.occupied_by.is_a(self.semantics.object.type)}
-
-            if bool(object_to_arm_dict):
-                object_in_gripper = True
-                arm = object_to_arm_dict[self.semantics.object.type]
-                self.context.arm_designator = \
-                    ArmDesignator({arm.side: arm})
-
-        got_object = got_object_in_task or object_in_gripper
 
         # If precondition not met, request prior action from the task manager
         if not got_object:
@@ -126,55 +100,55 @@ class Place(Action):
             return
         # We can now assume that we are at the destination for handover!
 
+        self._robot.speech.speak("Bring the action!")
+
         self._config_result.succeeded = True
-        return
+
+    def _handover(self):
+        # TODO: Move this code to the handover smach state
+        self._robot.speech.speak("I will hand over the {} now".format(self.semantics.object.type))
+        arm = self.context.arm_designator.resolve()
+        arm.send_joint_goal('handover_to_human')
+        arm.wait_for_motion_done()
+
+        self._robot.speech.speak("Please take it from my gripper.", block=False)
+
+        attempt = 0
+
+        while not arm.handover_to_human(timeout=10) and attempt < 2:
+            self._robot.speech.speak("Please take it from my gripper.", block=False)
+            attempt += 1
+
+        self._robot.speech.speak("I will open my gripper now.", block=False)
+
+        self._robot.ed.update_entity(id=arm.occupied_by.id, action='remove')
+        arm.send_gripper_goal('open')
+        arm.wait_for_motion_done()
+
+        arm.reset()
+        arm.wait_for_motion_done()
+
+        arm.occupied_by = None
 
     def _start(self):
-        # We either got an arm, or we know which arm to place with
-        arm_designator = None
-        if self.semantics.arm:
-            arm_designator = robot_smach_states.util.designators.Designator(self.semantics.arm, resolve_type=Arm)
-        elif self.context.arm_designator:
-            arm_designator = self.context.arm_designator
+        # Handover
+        self._handover()
+
+        self._execute_result.succeeded = True
+        if self.semantics.source_location:
+            self._execute_result.message += " I brought a {} from {} to {}. ".format(self.semantics.object.type,
+                                                                                     self.semantics.source_location.id,
+                                                                                     self.semantics.target_location.id)
         else:
-            arms = [arm for arm_name, arm in self._robot.arms.iteritems() if
-                    arm.occupied_by == self.semantics.object.type]
-            if arms:
-                arm_designator = robot_smach_states.util.designators.Designator(arms[0], resolve_type=Arm)
-
-        if not arm_designator:
-            self._execute_result.message = " I was unable to resolve which arm to place with. "
-            self._execute_result.succeeded = False
-            return
-
-        item_to_place = robot_smach_states.util.designators.Designator(arm_designator.resolve().occupied_by,
-                                                                       resolve_type=Entity)
-
-        place_position = robot_smach_states.util.designators.EmptySpotDesignator(
-            self._robot,
-            robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id),
-            area="on_top_of"
-        )
-
-        self._place = PlaceSmachState(self._robot, item_to_place, place_position,
-                                      arm_designator)
-
-        state_machine_result = self._place.execute()
-        if state_machine_result == 'done':
-            self._execute_result.message = " I placed successfully. "
-            self._execute_result.succeeded = True
-        else:
-            self._execute_result.message = " I failed to place. "
-            self._execute_result.succeeded = True
+            self._execute_result.message += " I brought a {} to {}. ".format(self.semantics.object.type,
+                                                                             self.semantics.target_location.id)
 
     def _cancel(self):
-        if self._place.is_running:
-            self._place.request_preempt()
+        pass
 
 
 if __name__ == "__main__":
-
-    rospy.init_node('place_test')
+    rospy.init_node('bring_test')
 
     import sys
     robot_name = sys.argv[1]
@@ -187,12 +161,12 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    action = Place()
+    action = HandOver()
 
-    semantics = {'action': 'place',
-                 'entity': {'id': 'cabinet'},
-                 'side': 'left',
-                 'height': 0.8}
+    config = ConfigurationData({'action': 'hand-over',
+                                'object': {'location': 'cabinet'},
+                                'source-location': {'id': 'cabinet'},
+                                'target-location': {'id': 'dinner_table'}})
 
-    action.configure(robot, ConfigurationData(semantics))
+    action.configure(robot, config)
     action.start()

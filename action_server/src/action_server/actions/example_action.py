@@ -8,7 +8,7 @@ class ExampleAction(Action):
     """
     The ExampleAction class explains how Actions, as handled by the TaskManager, work.
 
-    As by example, it takes passed knowledge of a color passed by a previous Action, passes an Entity to the next
+    As by example, it takes passed context of a color passed by a previous Action, passes an Entity to the next
     Action and uses a dict mapping from object types to colors from the common knowledge. A practical use would be the
     following:
 
@@ -41,7 +41,7 @@ class ExampleAction(Action):
         self._required_skills = ['ed']
 
         """
-        Similarly, you can set the required keys in the knowledge. Their availability is also checked in the configure
+        Similarly, you can set the required keys in the context. Their availability is also checked in the configure
         step.
         """
         self._required_passed_knowledge = ['color']
@@ -62,7 +62,7 @@ class ExampleAction(Action):
     def _configure(self, robot, config):
         """
         :param robot: The robot to use for this action
-        :param config: The configuration of the action, containing fields semantics and knowledge
+        :param config: The configuration of the action, containing fields semantics and context
         :return: ConfigurationResult
 
         The configure step is typically done just after the command is given. It is intended to check if the task makes
@@ -91,7 +91,7 @@ class ExampleAction(Action):
 
         """
         Knowledge gained in previous Actions passed on to this Action can be accessed through config. The availability
-        of this field is checked by the base class (because we specified 'color' as required passed knowledge), but you
+        of this field is checked by the base class (because we specified 'color' as required passed context), but you
         should perform all the necessary checks on this data to make sure that it is what you expect it to be!
         """
         if not isinstance(config.knowledge['color'], VariableDesignator):
@@ -114,14 +114,14 @@ class ExampleAction(Action):
         self._entity_designator = VariableDesignator(resolve_type=Entity)
 
         """
-        Pass on the resulting knowledge by putting it in the resulting knowledge (this action results in some Entity).
-        The following action can use this data by accessing its config.knowledge['object']
+        Pass on the resulting context by putting it in the resulting context (this action results in some Entity).
+        The following action can use this data by accessing its config.context['object']
         """
         self._config_result.resulting_knowledge['object'] = self._entity_designator
 
         """
         Typically, we instantiate a (smach) state machine here, which will do the actual work of the action. In this
-        case, it will be some state machine filling an object designator based on the knowledge passed to this Action.
+        case, it will be some state machine filling an object designator based on the context passed to this Action.
         For more information on designators, how they work and why we need them, ask @LoyVanBeek.
         """
         self._action_fsm = DummyStateMachine(robot, self._color_designator, self._entity_designator, object_colors)
@@ -139,7 +139,7 @@ class ExampleAction(Action):
 
         """
         We typically run the state machine here. Under the hood, this state machine fills the entity designator. Because
-        this is the same object as the one in our _config_result.resulting_knowledge['object'], the knowledge of this
+        this is the same object as the one in our _config_result.resulting_knowledge['object'], the context of this
         entity is passed to any following states that used this Designator.
         """
         result = self._action_fsm.execute()

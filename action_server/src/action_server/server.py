@@ -88,7 +88,10 @@ class Server(object):
                     rospy.logdebug("Execution of state machine aborted because action failed.")
                     return
         except Exception as e:
-            raise type(e)("An error occurred using task recipe: %s\n" % goal.recipe + e.message)
+            rospy.logerr("An error occurred using task recipe: %s\n" % goal.recipe)
+            self._result.log_messages = [' I failed to perform the task. ']
+            self._action_server.set_aborted(self._result)
+            raise
 
         rospy.logdebug("Execution of state machine succeeded.")
         self._result.result = action_server_msgs.msg.TaskResult.RESULT_SUCCEEDED
