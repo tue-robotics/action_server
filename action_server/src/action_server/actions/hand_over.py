@@ -100,6 +100,8 @@ class HandOver(Action):
             return
         # We can now assume that we are at the destination for handover!
 
+        self._robot.speech.speak("Bring the action!")
+
         self._config_result.succeeded = True
 
     def _handover(self):
@@ -129,7 +131,6 @@ class HandOver(Action):
         arm.occupied_by = None
 
     def _start(self):
-        self._robot.speech.speak("Bring the action!")
         # Handover
         self._handover()
 
