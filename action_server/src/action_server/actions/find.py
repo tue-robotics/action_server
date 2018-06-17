@@ -92,7 +92,8 @@ class Find(Action):
                     self._nav_areas[location] = self._knowledge.get_inspect_position(location)
             else:
                 # person in room
-                self._find_state_machines = [states.FindPersonInRoom(robot, self._location.id, self._object.id)]
+                self._find_state_machines = [states.FindPersonInRoom(robot, self._location.id, self._object.id,
+                                                                     False)]
                 self._areas[self._location.id] = ["in"]
                 self._nav_areas[self._location.id] = "in"
                 self._config_result.context['object-designator'] = self._found_entity_designator
