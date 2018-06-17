@@ -1,54 +1,115 @@
 from action import Action, ConfigurationData
+from find import Find
 from entity_description import resolve_entity_description
 
 import rospy
+from robocup_knowledge import load_knowledge
+import hmi
 
 
 class TellNameOfPerson(Action):
-    ''' The TellNameOfPerson class implements the action to ask someones name and report it to the operator.
+    """ The TellNameOfPerson class implements the action to ask someones name and report it to the operator.
 
     Parameters to pass to the configure() method are:
      - `sentence` (required): The sentence to speak. May be a keyword to tell something more intelligent.
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
-        self._required_skills = ['speech']
+        self._required_skills = ['speech', 'hmi']
+        self._preempt_requested = False
+
+        common_knowledge = load_knowledge('common')
+
+        self._grammar = ""
+
+        for name in common_knowledge.names:
+            self._grammar += "\nNAME['%s'] -> %s" % (name, name)
 
     class Semantics:
         def __init__(self):
-            self.location = None
+            self.target_person = None
 
     @staticmethod
     def _parse_semantics(semantics_dict):
         semantics = TellNameOfPerson.Semantics()
 
-        semantics.location = resolve_entity_description(semantics_dict['location'])
+        if 'target-person' in semantics_dict:
+            semantics.target_person = resolve_entity_description(semantics_dict['target-person'])
 
         return semantics
+
+    class Context:
+        def __init__(self):
+            self.object_designator = None
+
+    @staticmethod
+    def _parse_context(context_dict):
+        context = TellNameOfPerson.Context()
+
+        if 'object-designator' in context_dict:
+            context.object_designator = context_dict['object-designator']
+
+        return context
 
     def _configure(self, robot, config):
         self._robot = robot
 
         semantics = TellNameOfPerson._parse_semantics(config.semantics)
+        context = TellNameOfPerson._parse_context(config.context)
 
-        self._sentence = "I understand you want me to tell you the name of the person at the {}. " \
-                         "But I can't do that yet. Sorry. Next task please.".format(semantics.location.id)
+        # If a person is specified in the task description, we need to go and find that person first
+        if semantics.target_person and not context.object_designator:
+            self._config_result.required_context = {
+                'action': 'find',
+                'object': config.semantics['target-person']
+            }
+            if semantics.target_person.location:
+                self._config_result.required_context['source-location'] = config.semantics['target-person']['location']
+                return
 
         self._config_result.succeeded = True
-        return
 
     def _start(self):
-        self._robot.speech.speak(self._sentence, block=True)
-        self._execute_result.succeeded = True
+        self._robot.head.look_at_standing_person()
+        self._robot.head.wait_for_motion_done()
+
+        self._robot.speech.speak("Hey sweetie what is your name?")
+
+        tries = 0
+        while tries < 3 and not self._preempt_requested:
+            try:
+                res = self._robot.hmi.query(description="",
+                                            grammar=self._grammar,
+                                            target='NAME')
+            except hmi.TimeoutException:
+                self._robot.speech.speak("My ears are not working properly, sorry!")
+                self._execute_result.message = "I was unable to hear anything when listening for your name"
+                tries += 1
+                continue
+
+            if res.semantics:
+                self._robot.speech.speak("Oh, so your name is {}".format(res.sentence))
+                self._execute_result.message = "The person's name was {}".format(res.sentence)
+                self._execute_result.succeeded = True
+                return
+            else:
+                if tries < 2:
+                    self._robot.speech.speak("Sorry, I did not understand you, try again.")
+                else:
+                    self._robot.speech.speak("Sorry, I was unable to understand you again. I'll just name you Maple. ")
+                    self._execute_result.message = " I did not understand the answer. "
+                tries += 1
 
     def _cancel(self):
-        pass
+        self._preempt_requested = True
 
 
 if __name__ == "__main__":
-    rospy.init_node('say_test')
+    rospy.init_node('tell_name_of_person_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
@@ -59,11 +120,9 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    action = CountAndTell()
+    action = TellNameOfPerson()
 
-    config = ConfigurationData({'action': 'count-and-tell',
-              'location': {'id': 'cabinet'},
-              'object': {'type': 'beer'}})
+    config = {'action': 'tell_name_of_person'}
 
     action.configure(robot, config)
     action.start()
