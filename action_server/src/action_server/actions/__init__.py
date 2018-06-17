@@ -2,6 +2,7 @@
 
 from answer_question import AnswerQuestion
 from arm_goal import ArmGoal
+from count_and_tell import CountAndTell
 from demo_presentation import DemoPresentation
 from find import Find
 from follow import Follow
@@ -16,4 +17,5 @@ from place import Place
 from reset_wm import ResetWM
 from say import Say
 from send_picture import SendPicture
+from tell_name_of_person import TellNameOfPerson
 from turn_toward_sound import TurnTowardSound
