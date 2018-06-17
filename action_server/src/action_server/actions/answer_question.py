@@ -1,5 +1,6 @@
 from action import Action, ConfigurationData
 from find import Find
+from entity_description import resolve_entity_description
 
 import rospy
 from robocup_knowledge import load_knowledge
@@ -18,6 +19,33 @@ class AnswerQuestion(Action):
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['speech', 'hmi']
+        self._preempt_requested = False
+
+    class Semantics:
+        def __init__(self):
+            self.target_person = None
+
+    @staticmethod
+    def _parse_semantics(semantics_dict):
+        semantics = AnswerQuestion.Semantics()
+
+        if 'target-person' in semantics_dict:
+            semantics.target_person = resolve_entity_description(semantics_dict['target-person'])
+
+        return semantics
+
+    class Context:
+        def __init__(self):
+            self.object_designator = None
+
+    @staticmethod
+    def _parse_context(context_dict):
+        context = AnswerQuestion.Context()
+
+        if 'object-designator' in context_dict:
+            context.object_designator = context_dict['object-designator']
+
+        return context
 
     def _configure(self, robot, config):
         self._robot = robot
@@ -27,38 +55,29 @@ class AnswerQuestion(Action):
             rospy.logerr("Failed to load speech data for 'AnswerQuestion' action")
             return
 
+        semantics = AnswerQuestion._parse_semantics(config.semantics)
+        context = AnswerQuestion._parse_context(config.context)
+
         # If a person is specified in the task description, we need to go and find that person first
-        if 'target-person' in config.semantics:
-            self._find_action = Find()
-            location_id = config.semantics['target-person']['loc']
-            find_semantics = {'object' : config.semantics['target-person'],
-                              'location' : {'id': location_id,
-                                            'type': "furniture" if self._knowledge.is_location(location_id)
-                                            else "room"}}
-            find_config = ConfigurationData(find_semantics, config.knowledge)
-            find_config_result = self._find_action.configure(robot, find_config)
-            if not find_config_result.succeeded:
-                self._config_result = find_config_result
+        if semantics.target_person and not context.object_designator:
+            self._config_result.required_context = {
+                'action': 'find',
+                'object': config.semantics['target-person']
+            }
+            if semantics.target_person.location:
+                self._config_result.required_context['source-location'] = config.semantics['target-person']['location']
                 return
-        else:
-            self._find_action = None
 
         self._config_result.succeeded = True
 
     def _start(self):
-        if self._find_action:
-            find_exec_res = self._find_action.start()
-            if not find_exec_res.succeeded:
-                self._execute_result = find_exec_res
-                return
-
         self._robot.head.look_at_standing_person()
         self._robot.head.wait_for_motion_done()
 
         self._robot.speech.speak("What is your question?")
 
         tries = 0
-        while tries < 3:
+        while tries < 3 and not self._preempt_requested:
             try:
                 res = self._robot.hmi.query(description="",
                                             grammar=self._speech_data.grammar,
@@ -90,9 +109,8 @@ class AnswerQuestion(Action):
                     self._execute_result.message = " I did not understand the question. "
                 tries += 1
 
-
     def _cancel(self):
-        pass
+        self._preempt_requested = True
 
 
 if __name__ == "__main__":
