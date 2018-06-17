@@ -10,9 +10,10 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>action_server_msgs</depend>
-  <depend>grammar_parser</depend>
-  <depend>robot_skills</depend>
-  <depend>actionlib</depend>
-
+  <exec_depend>action_server_msgs</exec_depend>
+  <exec_depend>grammar_parser</exec_depend>
+  <exec_depend>robot_skills</exec_depend>
+  <exec_depend>actionlib</exec_depend>
+  <exec_depend>challenge_presentation</exec_depend>
+  <exec_depend>challenge_presentation</exec_depend>
 </package>
