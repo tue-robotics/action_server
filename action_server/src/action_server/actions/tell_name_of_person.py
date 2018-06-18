@@ -28,14 +28,14 @@ class TellNameOfPerson(Action):
 
     class Semantics:
         def __init__(self):
-            self.target_person = None
+            self.location = None
 
     @staticmethod
     def _parse_semantics(semantics_dict):
         semantics = TellNameOfPerson.Semantics()
 
-        if 'target-person' in semantics_dict:
-            semantics.target_person = resolve_entity_description(semantics_dict['target-person'])
+        if 'location' in semantics_dict:
+            semantics.location = resolve_entity_description(semantics_dict['location'])
 
         return semantics
 
@@ -47,8 +47,8 @@ class TellNameOfPerson(Action):
     def _parse_context(context_dict):
         context = TellNameOfPerson.Context()
 
-        if 'object-designator' in context_dict:
-            context.object_designator = context_dict['object-designator']
+        if 'object' in context_dict:
+            context.object_designator = resolve_entity_description(context_dict['object'])
 
         return context
 
@@ -59,14 +59,15 @@ class TellNameOfPerson(Action):
         context = TellNameOfPerson._parse_context(config.context)
 
         # If a person is specified in the task description, we need to go and find that person first
-        if semantics.target_person and not context.object_designator:
+        if semantics.location and not context.object_designator:
             self._config_result.required_context = {
                 'action': 'find',
-                'object': config.semantics['target-person']
+                'object': {
+                    'location': config.semantics['location'],
+                    'type': 'person'
+                }
             }
-            if semantics.target_person.location:
-                self._config_result.required_context['source-location'] = config.semantics['target-person']['location']
-                return
+            return
 
         self._config_result.succeeded = True
 
