@@ -47,7 +47,6 @@ class CountObjectOnLocation(smach.State):
                 rospy.loginfo("Dropping {l} entities due to low class. score (< {th}): {dropped}"
                               .format(th=self.threshold, dropped=dropped, l=len(dropped)))
 
-                import ipdb; ipdb.set_trace()
                 object_classifications = over_threshold
 
                 list_objects = [obj for obj in object_classifications if obj.type == self.object_type]
