@@ -27,14 +27,14 @@ class SendPicture(Action):
 
     class Context:
         def __init__(self):
-            self.location_designator = None
+            self.location = None
 
     @staticmethod
     def _parse_context(context_dict):
         context = SendPicture.Context()
 
-        if 'location-designator' in context_dict:
-            context.location_designator = context_dict['location-designator']
+        if 'location' in context_dict:
+            context.location = resolve_entity_description(context_dict['location'])
 
         return context
 
@@ -44,7 +44,7 @@ class SendPicture(Action):
         self.semantics = self._parse_semantics(config.semantics)
         self.context = self._parse_context(config.context)
 
-        if self.context.location_designator is None:
+        if self.context.location is None:
             # Request navigation action
             self._config_result.required_context = {'action': 'navigate-to'}
             if self.semantics.target_location is not None:
