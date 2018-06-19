@@ -51,7 +51,12 @@ class CountAndTell(Action):
         return
 
     def _start(self):
-        self._count_state_machine.execute()
+        res = self._count_state_machine.execute()
+        if res == 'Aborted':
+            self._execute_result.succeeded = False
+            self._execute_result.message = "I failed to count the objects."
+            return
+        
         self._execute_result.succeeded = True
 
         # This message is instantiated in _configure but leaves some stuff to be formatted
