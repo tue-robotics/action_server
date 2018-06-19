@@ -71,11 +71,6 @@ class NavigateTo(Action):
         elif semantics.target_location.type == "waypoint":
             know_target = True
 
-        # # navigate to something else that we already know in the world
-        # elif semantics.target_location.id and self._robot.ed.get_entity(semantics.target_location.id):
-        #     print "3"
-        #     know_target = True
-
         # navigate to 'it'
         elif semantics.target_location.type == 'reference' and context.object and \
                 context.object.id == semantics.target_location.id:
@@ -84,8 +79,6 @@ class NavigateTo(Action):
         elif semantics.target_location.type == 'person' and context.object and \
                 semantics.target_location.id == context.object.id or semantics.target_location.id == "operator":
             know_target = True
-
-        # {'action': 'navigate-to', 'target-location': {'type': 'person', 'id': 'john', 'location': {'id': 'counter'}}}
 
         if not know_target:
             # Request find action
@@ -103,12 +96,12 @@ class NavigateTo(Action):
         if semantics.target_location.id and \
                 (semantics.target_location.type != 'person' or semantics.target_location.id == 'operator'):
             entity_designator = EntityByIdDesignator(self._robot, id=semantics.target_location.id)
-            e = entity_designator.resolve()
+            e = entity_designator.resolve()  # TODO: nasty assumption that we can resolve this entity here?!
 
             if e.is_a("waypoint"):
                 self._navigation_state_machine = NavigateToWaypoint(self._robot,
-                                               waypoint_designator=entity_designator,
-                                               radius=0.1)
+                                                                    waypoint_designator=entity_designator,
+                                                                    radius=0.1)
                 rospy.loginfo("Navigation set up for a waypoint")
             else:
                 if e.is_a("room"):
@@ -124,6 +117,11 @@ class NavigateTo(Action):
                                                                     entity_designator_area_name_map={
                                                                         entity_designator: area},
                                                                     entity_lookat_designator=entity_designator)
+        elif semantics.target_location.type == 'person' and context.object:
+            self._navigation_state_machine = NavigateToWaypoint(self._robot,
+                                                                waypoint_designator=context.object.designator,
+                                                                radius=0.7)
+            rospy.loginfo("Navigation set up for a waypoint")
         else:
             entity_designator = context.object.designator
             self._navigation_state_machine = NavigateToSymbolic(self._robot,
