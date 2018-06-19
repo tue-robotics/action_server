@@ -58,8 +58,6 @@ class SendPicture(Action):
         return
 
     def _start(self):
-        self._robot.speech.speak("I will take a picture and send it to my operator now. ")
-
         result = self.detect_face_state_machine.execute(self._robot)
 
         if result == 'failed':
@@ -70,8 +68,7 @@ class SendPicture(Action):
             self._execute_result.succeeded = True
 
     def _cancel(self):
-        if self.detect_face_state_machine.is_running:
-            self.detect_face_state_machine.request_preempt()
+        return
 
 
 if __name__ == "__main__":
