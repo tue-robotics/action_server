@@ -80,3 +80,5 @@ if __name__ == "__main__":
 
     action.configure(robot, config)
     action.start()
+
+    rospy.loginfo(action._execute_result)
