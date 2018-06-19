@@ -39,7 +39,6 @@ class Find(Action):
         self._robot.head.cancel_goal()
         self._robot.base.force_drive(0, 0, math.copysign(1, th) * vth, abs(th / vth))
 
-        self._robot.speech.speak("Found you!")
         self._robot.speech.speak("I will point at you now.")
 
         self._robot.head.look_at_ground_in_front_of_robot(distance=100)
@@ -130,9 +129,10 @@ class Find(Action):
             # person in room
             if not self._semantics.object.id:
                 self._semantics.object.id = 'someone'
+            self._found_entity_designator = VariableDesignator(resolve_type=Entity)
             self._find_state_machines = [
                 states.FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
-                                        False)]  # This smach state should also return the found entity!
+                                        False, self._found_entity_designator.writeable)]  # This smach state should also return the found entity!
             self._config_result.context['location'] = {
                 'designator': EdEntityDesignator(self._robot, id=self._semantics.source_location.id)
             }
@@ -142,6 +142,14 @@ class Find(Action):
             self._found_entity_designator = EdEntityDesignator(self._robot, id=self._semantics.object.id)
             self._config_result.context['object']['designator'] = self._found_entity_designator
             self._config_result.succeeded = True
+
+            # TODO: Robocup hack to make sure the robot moves to the found person
+            self._navigation_state_machine = states.NavigateToWaypoint(
+                self._robot,
+                waypoint_designator=self._found_entity_designator,
+                radius=0.7,
+                look_at_designator=self._found_entity_designator
+            )
             return
 
         # We need to find an object
@@ -196,35 +204,49 @@ class Find(Action):
         for fsm in self._find_state_machines:
             res = fsm.execute()
 
-            if res in ['succeeded', 'found']:
-                self._semantics.object.type = self._found_entity_designator.resolve().type
-                self._execute_result.message = " I found {}. ".format(
-                    self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type)
-                self._execute_result.succeeded = True
+            location = None
+            if self._semantics.source_location.id:
+                location = self._semantics.source_location.id
 
-                # if not self._semantics.object.type == "person":
-                #     self._robot.speech.speak("Hey, I found a {}!".format(self._semantics.object.type if self._semantics.object.type else
-                #                                                          self._semantics.object.category))
+            if res in ['succeeded', 'found']:
+                if self._semantics.object.type == 'person':
+                    if self._semantics.object.id:
+                        if location:
+                            self._execute_result.message = " I found {} at the {}. ".format(self._semantics.object.id,
+                                                                                            location)
+                        else:
+                            self._execute_result.message = " I found {}. ".format(self._semantics.object.id)
+                    else:
+                        if location:
+                            self._execute_result.message = " I found a person at the {}. ".format(location)
+                        else:
+                            self._execute_result.message = " I found a person. "
+                    self._point_at_person(self._found_entity_designator.resolve())
+                    self._navigation_state_machine.execute()
+                else:
+                    self._robot.speech.speak("Hey, I found a {}!".format(self._semantics.object.type if
+                                                                         self._semantics.object.type else
+                                                                         self._semantics.object.category))
                 return
-            # elif res == 'not_found':
-            #     if self._semantics.object.type == "person":
-            #         self._robot.speech.speak(" I don't see anyone here. ")
-            #     else:
-            #         self._robot.speech.speak("I don't see what I am looking for here.")
-            #
-            #     self._execute_result.message = " I couldn't find {} {} the {} ".format(
-            #         self._semantics.object.id if self._semantics.object.id and not self._semantics.object.id == "None" else \
-            #             "a " + self._semantics.object.type if self._semantics.object.type else "a " + self._semantics.object.category,
-            #         "in" if self._location.id in self._knowledge.location_rooms else "at",
-            #         self._location.id
-            #     )
-            # else:
-            #     self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._location.id))
-            #     self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
-            #         self._location.id,
-            #         self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type if self._semantics.object.type else \
-            #             "a " + self._semantics.object.category
-            #     )
+            elif res == 'not_found':
+                if self._semantics.object.type == "person":
+                    self._robot.speech.speak(" I don't see anyone here. ")
+                else:
+                    self._robot.speech.speak("I don't see what I am looking for here.")
+
+                self._execute_result.message = " I couldn't find {} {} the {} ".format(
+                    self._semantics.object.id if self._semantics.object.id and not self._semantics.object.id == "None" else \
+                        "a " + self._semantics.object.type if self._semantics.object.type else "a " + self._semantics.object.category,
+                    "in" if self._location.id in self._knowledge.location_rooms else "at",
+                    self._location.id
+                )
+            else:
+                self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._location.id))
+                self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
+                    self._location.id,
+                    self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type if self._semantics.object.type else \
+                        "a " + self._semantics.object.category
+                )
 
     def _cancel(self):
         pass
