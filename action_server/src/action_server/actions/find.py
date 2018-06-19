@@ -157,7 +157,7 @@ class Find(Action):
         self._areas = {}
         self._nav_areas = {}
         if self._semantics.source_location.id in self._knowledge.location_rooms:
-            locations = self._knowledge.get_locations(self._semantics.source_location.id)
+            locations = self._knowledge.get_locations(self._semantics.source_location.id, True)
             for location in locations:
                 self._areas[location] = self._knowledge.get_inspect_areas(location)
                 self._nav_areas[location] = self._knowledge.get_inspect_position(location)
