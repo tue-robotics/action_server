@@ -2,6 +2,9 @@ from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
 import rospy
+import robot_smach_states as states
+import robot_smach_states.util.designators as ds
+
 
 
 class CountAndTell(Action):
@@ -33,16 +36,23 @@ class CountAndTell(Action):
 
         semantics = CountAndTell._parse_semantics(config.semantics)
 
-        self._sentence = "I understand you want me to count the number of {} on the {} and tell you. " \
-                         "But I can't do that yet. Sorry. Next task please.".format(semantics.object.type,
-                                                                                    semantics.location.id)
+        self._count_designator = ds.VariableDesignator(-1)
+        self._count_state_machine = states.CountObjectsOnLocation(robot,
+                                                                  location=semantics.location.id,
+                                                                  num_objects_designator=self._count_designator.writeable,
+                                                                  object_type=semantics.object.type)
 
+        # Here we set up a message that is formatted further later, in self._start
+        self._execute_result.message = "I counted {{c}} {t}s".format(t=semantics.object.type)
         self._config_result.succeeded = True
         return
 
     def _start(self):
-        self._robot.speech.speak(self._sentence, block=True)
+        self._count_state_machine.execute()
         self._execute_result.succeeded = True
+
+        # This message is instantiated in _configure but leaves some stuff to be formatted
+        self._execute_result.message = self._execute_result.message.format(c=self._count_designator.resolve())
 
     def _cancel(self):
         pass
@@ -65,8 +75,8 @@ if __name__ == "__main__":
     action = CountAndTell()
 
     config = ConfigurationData({'action': 'count-and-tell',
-              'location': {'id': 'cabinet'},
-              'object': {'type': 'beer'}})
+              'location': {'id': 'counter'},
+              'object': {'type': 'apple'}})
 
     action.configure(robot, config)
     action.start()
