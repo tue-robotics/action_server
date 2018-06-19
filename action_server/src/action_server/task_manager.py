@@ -41,13 +41,14 @@ class TaskManager(object):
 
             # If context is required, we will need to configure an action prior to the current one
             if configuration_result.required_context:
+                rospy.logwarn("More context required: {}".format(configuration_result.required_context))
+
                 # We derive the required action from the required context
                 # TODO: Using postconditions of actions, we could infer what kind of prior action is necessary
                 prior_action = self.get_action_from_context(configuration_result.required_context)
 
                 # Configure the prior action using the same recursive strategy
-                prior_config_data = ConfigurationData(configuration_result.required_context,
-                                                      configuration_data.context)
+                prior_config_data = ConfigurationData(configuration_result.required_context)
                 prior_action_list, prior_action_config_result = self.recursive_configure(prior_action,
                                                                                          prior_config_data)
 
@@ -66,6 +67,7 @@ class TaskManager(object):
             else:
                 if configuration_result.succeeded:
                     action_list.append(action)
+                    rospy.loginfo("Configuration succeeded!\n")
                 preconditions_met = True
 
         # Return the list of configured actions and the current configuration result

@@ -36,14 +36,14 @@ class AnswerQuestion(Action):
 
     class Context:
         def __init__(self):
-            self.object_designator = None
+            self.object = None
 
     @staticmethod
     def _parse_context(context_dict):
         context = AnswerQuestion.Context()
 
-        if 'object-designator' in context_dict:
-            context.object_designator = context_dict['object-designator']
+        if 'object' in context_dict:
+            context.object = resolve_entity_description(context_dict['object'])
 
         return context
 
@@ -59,7 +59,7 @@ class AnswerQuestion(Action):
         context = AnswerQuestion._parse_context(config.context)
 
         # If a person is specified in the task description, we need to go and find that person first
-        if semantics.target_person and not context.object_designator:
+        if semantics.target_person and not context.object:
             self._config_result.required_context = {
                 'action': 'find',
                 'object': config.semantics['target-person']
