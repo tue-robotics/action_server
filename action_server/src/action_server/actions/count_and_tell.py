@@ -45,7 +45,8 @@ class CountAndTell(Action):
                                                            self._count_designator)
 
         # Here we set up a message that is formatted further later, in self._start
-        self._execute_result.message = "I counted {{c}} {t}s".format(t=semantics.object.type)
+        self._execute_result.message = "I counted {{c}} {t}s on the {l}".format(t=semantics.object.type,
+                                                                                l=semantics.location.id)
         self._config_result.succeeded = True
         return
 
@@ -55,6 +56,7 @@ class CountAndTell(Action):
 
         # This message is instantiated in _configure but leaves some stuff to be formatted
         self._execute_result.message = self._execute_result.message.format(c=self._count_designator.resolve())
+        self._robot.speech.speak(self._execute_result.message)
 
     def _cancel(self):
         pass
