@@ -88,6 +88,9 @@ class Say(Action):
         elif self._sentence == 'you_shall_not_pass':
             line = " You shall not pass! "
             self._execute_result.message = " I told them I won't let them pass. "
+        elif self._sentence == 'party':
+            line = "start the party"
+            self._execute_result.message = " I will get the party started. "
         elif self._sentence == 'joke':
             line = random.choice([
                 "What do you call a fish with no eyes? A fsh.",
