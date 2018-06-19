@@ -68,6 +68,9 @@ class NavigateTo(Action):
         elif semantics.target_location.id in self._knowledge.location_names:
             know_target = True
 
+        elif semantics.target_location.type == "waypoint":
+            know_target = True
+
         # # navigate to something else that we already know in the world
         # elif semantics.target_location.id and self._robot.ed.get_entity(semantics.target_location.id):
         #     print "3"
