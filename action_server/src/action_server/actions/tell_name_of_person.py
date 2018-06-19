@@ -41,14 +41,14 @@ class TellNameOfPerson(Action):
 
     class Context:
         def __init__(self):
-            self.object_designator = None
+            self.object = None
 
     @staticmethod
     def _parse_context(context_dict):
         context = TellNameOfPerson.Context()
 
         if 'object' in context_dict:
-            context.object_designator = resolve_entity_description(context_dict['object'])
+            context.object = resolve_entity_description(context_dict['object'])
 
         return context
 
@@ -59,13 +59,11 @@ class TellNameOfPerson(Action):
         context = TellNameOfPerson._parse_context(config.context)
 
         # If a person is specified in the task description, we need to go and find that person first
-        if semantics.location and not context.object_designator:
+        if semantics.location and not context.object:
             self._config_result.required_context = {
                 'action': 'find',
-                'object': {
-                    'location': config.semantics['location'],
-                    'type': 'person'
-                }
+                'object': {'type': 'person'},
+                'source-location': config.semantics['location'],
             }
             return
 
@@ -90,7 +88,7 @@ class TellNameOfPerson(Action):
                 continue
 
             if res.semantics:
-                self._robot.speech.speak("Oh, so your name is {}".format(res.sentence))
+                self._robot.speech.speak("Hi {name}! Bye {name}".format(name=res.sentence))
                 self._execute_result.message = "The person's name was {}".format(res.sentence)
                 self._execute_result.succeeded = True
                 return
