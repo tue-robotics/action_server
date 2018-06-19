@@ -147,7 +147,7 @@ class Find(Action):
             self._navigation_state_machine = states.NavigateToWaypoint(
                 self._robot,
                 waypoint_designator=self._found_entity_designator,
-                radius=0.7,
+                radius=1.0,
                 look_at_designator=self._found_entity_designator
             )
             return
