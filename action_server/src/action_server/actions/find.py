@@ -227,6 +227,7 @@ class Find(Action):
                     self._robot.speech.speak("Hey, I found a {}!".format(self._semantics.object.type if
                                                                          self._semantics.object.type else
                                                                          self._semantics.object.category))
+                self._execute_result.succeeded = True
                 return
             elif res == 'not_found':
                 if self._semantics.object.type == "person":
