@@ -21,7 +21,7 @@ class Guide(Action):
 
     class Semantics:
         def __init__(self):
-            self.follower = None
+            self.object = None
             self.source_location = None
             self.target_location = None
 
@@ -29,8 +29,7 @@ class Guide(Action):
     def _parse_semantics(semantics_dict):
         semantics = Guide.Semantics()
 
-        if 'object' in semantics_dict:
-            semantics.follower = resolve_entity_description(semantics_dict['object'])
+        semantics.object = resolve_entity_description(semantics_dict['object'])
 
         if 'source-location' in semantics_dict:
             semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
@@ -42,38 +41,46 @@ class Guide(Action):
 
     class Context:
         def __init__(self):
-            self.person_designator = None
+            self.person = None
 
     @staticmethod
     def _parse_context(context_dict):
         context = Guide.Context()
 
-        if 'person-designator' in context_dict:
-            context.person_designator = context_dict['person-designator']
+        if 'person' in context_dict:
+            context.person = resolve_entity_description(context_dict['person'])
 
         return context
 
     def _configure(self, robot, config):
+        self._robot = robot
+
         # We start by parsing semantics and context
         self._semantics = Guide._parse_semantics(config.semantics)
         self._context = Guide._parse_context(config.context)
 
+        person_known = False
+        if self._robot.ed.get_entity(id=self._semantics.object.id):
+            person_known = True
+        elif self._context.person:
+            person_known = True
+
         # Before we start guiding, we need to know we're at the person we should guide
         # we check this by checking if we found a person earlier
-        if not self._context.person_designator:
+        if not person_known:
             self._config_result.required_context = {
                 'action': 'find',
-                'object': config.semantics['object'],
-                'source-location': config.semantics['source-location']
+                'object': config.semantics['object']
             }
-            print "I'll need to find someone first!"
+            if self._semantics.source_location:
+                self._config_result.required_context['source-location'] = config.semantics['source-location']
             return
 
-        target_location_designator = ds.EntityByIdDesignator(robot, id=self._semantics.target_location.id)
+        target_location_designator = ds.EntityByIdDesignator(self._robot, id=self._semantics.target_location.id)
 
-        self._guide_state_machine = states.Guide(robot=robot,
+        self._guide_state_machine = states.Guide(robot=self._robot,
                                                  target_location=target_location_designator,
-                                                 follower=self._context.person_designator)
+                                                 follower=self._context.person.designator)
 
         self._config_result.succeeded = True
 
