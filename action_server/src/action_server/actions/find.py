@@ -242,13 +242,13 @@ class Find(Action):
                 self._execute_result.message = " I couldn't find {} {} the {} ".format(
                     self._semantics.object.id if self._semantics.object.id and not self._semantics.object.id == "None" else \
                         "a " + self._semantics.object.type if self._semantics.object.type else "a " + self._semantics.object.category,
-                    "in" if self._location.id in self._knowledge.location_rooms else "at",
-                    self._location.id
+                    "in" if self._semantics.source_location.id in self._knowledge.location_rooms else "at",
+                    self._semantics.source_location.id
                 )
             else:
-                self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._location.id))
+                self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._semantics.source_location.id))
                 self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
-                    self._location.id,
+                    self._semantics.source_location.id,
                     self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type if self._semantics.object.type else \
                         "a " + self._semantics.object.category
                 )
