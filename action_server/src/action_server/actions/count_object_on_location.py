@@ -1,10 +1,11 @@
 #! /usr/bin/env python
 import rospy
 import smach
+import robot_smach_states as states
 import robot_smach_states.util.designators as ds
 from robot_smach_states.util.startup import startup
 
-class CountObjectOnLocation(smach.StateMachine):
+class CountObjectOnLocation(smach.State):
     def __init__(self, robot, location, num_objects_designator, segmentation_area='on_top_of', object_type='', threshold=0.0):
         """ Constructor
 
@@ -20,13 +21,13 @@ class CountObjectOnLocation(smach.StateMachine):
         self.location = location
         self.segmentation_area = segmentation_area
         self.threshold = threshold
-        self.object = object_type
+        self.object_type = object_type
 
         ds.checks.is_writeable(num_objects_designator)
-        ds.checks.resolve_type(int)
-        self.num_objects = num_objects_designator
+        ds.checks.check_resolve_type(num_objects_designator, int)
+        self.num_objects_designator = num_objects_designator
 
-    def count_object_on_location(self):
+    def execute(self, userdata=None):
         res = self.robot.ed.update_kinect("{} {}".format(self.segmentation_area, self.location))
         segmented_object_ids = res.new_ids + res.updated_ids
 
@@ -36,21 +37,22 @@ class CountObjectOnLocation(smach.StateMachine):
 
             if object_classifications:
                 for idx, obj in enumerate(object_classifications):
-                    rospy.loginfo("   - Object {} is a '{}' (ID: {})".format(idx, obj.type, obj.id))
+                    rospy.loginfo("   - Object {i} is a '{t}' (prob: {p}, ID: {id})".format(i=idx, t=obj.type, id=obj.id, p=obj.probability))
 
+                over_threshold = object_classifications
                 if self.threshold:
-                    over_threshold = [obj for obj in object_classifications if
-                    obj.probability >= self.threshold]
+                    over_threshold = [obj for obj in object_classifications if obj.probability >= self.threshold]
 
-                dropped = {obj.id: obj.probability for obj in object_classifications if
-                           obj.probability < self.threshold}
+                dropped = {obj.id: obj.probability for obj in object_classifications if obj.probability < self.threshold}
                 rospy.loginfo("Dropping {l} entities due to low class. score (< {th}): {dropped}"
                               .format(th=self.threshold, dropped=dropped, l=len(dropped)))
 
+                import ipdb; ipdb.set_trace()
                 object_classifications = over_threshold
 
-                list_objects = [obj for obj in object_classifications if obj['obj.type'] == self.object_type]
+                list_objects = [obj for obj in object_classifications if obj.type == self.object_type]
                 num_objects = len(list_objects)
+                rospy.loginfo("Counted {} objects matching the query".format(num_objects))
                 self.num_objects_designator.write(num_objects)
             return 'done'
         else:
@@ -63,7 +65,7 @@ class TestCountObjects(smach.StateMachine):
     def __init__(self, robot):
         smach.StateMachine.__init__(self, outcomes=['Done','Aborted'])
 
-        count = ds.VariableDesignator(0)
+        count = ds.VariableDesignator(-1)
 
         with self:
             smach.StateMachine.add('INITIALIZE',
@@ -72,13 +74,13 @@ class TestCountObjects(smach.StateMachine):
                                                 'abort': 'Aborted'})
 
             smach.StateMachine.add("COUNT",
-                                   CountObjectOnLocation(robot, 'counter', object_type='coke', 
-                                                         num_objects_designator=count.writeable()),
+                                   CountObjectOnLocation(robot, 'counter', object_type='apple',
+                                                         num_objects_designator=count.writeable),
                                    transitions={'done': 'Done',
                                                 'failed':'Aborted'})
 
 
 if __name__ == "__main__":
-    # rospy.init_node('gpsr_function_exec')
+    rospy.init_node('gpsr_function_exec')
 
-    startup(TestCountObjects, challenge_name="gps_function")
+    startup(TestCountObjects, challenge_name="gpsr_function")
