@@ -223,10 +223,14 @@ class Find(Action):
                             self._execute_result.message = " I found a person. "
                     self._point_at_person(self._found_entity_designator.resolve())
                     self._navigation_state_machine.execute()
+                    self._robot.speech.speak("Hi there!")
                 else:
                     self._robot.speech.speak("Hey, I found a {}!".format(self._semantics.object.type if
                                                                          self._semantics.object.type else
                                                                          self._semantics.object.category))
+                    self._execute_result.message = " I found a {} ".format(self._semantics.object.type if
+                                                                           self._semantics.object.type else
+                                                                           self._semantics.object.category)
                 self._execute_result.succeeded = True
                 return
             elif res == 'not_found':
