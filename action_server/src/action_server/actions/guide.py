@@ -41,14 +41,14 @@ class Guide(Action):
 
     class Context:
         def __init__(self):
-            self.person = None
+            self.object = None
 
     @staticmethod
     def _parse_context(context_dict):
         context = Guide.Context()
 
-        if 'person' in context_dict:
-            context.person = resolve_entity_description(context_dict['person'])
+        if 'object' in context_dict:
+            context.object = resolve_entity_description(context_dict['object'])
 
         return context
 
@@ -59,15 +59,16 @@ class Guide(Action):
         self._semantics = Guide._parse_semantics(config.semantics)
         self._context = Guide._parse_context(config.context)
 
-        person_known = False
-        if self._robot.ed.get_entity(id=self._semantics.object.id):
-            person_known = True
-        elif self._context.person:
-            person_known = True
+        person_designator = None
+        # if self._robot.ed.get_entity(id=self._semantics.object.id):
+            # person_designator = ds.EntityByIdDesignator(self._robot, id=self._semantics.object.id)
+        # elif self._context.object:
+        if self._context.object:
+            person_designator = self._context.object.designator
 
         # Before we start guiding, we need to know we're at the person we should guide
         # we check this by checking if we found a person earlier
-        if not person_known:
+        if not person_designator:
             self._config_result.required_context = {
                 'action': 'find',
                 'object': config.semantics['object']
@@ -78,13 +79,23 @@ class Guide(Action):
 
         target_location_designator = ds.EntityByIdDesignator(self._robot, id=self._semantics.target_location.id)
 
-        self._guide_state_machine = states.Guide(robot=self._robot,
-                                                 target_location=target_location_designator,
-                                                 follower=self._context.person.designator)
+        area = "near"
+        if self._semantics.target_location.type == "room":
+            area = "in"
+
+        self._guide_state_machine = states.NavigateToSymbolic(robot=self._robot,
+                                                              entity_designator_area_name_map={
+                                                                  target_location_designator: area
+                                                              },
+                                                              entity_lookat_designator=target_location_designator)
 
         self._config_result.succeeded = True
 
     def _start(self):
+        self._robot.head.look_at_standing_person()
+        self._robot.head.wait_for_motion_done()
+        self._robot.speech.speak("Follow me if you want to live")
+        self._robot.head.close()
         self._guide_state_machine.execute()
         self._execute_result.succeeded = True
         self._execute_result.message = "I guided "
