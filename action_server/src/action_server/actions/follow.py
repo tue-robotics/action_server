@@ -1,6 +1,6 @@
 from action import Action, ConfigurationData
 from find import Find
-from entity_description import resolve_entity_description
+from entity_description import resolve_entity_description, EntityDescription
 from robot_smach_states.navigation import NavigateToSymbolic
 
 from robot_smach_states.navigation import FollowOperator
@@ -41,35 +41,67 @@ class Follow(Action):
         self._required_field_prompts = {'target': " Who would you like me to follow? "}
         self._required_skills = ['base']
 
+    class Semantics:
+        def __init__(self):
+            self.target = None
+            self.location_from = None
+            self.location_to = None
+
+    @staticmethod
+    def _parse_semantics(semantics_dict):
+        semantics = Follow.Semantics()
+
+        semantics.target = resolve_entity_description(semantics_dict['target'])
+
+        if 'location-from' in semantics_dict:
+            semantics.location_from = resolve_entity_description(semantics_dict['location-from'])
+
+        if 'location-to' in semantics_dict:
+            semantics.location_to = resolve_entity_description(semantics_dict['location-to'])
+
+        return semantics
+
+    class Context:
+        def __init__(self):
+            self.location = None
+
+    @staticmethod
+    def _parse_context(context_dict):
+        context = Follow.Context()
+
+        if 'location' in context_dict:
+            context.location = resolve_entity_description(context_dict['location'])
+
+        return context
+
     def _configure(self, robot, config):
-        self._target = resolve_entity_description(config.semantics["target"])
+        semantics = Follow._parse_semantics(config.semantics)
+        context = Follow._parse_context(config.context)
 
         self._origin = None
         self._find_action = None
+        self._target = semantics.target
 
-        if self._target.type == "reference":
+        if not semantics.target or semantics.target.type == "reference":
             pass
         else:
-            if not self._target.id == "operator" and not "location-from" in config.semantics:
+            if not semantics.target.id == "operator" and not semantics.location_from:
                 self._config_result.missing_field = "location-from"
-                self._config_result.message = " Where can I find {}? ".format(self._target.id)
+                self._config_result.message = " Where can I find {}? ".format(semantics.target.id)
                 return
 
-            if "location-from" in config.semantics and "location-designator" not in config.context:
+            if semantics.location_from and not context.location:
                 self._origin = resolve_entity_description(config.semantics["location-from"])
                 self._config_result.required_context = {'action': 'find',
                                                         'source-location': {'id': self._origin.id},
                                                         'object': {'type': 'person',
-                                                                   'id': self._target.id}}
+                                                                   'id': semantics.target.id}}
                 return
 
-        if self._target.id == "operator":
+        if semantics.target.id == "operator":
             self._target.id = "you"
 
-        if "location-to" in config.semantics:
-            self._goal = resolve_entity_description(config.semantics["location-to"])
-        else:
-            self._goal = None
+        self._goal = semantics.location_to
 
         self._robot = robot
 
