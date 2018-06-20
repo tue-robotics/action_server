@@ -124,7 +124,8 @@ class Follow(Action):
                 self._execute_result.message += " But I failed to follow {} ".format(self._target.id)
                 return
         self._robot.speech.speak("Thank you for guiding me.")
-        self._execute_result.message += " I successfully followed {} ".format(self._target.id)
+        self._execute_result.message += " I successfully followed {} ".format(self._target.id if self._target.id
+                                                                              else ".")
         if self._goal:
             self._execute_result.message += " to the {}".format(self._goal.id)
 
