@@ -78,6 +78,8 @@ class PickUp(Action):
                 # Then the context object must be one of that category
                 if self._knowledge.get_object_category(context.object.type) == semantics.object.category:
                     object_found = True
+                if context.object.category == semantics.object.category:
+                    object_found = True
 
         if not object_found:
             self._config_result.required_context = {
