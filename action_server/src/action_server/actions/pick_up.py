@@ -19,7 +19,8 @@ class PickUp(Action):
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['arms']
-        self._required_field_prompts = {'object': " What would you like me to pick up? "}
+        self._required_field_prompts = {'object': " What would you like me to pick up? ",
+                                        'source-location': " Where would you like me to pick that up? "}  # TODO: handle source location from context?
 
     class Semantics:
         def __init__(self):
