@@ -6,7 +6,7 @@ class ClearTable(Action):
         Action.__init__(self)
 
     def _configure(self, robot, config):
-        self._state_machines = [OpenDishwasher(), GrabRobust(), NavigateAndPlaceDishwasher()]
+        self._state_machines = [OpenDishwasher(robot, "dishwasher"), GrabRobust(robot), NavigateAndPlaceDishwasher(robot)]
 
         self._config_result.succeeded = True
         self._active_state_machine = None
