@@ -1,12 +1,12 @@
 from action import Action, ConfigurationData
-from challenge_dishwasher.dishwasher import NavigateAndPlaceDishwasher, GrabRobust, OpenDishwasher
+from challenge_dishwasher.dishwasher import NavigateAndPlaceDishwasher, GrabRobust, NavigateAndOpenDishwasher
 
 class ClearTable(Action):
     def __init__(self):
         Action.__init__(self)
 
     def _configure(self, robot, config):
-        self._state_machines = [OpenDishwasher(robot, "dishwasher"), GrabRobust(robot), NavigateAndPlaceDishwasher(robot)]
+        self._state_machines = [GrabRobust(robot), NavigateAndOpenDishwasher(robot), NavigateAndPlaceDishwasher(robot)]
 
         self._config_result.succeeded = True
         self._active_state_machine = None
