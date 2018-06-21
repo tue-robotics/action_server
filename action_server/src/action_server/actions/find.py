@@ -132,7 +132,7 @@ class Find(Action):
             self._found_entity_designator = VariableDesignator(resolve_type=Entity)
             self._find_state_machines = [
                 states.FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
-                                        False, self._found_entity_designator.writeable)]
+                                        True, self._found_entity_designator.writeable)]
             self._config_result.context['location'] = {
                 'designator': EdEntityDesignator(self._robot, id=self._semantics.source_location.id)
             }
