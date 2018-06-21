@@ -19,3 +19,6 @@ from say import Say
 from send_picture import SendPicture
 from tell_name_of_person import TellNameOfPerson
 from turn_toward_sound import TurnTowardSound
+
+from clear_table import ClearTable
+from open_door import OpenDoor
