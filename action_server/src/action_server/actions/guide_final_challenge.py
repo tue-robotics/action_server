@@ -67,7 +67,8 @@ class GuideFinalChallenge(Action):
         self._robot.head.close()
         self._state_machine.execute()
         self._execute_result.succeeded = True
-        self._execute_result.message = " Here you go! "
+        self._execute_result.message = " I guided! "
+        self._robot.speech.speak("Here you go!")
 
     def _cancel(self):
         self._state_machine.request_preempt()
