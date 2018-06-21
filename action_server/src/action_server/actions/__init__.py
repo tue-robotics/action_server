@@ -22,3 +22,4 @@ from turn_toward_sound import TurnTowardSound
 
 from clear_table import ClearTable
 from open_door import OpenDoor
+from guide_final_challenge import GuideFinalChallenge
