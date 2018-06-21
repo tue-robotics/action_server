@@ -13,7 +13,7 @@ class OpenDoor(Action):
         # self._required_field_prompts = {'object': " What object would you like me to work with? "}
 
     def _configure(self, robot, config):
-        self._state_machine = OpenDoorMachine(robot)
+        self._state_machine = OpenDoorMachine(robot, "cupboard", "in_front_of", "shelf6")
         self._config_result.succeeded = True
         return
 
