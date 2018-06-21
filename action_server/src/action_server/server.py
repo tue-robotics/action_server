@@ -54,9 +54,6 @@ class Server(object):
 
             if configuration_result.succeeded:
                 rospy.logdebug("Setting up state machine succeeded")
-                # TODO: remove this robocup hack!
-                rospy.loginfo("Waiting for TC to get in position...")
-                self._robot.speech.speak("Please step aside and let me get to work.", block=True)
             else:
                 if configuration_result.missing_field:
                     self._result.result = action_server_msgs.msg.TaskResult.RESULT_MISSING_INFORMATION
