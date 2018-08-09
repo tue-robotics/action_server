@@ -1,7 +1,7 @@
 from action import Action, ConfigurationData
 
 import rospy
-from challenge_presentation import PresentationMachine
+from challenge_presentation import PresentationMachine, PresentationMachineHero
 
 
 class DemoPresentation(Action):
@@ -18,7 +18,10 @@ class DemoPresentation(Action):
             language = config.semantics['language']
         else:
             language = 'en'
-        self._presentation_sm = PresentationMachine(robot, language=language)
+        if robot.robot_name == 'hero':
+            self._presentation_sm = PresentationMachineHero(robot, language=language)
+        else:
+            self._presentation_sm = PresentationMachine(robot, language=language)
         self._config_result.succeeded = True
         return
 
