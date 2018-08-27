@@ -17,3 +17,4 @@ from reset_wm import ResetWM
 from say import Say
 from send_picture import SendPicture
 from turn_toward_sound import TurnTowardSound
+from clear import Clears
