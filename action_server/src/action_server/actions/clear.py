@@ -1,20 +1,18 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
-
+# from challenge_clear import ClearMachine
 import rospy
 
 
 class Clear(Action):
     """
-    The HandOver class implements the action to hand over an object to a person.
+    The Clear class implements the action to clean up a location.
 
-    Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
-    an object to bring (required).
+    Parameters to pass to the configure() method are 'source-location' (required) and 'target-location' (optional).
     """
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'source-location': "What location would you like me to clear?",
-                                        'target-location': "Where would you like me to clear the items to?"}
+        self._required_field_prompts = {'source-location': "What location would you like me to clear?"}
         self._required_skills = ['base']
 
     class Semantics:
@@ -26,8 +24,8 @@ class Clear(Action):
     def _parse_semantics(semantics_dict):
         semantics = Clear.Semantics()
 
-        semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
         semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
+        semantics.source_location = resolve_entity_description(semantics_dict['target-location'])
 
         return semantics
 
@@ -36,27 +34,29 @@ class Clear(Action):
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
-
-        # options:
-        #   - navigate to target  ->  inspect target  ->  for entity in segmented_objects: place to trashbin
-        #   - navigate to target  ->  inspect target  ->  place (random) entity in trashbin  ->  inspect target  -> loop
-        #   - make state machine (like demo presentation) that executes whole action
-        #   -
-
-    def _test(self):
-        self._robot.speech.speak("Test if clear can be called through the action server.", block=False)
-
+        # self._clear_sm = ClearMachine(robot, target_location=config.semantics['target-location'],
+        #                               source_location=config.semantics['source-location'])
+        self._robot.speech.speak("target is {}, source is {}".format(config.semantics['target-location'],
+                                                                     config.semantics['source-location']))
+        self._config_result.succeeded = True
+        return
 
     def _start(self):
-        # Handover
-        self._test()
 
-        self._execute_result.succeeded = True
+        # outcome = self._clear_sm.execute()
+        # if outcome == 'done':
+        #     self._execute_result.message = " I cleared the table! Wasn't that awesome? "
+        #     self._execute_result.succeeded = True
+        # elif outcome == 'aborted':
+        #     self._execute_result.message = " Something went wrong. Sorry! "
+        #     self._execute_result.succeeded = False
+
+        return
 
 
     def _cancel(self):
+        # self._clear_sm.request_preempt()
         pass
-
 
 if __name__ == "__main__":
     rospy.init_node('clear_test')
@@ -82,15 +82,3 @@ if __name__ == "__main__":
 
     action.configure(robot, config)
     action.start()
-
-
-#########################################
-# smach.StateMachine.add('SEGMENT', robot_smach_states.SegmentObjects(robot,
-#                                                                     e_classifications_des.writeable,
-#                                                                     e_des,
-#                                                                     source_location),
-#                        transitions={'done': "HANDLE_DETECTED_ENTITIES"})
-#
-# smach.StateMachine.add('HANDLE_DETECTED_ENTITIES', HandleDetectedEntities(robot, e_classifications_des, known_types,
-#                                                                           location_id, source_location),
-#                        transitions={"done": next_state})
