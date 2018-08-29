@@ -21,13 +21,17 @@ class Clear(Action):
         def __init__(self):
             self.target_location = None
             self.source_location = None
+            self.default_target = {'id': 'trashbin'}
 
     @staticmethod
     def _parse_semantics(semantics_dict):
         semantics = Clear.Semantics()
 
         semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
-        semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
+        if 'target-location' in config.semantics:
+            semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
+        else:
+            semantics.target_location = resolve_entity_description(semantics_dict[semantics.default_target])
 
         return semantics
 
@@ -55,26 +59,22 @@ class Clear(Action):
         target_placeAreaDes = VariableDesignator(target_placeArea[0])
         target_navAreaDes = VariableDesignator(target_navArea)
 
-        self._clear_sm = ClearSmachState(robot = self._robot,
-                                         source_location = source_location_designator,
-                                         source_navArea = source_navAreaDes,
-                                         source_searchArea = source_searchAreaDes,
-                                         target_location = target_location_designator,
-                                         target_navArea = target_navAreaDes,
-                                         target_placeArea = target_placeAreaDes)
+        self._clear_sm = ClearSmachState(self._robot, source_location_designator, source_navAreaDes,
+                                         source_searchAreaDes, target_location_designator, target_navAreaDes,
+                                         target_placeAreaDes)
         self._config_result.succeeded = True
         return
 
     def _start(self):
+        outcome = self._clear_sm.execute()
 
-         outcome = self._clear_sm.execute()
-         if outcome == 'done':
-             self._execute_result.message = " I cleared the table! Wasn't that awesome? "
-             self._execute_result.succeeded = True
-         elif outcome == 'failed':
-             self._execute_result.message = " Something went wrong. Sorry! "
-             self._execute_result.succeeded = False
-         return
+        if outcome == 'done':
+            self._execute_result.message = " I cleared the table! Wasn't that awesome? "
+            self._execute_result.succeeded = True
+        elif outcome == 'failed':
+            self._execute_result.message = " Something went wrong. Sorry! "
+            self._execute_result.succeeded = False
+        return
 
 
     def _cancel(self):
