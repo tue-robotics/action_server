@@ -50,9 +50,9 @@ class Clear(Action):
         target_placeArea = self._knowledge.get_inspect_areas(self._target_location.id)
         target_navArea = self._knowledge.get_inspect_position(self._target_location.id)
 
-        source_searchAreaDes = VariableDesignator(source_searchArea)
+        source_searchAreaDes = VariableDesignator(source_searchArea[0])
         source_navAreaDes = VariableDesignator(source_navArea)
-        target_placeAreaDes = VariableDesignator(target_placeArea)
+        target_placeAreaDes = VariableDesignator(target_placeArea[0])
         target_navAreaDes = VariableDesignator(target_navArea)
 
         self._clear_sm = ClearSmachState(robot = self._robot,
