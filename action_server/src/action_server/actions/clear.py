@@ -28,7 +28,8 @@ class Clear(Action):
         semantics = Clear.Semantics()
 
         semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
-        if 'target-location' in config.semantics:
+
+        if 'target-location' in semantics_dict:
             semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
         else:
             semantics.target_location = resolve_entity_description(semantics_dict[semantics.default_target])
@@ -40,6 +41,7 @@ class Clear(Action):
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
+
         self._source_location = self.semantics.source_location
         self._target_location = self.semantics.target_location
 
