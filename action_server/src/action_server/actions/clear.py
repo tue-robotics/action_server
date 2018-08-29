@@ -36,13 +36,13 @@ class Clear(Action):
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
-        self._source_location = resolve_entity_description(config.semantics['source-location'])
-        self._target_location = resolve_entity_description(config.semantics['target-location'])
+        self._source_location = self.semantics.source_location
+        self._target_location = self.semantics.target_location
 
         self._robot.speech.speak("target is {}, source is {}".format(self._target_location.id, self._source_location.id))
 
-        source_location_designator = EdEntityDesignator(self._robot, id=self._source_location)
-        target_location_designator = EdEntityDesignator(self._robot, id=self._target_location)
+        source_location_designator = EdEntityDesignator(self._robot, id=self._source_location.id)
+        target_location_designator = EdEntityDesignator(self._robot, id=self._target_location.id)
 
         source_searchArea = self._knowledge.get_inspect_areas(self._source_location.id)
         source_navArea = self._knowledge.get_inspect_position(self._source_location.id)
