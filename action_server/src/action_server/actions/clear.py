@@ -21,7 +21,6 @@ class Clear(Action):
         def __init__(self):
             self.target_location = None
             self.source_location = None
-            self.default_target = {'id': 'trashbin'}
 
     @staticmethod
     def _parse_semantics(semantics_dict):
@@ -29,10 +28,7 @@ class Clear(Action):
 
         semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
 
-        if 'target-location' in semantics_dict:
-            semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
-        else:
-            semantics.target_location = resolve_entity_description(semantics_dict[semantics.default_target])
+        semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
 
         return semantics
 
