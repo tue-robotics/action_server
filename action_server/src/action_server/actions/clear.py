@@ -57,9 +57,13 @@ class Clear(Action):
         target_placeAreaDes = VariableDesignator(target_placeArea[0])
         target_navAreaDes = VariableDesignator(target_navArea)
 
-        self._clear_sm = ClearSmachState(self._robot, source_location_designator, source_navAreaDes,
-                                         source_searchAreaDes, target_location_designator, target_navAreaDes,
-                                         target_placeAreaDes)
+        self._clear_sm = ClearSmachState(robot = self._robot,
+                                         source_location = source_location_designator,
+                                         source_navArea = source_navAreaDes,
+                                         source_searchArea = source_searchAreaDes,
+                                         target_location = target_location_designator,
+                                         target_navArea = target_navAreaDes,
+                                         target_placeArea = target_placeAreaDes)
         self._config_result.succeeded = True
         return
 
