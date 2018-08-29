@@ -27,7 +27,7 @@ class Clear(Action):
         semantics = Clear.Semantics()
 
         semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
-        semantics.source_location = resolve_entity_description(semantics_dict['target-location'])
+        semantics.target_location = resolve_entity_description(semantics_dict['target-location'])
 
         return semantics
 
@@ -39,7 +39,7 @@ class Clear(Action):
         self._source_location = resolve_entity_description(config.semantics['source-location'])
         self._target_location = resolve_entity_description(config.semantics['target-location'])
 
-        self._robot.speech.speak("target is {}, source is {}".format(self._source_location.id, self._target_location.id))
+        self._robot.speech.speak("target is {}, source is {}".format(self._target_location.id, self._source_location.id))
 
         source_location_designator = EdEntityDesignator(self._robot, id=self._source_location)
         target_location_designator = EdEntityDesignator(self._robot, id=self._target_location)
