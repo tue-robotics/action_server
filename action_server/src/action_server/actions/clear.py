@@ -36,8 +36,8 @@ class Clear(Action):
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
-        self._source_location = config.semantics['source-location']
-        self._target_location = config.semantics['target-location']
+        self._source_location = resolve_entity_description(config.semantics['source-location'])
+        self._target_location = resolve_entity_description(config.semantics['target-location'])
 
         self._robot.speech.speak("target is {}, source is {}".format(self._source_location,self._target_location))
 
