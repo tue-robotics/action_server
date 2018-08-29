@@ -1,5 +1,7 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
+from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
+from robot_smach_states.clear import Clear as ClearSmachState
 # from challenge_clear import ClearMachine
 import rospy
 
@@ -34,24 +36,45 @@ class Clear(Action):
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
-        # self._clear_sm = ClearMachine(robot, target_location=config.semantics['target-location'],
-        #                               source_location=config.semantics['source-location'])
-        self._robot.speech.speak("target is {}, source is {}".format(config.semantics['target-location'],
-                                                                     config.semantics['source-location']))
+        self._source_location = config.semantics['source-location']
+        self._target_location = config.semantics['target-location']
+
+        self._robot.speech.speak("target is {}, source is {}".format(self._source_location,self._target_location))
+
+        source_location_designator = EdEntityDesignator(self._robot, id=self._source_location)
+        target_location_designator = EdEntityDesignator(self._robot, id=self._target_location)
+
+        source_searchArea = self._knowledge.get_inspect_areas(self._source_location.id)
+        source_navArea = self._knowledge.get_inspect_position(self._source_location.id)
+
+        target_placeArea = self._knowledge.get_inspect_areas(self._target_location.id)
+        target_navArea = self._knowledge.get_inspect_position(self._target_location.id)
+
+        source_searchAreaDes = VariableDesignator(source_searchArea)
+        source_navAreaDes = VariableDesignator(source_navArea)
+        target_placeAreaDes = VariableDesignator(target_placeArea)
+        target_navAreaDes = VariableDesignator(target_navArea)
+
+        self._clear_sm = ClearSmachState(robot = self._robot,
+                                         source_location = source_location_designator,
+                                         source_navArea = source_navAreaDes,
+                                         source_searchArea = source_searchAreaDes,
+                                         target_location = target_location_designator,
+                                         target_navArea = target_navAreaDes,
+                                         target_placeArea = target_placeAreaDes)
         self._config_result.succeeded = True
         return
 
     def _start(self):
 
-        # outcome = self._clear_sm.execute()
-        # if outcome == 'done':
-        #     self._execute_result.message = " I cleared the table! Wasn't that awesome? "
-        #     self._execute_result.succeeded = True
-        # elif outcome == 'aborted':
-        #     self._execute_result.message = " Something went wrong. Sorry! "
-        #     self._execute_result.succeeded = False
-
-        return
+         outcome = self._clear_sm.execute()
+         if outcome == 'done':
+             self._execute_result.message = " I cleared the table! Wasn't that awesome? "
+             self._execute_result.succeeded = True
+         elif outcome == 'failed':
+             self._execute_result.message = " Something went wrong. Sorry! "
+             self._execute_result.succeeded = False
+         return
 
 
     def _cancel(self):
