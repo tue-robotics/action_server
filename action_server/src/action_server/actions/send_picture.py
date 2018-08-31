@@ -1,6 +1,7 @@
 from action import Action, ConfigurationData
 import rospy
 import robot_smach_states as states
+from sensor_msgs.msg import Image
 
 from entity_description import resolve_entity_description
 
@@ -52,7 +53,11 @@ class SendPicture(Action):
             return
         # We can now assume we arrived at the place to take the picture from.
 
-        self.detect_face_state_machine = states.DetectFace(self._robot)
+        # self.detect_face_state_machine = states.DetectFace(self._robot)
+
+        entity_to_inspect = resolve_entity_description(config.semantics['target-location'])
+
+        self.look_at_sm = states.LookOnTopOfEntity(self._robot, entity_to_inspect)
 
         self._config_result.succeeded = True
         return
@@ -60,14 +65,18 @@ class SendPicture(Action):
     def _start(self):
         self._robot.speech.speak("I will take a picture and send it to my operator now. ")
 
-        result = self.detect_face_state_machine.execute(self._robot)
+        image_pub = rospy.Publisher("/hero/photo_to_telegram", Image, queue_size=1)
+        self.look_at_sm.run(self._robot)
 
-        if result == 'failed':
-            self._execute_result.message = " I didn't see anyone. "
-            self._execute_result.succeeded = False
-        else:
-            self._execute_result.message = " I found someone at the door. "
-            self._execute_result.succeeded = True
+        image_pub.publish(robot.perception.get_image())
+        robot.head.close()
+
+        # if result == 'failed':
+        #     self._execute_result.message = " I didn't see anyone. "
+        #     self._execute_result.succeeded = False
+        # else:
+        # self._execute_result.message = " I found someone at the door. "
+        self._execute_result.succeeded = True
 
     def _cancel(self):
         if self.detect_face_state_machine.is_running:
