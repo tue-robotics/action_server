@@ -150,14 +150,13 @@ class Place(Action):
         item_to_place = robot_smach_states.util.designators.Designator(arm_designator.resolve().occupied_by,
                                                                        resolve_type=Entity)
 
-        place_position = robot_smach_states.util.designators.EmptySpotDesignator(
-            self._robot,
-            robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id),
-            area="on_top_of"
-        )
+       # place_position = robot_smach_states.util.designators.EmptySpotDesignator(
+       #     self._robot,
+       #     robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id),
+       #     area="on_top_of"
+       # )
 
-        self._place = PlaceSmachState(self._robot, item_to_place, place_position,
-                                      arm_designator)
+        self._place = PlaceSmachState(self._robot, item_to_place, robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id), arm_designator, "on_top_of")
 
         state_machine_result = self._place.execute()
         if state_machine_result == 'done':
