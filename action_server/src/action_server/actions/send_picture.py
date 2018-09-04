@@ -68,7 +68,7 @@ class SendPicture(Action):
 
         image_pub = rospy.Publisher("/hero/image_from_ros", Image, queue_size=1)
         self.look_at_sm.run()
-
+        rospy.sleep(1)
         image_pub.publish(self._robot.perception.get_image())
         self._robot.head.close()
 
