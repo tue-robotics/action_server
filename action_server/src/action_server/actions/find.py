@@ -131,7 +131,7 @@ class Find(Action):
             self._found_entity_designator = VariableDesignator(resolve_type=Entity)
             self._find_state_machines = [
                 states.FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
-                                        True, self._found_entity_designator.writeable)]
+                                        False, self._found_entity_designator.writeable)]
             self._config_result.context['location'] = {
                 'designator': EdEntityDesignator(self._robot, id=self._semantics.source_location.id)
             }
@@ -220,7 +220,6 @@ class Find(Action):
                             self._execute_result.message = " I found a person at the {}. ".format(location)
                         else:
                             self._execute_result.message = " I found a person. "
-                    self._point_at_person(self._found_entity_designator.resolve())
                     self._navigation_state_machine.execute()
                     self._robot.speech.speak("Hi there!")
                 else:
