@@ -41,7 +41,7 @@ class Clear(Action):
         self._source_location = self.semantics.source_location
         self._target_location = self.semantics.target_location
 
-        self._robot.speech.speak("target is {}, source is {}".format(self._target_location.id, self._source_location.id))
+        # self._robot.speech.speak("target is {}, source is {}".format(self._target_location.id, self._source_location.id))
 
         source_location_designator = EdEntityDesignator(self._robot, id=self._source_location.id)
         target_location_designator = EdEntityDesignator(self._robot, id=self._target_location.id)
