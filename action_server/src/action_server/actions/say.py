@@ -63,7 +63,7 @@ class Say(Action):
             self._execute_result.message = " I told my team's name. "
         elif self._sentence == "COUNTRY":
             line = "My team is from the Netherlands, also known as Holland."
-            self._execute_result.message = " I told my team's name. "
+            self._execute_result.message = " I told my team's country. "
         elif self._sentence == "TEAM_AFFILIATION":
             line = "My team is affiliated with the University of Technology Eindhoven"
             self._execute_result.message = " I told my team's affiliation. "
@@ -87,12 +87,12 @@ class Say(Action):
             self._execute_result.message = " I told I'll never join the dark side. "
         elif self._sentence == 'JOKE':
             line = random.choice([
-                "What do you call a fish with no eyes? A fsh.",
+                "What do you call a fish with no eyes? An fsh.",
                 "You don't need a parachute to go skydiving. You need a parachute to go skydiving twice.",
                 "What is the difference between a snowman and a snowwoman?       Snowballs.",
-                "What is Bruce Lee's favorite drink? Wataaaaah!",
+                "What did one ocean say to the other?     Nothing, they just waved.",
                 "A blind man walks into a bar. And a table. And a chair.",
-                "It's color is yellow and when you push the button, it turns red?         A chick in the blender"
+                "What is yellow and when you push the button, it turns red?         A chick in the blender"
             ])
             self._execute_result.message = " I told a joke. "
         elif self._sentence == 'SOMETHING_ABOUT_SELF':
@@ -109,6 +109,14 @@ class Say(Action):
                     "Although that would be hard here. ",
                     "Sometimes I feel a little tense. But then I touch something metal and it helps me discharge and "
                     "relax."
+                ])
+            elif self._robot.robot_name == 'hero':
+                line = random.choice([
+                    "My software is like Frankesteins monster, a raggety combination of Toyota, Tech United "
+                    "and Stack Overflow.",
+                    "I can't subtly drive over my charging cable. That does not keep me from trying, though!.",
+                    "I have really funny ears, they allow me to hear whatever I want to hear!.",
+                    "I think I'm a lot fatter than I am, which makes me too scared to go into a lot of places."
                 ])
             self._execute_result.message = " I told something about myself. "
         else:
