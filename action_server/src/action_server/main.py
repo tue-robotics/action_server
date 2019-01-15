@@ -19,14 +19,14 @@ if __name__ == "__main__":
     rospy.loginfo("Parameters:")
     rospy.loginfo("robot_name = {}".format(robot_name))
 
-    if robot_name == 'amigo':
+    if robot_name.lower() == 'amigo':
         from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
+    elif robot_name.lower() == 'sergio':
         from robot_skills.sergio import Sergio as Robot
-    elif robot_name == 'hero':
+    elif robot_name.lower() == 'hero':
         from robot_skills.hero import Hero as Robot
     else:
-        rospy.logerr("'robot_name' must be 'amigo', 'sergio' or 'Hero'")
+        rospy.logerr("'robot_name' must be 'amigo', 'sergio' or 'hero'")
         sys.exit()
 
     robot = Robot()
