@@ -11,7 +11,7 @@ if __name__ == "__main__":
     rospy.init_node('action_server')
 
     try:
-        robot_name = rospy.get_param('~robot_name')
+        robot_name = rospy.get_param('~robot_name').lower()
     except KeyError:
         rospy.logerr("Please provide a 'robot_name'")
         exit(0)
@@ -19,11 +19,11 @@ if __name__ == "__main__":
     rospy.loginfo("Parameters:")
     rospy.loginfo("robot_name = {}".format(robot_name))
 
-    if robot_name.lower() == 'amigo':
+    if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
-    elif robot_name.lower() == 'sergio':
+    elif robot_name == 'sergio':
         from robot_skills.sergio import Sergio as Robot
-    elif robot_name.lower() == 'hero':
+    elif robot_name == 'hero':
         from robot_skills.hero import Hero as Robot
     else:
         rospy.logerr("'robot_name' must be 'amigo', 'sergio' or 'hero'")
