@@ -114,7 +114,7 @@ class Say(Action):
                 line = random.choice([
                     "My software is like Frankesteins monster, a raggety combination of Toyota, Tech United "
                     "and Stack Overflow.",
-                    "I can't subtly drive over my charging cable. That does not keep me from trying, though!.",
+                    "I can't subtly drive over my charging cable. That does not keep me from trying though.",
                     "I have really funny ears, they allow me to hear whatever I want to hear!.",
                     "I think I'm a lot fatter than I am, which makes me too scared to go into a lot of places."
                 ])
