@@ -139,14 +139,14 @@ class Find(Action):
                 self._config_result.context['location']['id'] = self._semantics.source_location.id
 
             self._found_entity_designator = EdEntityDesignator(self._robot, id=self._semantics.object.id)
-            self._config_result.context['object']['designator'] = self._found_entity_designator
+            self._config_result.context['object-designator'] = self._found_entity_designator
             self._config_result.succeeded = True
 
             # TODO: Robocup hack to make sure the robot moves to the found person
             self._navigation_state_machine = states.NavigateToWaypoint(
                 self._robot,
                 waypoint_designator=self._found_entity_designator,
-                radius=1.0,
+                radius=0.7,
                 look_at_designator=self._found_entity_designator
             )
             return
@@ -194,6 +194,8 @@ class Find(Action):
         self._config_result.context['object'] = {'designator': self._found_entity_designator,
                                                  'type': self._semantics.object.type,
                                                  'category': self._semantics.object.category}
+        self._config_result.context['object-designator'] = self._found_entity_designator
+        self._config_result.context['location-designator'] = location_designator
         self._config_result.context['location'] = {'designator': location_designator}
         if self._semantics.source_location.id:
             self._config_result.context['location']['id'] = self._semantics.source_location.id
