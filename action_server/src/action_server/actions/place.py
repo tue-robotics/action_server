@@ -156,7 +156,7 @@ class Place(Action):
        #     area="on_top_of"
        # )
 
-        self._place = PlaceSmachState(self._robot, item_to_place, robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id), arm_designator, "on_top_of")
+        self._place = PlaceSmachState(self._robot, item_to_place, robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id), arm_designator, place_volume="on_top_of")
 
         state_machine_result = self._place.execute()
         if state_machine_result == 'done':
