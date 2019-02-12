@@ -61,9 +61,6 @@ class Guide(Action):
         self._context = Guide._parse_context(config.context)
 
         person_designator = None
-        # if self._robot.ed.get_entity(id=self._semantics.object.id):
-            # person_designator = ds.EntityByIdDesignator(self._robot, id=self._semantics.object.id)
-        # elif self._context.object:
         if self._context.object:
             person_designator = self._context.object.designator
 
