@@ -8,11 +8,13 @@ import robot_smach_states.util.designators as ds
 
 
 class CountAndTell(Action):
-    ''' The CountAndTell class implements the action to count the number of objects and tell the operator.
+    """
+    The CountAndTell class implements the action to count the number of objects in a specific location and tell the
+        operator the amount of objects, the type and the location.
 
     Parameters to pass to the configure() method are:
-     - `sentence` (required): The sentence to speak. May be a keyword to tell something more intelligent.
-    '''
+     - `config` (required): the ConfigurationData defines the input data structure for configuration of an action.
+    """
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['speech']
