@@ -96,7 +96,7 @@ class TellNameOfPerson(Action):
                 if tries < 2:
                     self._robot.speech.speak("Sorry, I did not understand you, try again.")
                 else:
-                    self._robot.speech.speak("Sorry, I was unable to understand you again. I'll just name you Maple. ")
+                    self._robot.speech.speak("Sorry, I was unable to understand you again. I'll just name you Max. ")
                     self._execute_result.message = " I did not understand the answer. "
                 tries += 1
 
