@@ -9,7 +9,7 @@ from follow import Follow
 from guide import Guide
 from gripper_goal import GripperGoal
 from hand_over import HandOver
-from inspect import Inspect
+from inspect_action import Inspect
 from look_at import LookAt
 from navigate_to import NavigateTo
 from pick_up import PickUp
