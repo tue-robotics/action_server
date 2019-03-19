@@ -23,8 +23,10 @@ if __name__ == "__main__":
         from robot_skills.amigo import Amigo as Robot
     elif robot_name == 'sergio':
         from robot_skills.sergio import Sergio as Robot
+    elif robot_name == 'hero':
+        from robot_skills.hero import Hero as Robot
     else:
-        rospy.logerr("'robot_name' must be either 'amigo' or 'sergio'")
+        rospy.logerr("'robot_name' must be either 'amigo', 'hero, or 'sergio'")
         sys.exit()
 
     robot = Robot()
