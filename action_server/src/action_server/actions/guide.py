@@ -112,6 +112,8 @@ if __name__ == "__main__":
         from robot_skills.amigo import Amigo as Robot
     elif robot_name == 'sergio':
         from robot_skills.sergio import Sergio as Robot
+    elif robot_name == 'hero':
+        from robot_skills.hero import Hero as Robot
     else:
         from robot_skills.mockbot import Mockbot as Robot
 
@@ -120,7 +122,8 @@ if __name__ == "__main__":
     action = Guide()
 
     config = ConfigurationData({'action': 'guide',
-              'object': {'id': 'cabinet'}})
+              'object': {'id': 'cabinet'},
+              'target-location': {'id':'dinner_table'}})
 
     action.configure(robot, config)
     action.start()
