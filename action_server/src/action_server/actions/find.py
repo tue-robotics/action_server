@@ -129,10 +129,13 @@ class Find(Action):
             # person in room
             if not self._semantics.object.id:
                 self._semantics.object.id = 'someone'
+                discard_other_labels = False
+            else:
+                discard_other_labels = True
             self._found_entity_designator = VariableDesignator(resolve_type=Entity)
             self._find_state_machines = [
                 states.FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
-                                        True, self._found_entity_designator.writeable)]
+                                        discard_other_labels, self._found_entity_designator.writeable)]
             self._config_result.context['location'] = {
                 'designator': EdEntityDesignator(self._robot, id=self._semantics.source_location.id)
             }
