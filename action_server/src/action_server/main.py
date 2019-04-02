@@ -11,7 +11,7 @@ if __name__ == "__main__":
     rospy.init_node('action_server')
 
     try:
-        robot_name = rospy.get_param('~robot_name')
+        robot_name = rospy.get_param('~robot_name').lower()
     except KeyError:
         rospy.logerr("Please provide a 'robot_name'")
         exit(0)
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     elif robot_name == 'hero':
         from robot_skills.hero import Hero as Robot
     else:
-        rospy.logerr("'robot_name' must be either 'amigo', 'hero, or 'sergio'")
+        rospy.logerr("'robot_name' must be 'amigo', 'sergio' or 'hero'")
         sys.exit()
 
     robot = Robot()
