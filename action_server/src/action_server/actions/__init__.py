@@ -20,5 +20,4 @@ from send_picture import SendPicture
 from tell_name_of_person import TellNameOfPerson
 from turn_toward_sound import TurnTowardSound
 
-from open_door import OpenDoor
-from guide_final_challenge import GuideFinalChallenge
+# from open_door import OpenDoor
