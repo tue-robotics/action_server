@@ -13,7 +13,8 @@ class CountAndTell(Action):
         operator the amount of objects, the type and the location.
 
     Parameters to pass to the configure() method are:
-     - `config` (required): the ConfigurationData defines the input data structure for configuration of an action.
+     - `config` (required): the ConfigurationData defines the input data structure for configuration of an action i.e
+                            a JSON string with for this action a "location" and an " object".
     """
     def __init__(self):
         Action.__init__(self)
@@ -58,7 +59,7 @@ class CountAndTell(Action):
             self._execute_result.succeeded = False
             self._execute_result.message = "I failed to count the objects."
             return
-        
+
         self._execute_result.succeeded = True
 
         # This message is instantiated in _configure but leaves some stuff to be formatted
