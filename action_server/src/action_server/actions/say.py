@@ -13,7 +13,7 @@ class Say(Action):
     '''
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'sentence' : "I didn't get what you want me to say."}
+        self._required_field_prompts = {'sentence': "What would you like me to say?"}
         self._required_skills = ['speech']
 
     def _configure(self, robot, config):
@@ -53,39 +53,45 @@ class Say(Action):
         rospy.loginfo('Answering {}'.format(self._sentence))
 
         # TODO: This knowledge should be somehow returned by the robot object
-        if self._sentence == 'TIME':
+        if self._sentence == 'time':
             hours = datetime.now().hour
             minutes = datetime.now().minute
             line = "The time is {} {}".format(hours, minutes)
             self._execute_result.message = " I told the time. "
-        elif self._sentence == "TEAM_NAME":
+        elif self._sentence == "team_name":
             line = "My team's name is Tech United Eindhoven"
             self._execute_result.message = " I told my team's name. "
-        elif self._sentence == "COUNTRY":
+        elif self._sentence == "country":
             line = "My team is from the Netherlands, also known as Holland."
             self._execute_result.message = " I told my team's name. "
-        elif self._sentence == "TEAM_AFFILIATION":
+        elif self._sentence == "team_affiliation":
             line = "My team is affiliated with the University of Technology Eindhoven"
             self._execute_result.message = " I told my team's affiliation. "
-        elif self._sentence == "ROBOT_NAME":
+        elif self._sentence == "robot_name":
             line = 'My name is {}'.format(self._robot.robot_name)
             self._execute_result.message = " I told my name. "
-        elif self._sentence == 'TODAY':
+        elif self._sentence == 'today':
             line = datetime.today().strftime('Today is %A %B %d')
             self._execute_result.message = " I told what day it is. "
-        elif self._sentence == 'TOMORROW':
+        elif self._sentence == 'tomorrow':
             line = (datetime.today() + timedelta(days=1)).strftime('Tomorrow is %A %B %d')
             self._execute_result.message = " I told what day it is tomorrow. "
-        elif self._sentence == 'DAY_OF_MONTH':
+        elif self._sentence == 'day_of_month':
             line = datetime.now().strftime('It is day %d of the month')
             self._execute_result.message = " I told the day of the month. "
-        elif self._sentence == 'DAY_OF_WEEK':
+        elif self._sentence == 'day_of_week':
             line = datetime.today().strftime('Today is a %A')
             self._execute_result.message = " I told the day of the week. "
-        elif self._sentence == 'DARK_SIDE':
+        elif self._sentence == 'dark_side':
             line = " I'll never join you! "
             self._execute_result.message = " I told I'll never join the dark side. "
-        elif self._sentence == 'JOKE':
+        elif self._sentence == 'you_shall_not_pass':
+            line = " You shall not pass! "
+            self._execute_result.message = " I told them I won't let them pass. "
+        elif self._sentence == 'party':
+            line = "start the party"
+            self._execute_result.message = " I will get the party started. "
+        elif self._sentence == 'joke':
             line = random.choice([
                 "What do you call a fish with no eyes? A fsh.",
                 "You don't need a parachute to go skydiving. You need a parachute to go skydiving twice.",
@@ -95,7 +101,7 @@ class Say(Action):
                 "It's color is yellow and when you push the button, it turns red?         A chick in the blender"
             ])
             self._execute_result.message = " I told a joke. "
-        elif self._sentence == 'SOMETHING_ABOUT_SELF':
+        elif self._sentence == 'something_about_self':
             if self._robot.robot_name == 'amigo':
                 line = random.choice([
                     "I once dragged a person across the floor for meters.",

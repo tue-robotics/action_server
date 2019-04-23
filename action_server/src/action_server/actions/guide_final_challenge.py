@@ -1,14 +1,13 @@
-import rospy
-
 from action import Action, ConfigurationData
-
 import robot_smach_states as states
 import robot_smach_states.util.designators as ds
 from entity_description import resolve_entity_description
 
+import rospy
 
-class Guide(Action):
-    ''' The Guide class navigates to a target, telling someone to follow the robot and about arriving at the target.
+
+class GuideFinalChallenge(Action):
+    ''' The GuideFinalChallenge. class navigates to a target, telling someone to follow the robot and about arriving at the target.
 
     Parameters to pass to the configure() method are:
      - `object` (required): the id of the entity to navigate to
@@ -29,7 +28,7 @@ class Guide(Action):
 
     @staticmethod
     def _parse_semantics(semantics_dict):
-        semantics = Guide.Semantics()
+        semantics = GuideFinalChallenge.Semantics()
 
         semantics.object = resolve_entity_description(semantics_dict['object'])
 
@@ -41,40 +40,11 @@ class Guide(Action):
 
         return semantics
 
-    class Context:
-        def __init__(self):
-            self.object = None
-
-    @staticmethod
-    def _parse_context(context_dict):
-        context = Guide.Context()
-
-        if 'object' in context_dict:
-            context.object = resolve_entity_description(context_dict['object'])
-
-        return context
-
     def _configure(self, robot, config):
         self._robot = robot
 
         # We start by parsing semantics and context
-        self._semantics = Guide._parse_semantics(config.semantics)
-        self._context = Guide._parse_context(config.context)
-
-        person_designator = None
-        if self._context.object:
-            person_designator = self._context.object.designator
-
-        # Before we start guiding, we need to know we're at the person we should guide
-        # we check this by checking if we found a person earlier
-        if not person_designator:
-            self._config_result.required_context = {
-                'action': 'find',
-                'object': config.semantics['object']
-            }
-            if self._semantics.source_location:
-                self._config_result.required_context['source-location'] = config.semantics['source-location']
-            return
+        self._semantics = GuideFinalChallenge._parse_semantics(config.semantics)
 
         target_location_designator = ds.EntityByIdDesignator(self._robot, id=self._semantics.target_location.id)
 
@@ -82,7 +52,7 @@ class Guide(Action):
         if self._semantics.target_location.type == "room":
             area = "in"
 
-        self._guide_state_machine = states.NavigateToSymbolic(robot=self._robot,
+        self._state_machine = states.NavigateToSymbolic(robot=self._robot,
                                                               entity_designator_area_name_map={
                                                                   target_location_designator: area
                                                               },
@@ -93,37 +63,12 @@ class Guide(Action):
     def _start(self):
         self._robot.head.look_at_standing_person()
         self._robot.head.wait_for_motion_done()
-        self._robot.speech.speak("Follow me if you want to live")
+        self._robot.speech.speak("Follow me. I will guide you to the {}".format(self._semantics.target_location.id))
         self._robot.head.close()
-        self._guide_state_machine.execute()
+        self._state_machine.execute()
         self._execute_result.succeeded = True
-        self._execute_result.message = "I guided "
+        self._execute_result.message = " I guided! "
+        self._robot.speech.speak("Here you go!")
 
     def _cancel(self):
-        self._guide_state_machine.request_preempt()
-
-
-if __name__ == "__main__":
-    rospy.init_node('navigate_to_test')
-
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    elif robot_name == 'hero':
-        from robot_skills.hero import Hero as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
-
-    robot = Robot()
-
-    action = Guide()
-
-    config = ConfigurationData({'action': 'guide',
-              'object': {'id': 'cabinet'},
-              'target-location': {'id':'dinner_table'}})
-
-    action.configure(robot, config)
-    action.start()
+        self._state_machine.request_preempt()

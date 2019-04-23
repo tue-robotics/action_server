@@ -27,14 +27,14 @@ class SendPicture(Action):
 
     class Context:
         def __init__(self):
-            self.location_designator = None
+            self.location = None
 
     @staticmethod
     def _parse_context(context_dict):
         context = SendPicture.Context()
 
-        if 'location-designator' in context_dict:
-            context.location_designator = context_dict['location-designator']
+        if 'location' in context_dict:
+            context.location = resolve_entity_description(context_dict['location'])
 
         return context
 
@@ -44,7 +44,7 @@ class SendPicture(Action):
         self.semantics = self._parse_semantics(config.semantics)
         self.context = self._parse_context(config.context)
 
-        if self.context.location_designator is None:
+        if self.context.location is None:
             # Request navigation action
             self._config_result.required_context = {'action': 'navigate-to'}
             if self.semantics.target_location is not None:
@@ -58,8 +58,6 @@ class SendPicture(Action):
         return
 
     def _start(self):
-        self._robot.speech.speak("I will take a picture and send it to my operator now. ")
-
         result = self.detect_face_state_machine.execute(self._robot)
 
         if result == 'failed':
@@ -70,8 +68,7 @@ class SendPicture(Action):
             self._execute_result.succeeded = True
 
     def _cancel(self):
-        if self.detect_face_state_machine.is_running:
-            self.detect_face_state_machine.request_preempt()
+        return
 
 
 if __name__ == "__main__":
