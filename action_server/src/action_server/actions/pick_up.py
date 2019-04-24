@@ -93,9 +93,9 @@ class PickUp(Action):
         # Add the found object to the context that is passed to the next task
         self._config_result.context['object'] = config.context['object']
 
-        side = config.semantics['side'] if 'side' in config.semantics else 'right'
+        # side = config.semantics['side'] if 'side' in config.semantics else 'right'
 
-        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[side]).lockable()
+        arm_des = UnoccupiedArmDesignator(self._robot, {}).lockable()
         arm_des.lock()
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
@@ -128,6 +128,7 @@ class PickUp(Action):
         if self._fsm.is_running:
             self._fsm.request_preempt()
 
+
 if __name__ == "__main__":
     rospy.init_node('place_test')
 
@@ -137,6 +138,8 @@ if __name__ == "__main__":
         from robot_skills.amigo import Amigo as Robot
     elif robot_name == 'sergio':
         from robot_skills.sergio import Sergio as Robot
+    elif robot_name == 'hero':
+        from robot_skills.hero import Hero as Robot
     else:
         from robot_skills.mockbot import Mockbot as Robot
 
@@ -145,9 +148,9 @@ if __name__ == "__main__":
     action = PickUp()
 
     config = ConfigurationData({'action': 'pick_up',
-              'entity': {'id': 'cabinet'},
-              'side': 'left',
-              'height': 0.8})
+                                'entity': {'id': 'cabinet'},
+                                'side': 'left',
+                                'height': 0.8})
 
     action.configure(robot, config)
     action.start()
