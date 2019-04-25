@@ -124,7 +124,6 @@ class Place(Action):
         return
 
     def _start(self):
-        print("place start")
         # We either got an arm, or we know which arm to place with
         arm_designator = None
         if self.semantics.arm:
