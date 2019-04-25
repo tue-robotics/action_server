@@ -1,11 +1,11 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-from robot_skills.arms import Arm
+from robot_skills.arms import PublicArm
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
-from robot_smach_states.util.designators import ArmDesignator, EdEntityDesignator
+from robot_smach_states.util.designators import ArmDesignator
 
 import rospy
 
@@ -85,14 +85,10 @@ class Place(Action):
 
         object_in_gripper = False
         if not got_object_in_task:
-            object_to_arm_dict = {arm.occupied_by.type: arm for arm_name, arm in self._robot.arms.iteritems() if
-                                  arm.occupied_by and arm.occupied_by.is_a(self.semantics.object.type)}
-
-            if bool(object_to_arm_dict):
+            arm_des = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type]})
+            if arm_des.resolve() is not None:
                 object_in_gripper = True
-                arm = object_to_arm_dict[self.semantics.object.type]
-                self.context.arm_designator = \
-                    ArmDesignator({arm.side: arm})
+                self.context.arm_designator = arm_des
 
         got_object = got_object_in_task or object_in_gripper
 
@@ -131,17 +127,14 @@ class Place(Action):
         # We either got an arm, or we know which arm to place with
         arm_designator = None
         if self.semantics.arm:
-            arm_designator = robot_smach_states.util.designators.Designator(self.semantics.arm, resolve_type=Arm)
+            arm_designator = robot_smach_states.util.designators.Designator(self.semantics.arm, resolve_type=PublicArm)
         elif self.context.arm_designator:
             arm_designator = self.context.arm_designator
         else:
-            arms = [arm for arm_name, arm in self._robot.arms.iteritems() if
-                    arm.occupied_by == self.semantics.object.type]
-            if arms:
-                arm_designator = robot_smach_states.util.designators.Designator(arms[0], resolve_type=Arm)
+            arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type]})
 
         if not arm_designator:
-            self._execute_result.message = " I was unable to resolve which arm to place with. "
+            self._execute_result.message = " I was unable to resolve which arm to place with."
             self._execute_result.succeeded = False
             return
 
