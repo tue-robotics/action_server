@@ -139,5 +139,8 @@ class TaskManager(object):
     def request_preempt(self):
         self._action_sequence = []
         if self._active_action:
-            self._active_action.cancel()
+            try:
+                self._active_action.cancel()
+            except Exception as e:
+                rospy.logerr("Cancelling action failed:\n{}".format(e))
         self.clear()
