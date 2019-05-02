@@ -116,6 +116,12 @@ class Say(Action):
                     "Sometimes I feel a little tense. But then I touch something metal and it helps me discharge and "
                     "relax."
                 ])
+            elif self._robot.robot_name == 'hero':
+                line = random.choice([
+                    "I am very proud of my older brother Amigo. He has been competing in Robocup for a long time.",
+                    "Sometimes I feel a little tense. But then I touch something metal and it helps me discharge and "
+                    "relax."
+                ])
             self._execute_result.message = " I told something about myself. "
         else:
             line = self._sentence
