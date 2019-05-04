@@ -69,13 +69,20 @@ class HandOver(Action):
         got_object = (
             self.context.arm_designator is not None and (self.context.object.type == self.semantics.object.type or
                                                          self.semantics.object.type == 'reference'))
-
         # If precondition not met, request prior action from the task manager
+
         if not got_object:
             # Request pick_up action
             self._config_result.required_context = {'action': 'pick-up'}
+            # If necessary request an object from the given category
+            #ToDo this needs the grammar to make a difference between CATEGORY and NAMED_OBJECT
+            if 'category' in config.semantics and 'category' in config.semantics['category']:
+                self._config_result.required_context['object'] = config.semantics['object']
+                return
+
             if 'object' in config.semantics and 'type' in config.semantics['object']:
                 if config.semantics['object']['type'] != 'reference':
+                    rospy.logerr("test")
                     self._config_result.required_context['object'] = config.semantics['object']
                 elif 'object' in config.context and 'type' in config.context['object']:
                     self._config_result.required_context['object'] = {'type': config.context['object']['type']}
@@ -84,6 +91,7 @@ class HandOver(Action):
             if 'location' in config.context and 'id' in config.context['location']:
                 self._config_result.required_context['source-location'] = config.context['location']['id']
             return
+
         # Now we can assume we picked up the item!
 
         # We should have navigated to the place where we should hand over
