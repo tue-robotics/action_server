@@ -8,10 +8,12 @@ class EntityDescription(object):
         self.category = category
 
     def __repr__(self):
-        return "EntityDescription(id={id},type={type},location={location},area={area})".format(id=self.id,
-                                                                                               type=self.type,
-                                                                                               location=self.location,
-                                                                                               area=self.area)
+        return "EntityDescription(id={id},type={type},location={location},area={area}, category={category})".format(
+                    id=self.id,
+                    type=self.type,
+                    location=self.location,
+                    area=self.area,
+                    category=self.category)
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
