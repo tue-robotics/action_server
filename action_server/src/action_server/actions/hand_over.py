@@ -85,7 +85,7 @@ class HandOver(Action):
                 self._config_result.required_context['source-location'] = config.context['location']['id']
 
             # If necessary request an object from the given category
-            #ToDo this needs the grammar to make a difference between CATEGORY and NAMED_OBJECT
+            # ToDo this needs the grammar to make a difference between CATEGORY and NAMED_OBJECT
             if 'category' in config.semantics and 'category' in config.semantics['category']:
                 del config.semantics['category']
                 self._config_result.required_context['object'] = config.semantics['object']
