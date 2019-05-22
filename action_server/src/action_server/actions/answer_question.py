@@ -50,6 +50,7 @@ class AnswerQuestion(Action):
     def _configure(self, robot, config):
         self._robot = robot
 
+        # ToDo: remove this dependency!
         self._speech_data = load_knowledge('challenge_spr')
         if not self._speech_data:
             rospy.logerr("Failed to load speech data for 'AnswerQuestion' action")

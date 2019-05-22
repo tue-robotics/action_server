@@ -69,7 +69,6 @@ class HandOver(Action):
         got_object = (
             self.context.arm_designator is not None and (self.context.object.type == self.semantics.object.type or
                                                          self.semantics.object.type == 'reference'))
-
         # If precondition not met, request prior action from the task manager
         if not got_object:
             # Request pick_up action
@@ -79,13 +78,20 @@ class HandOver(Action):
                     self._config_result.required_context['object'] = config.semantics['object']
                 elif 'object' in config.context and 'type' in config.context['object']:
                     self._config_result.required_context['object'] = {'type': config.context['object']['type']}
+
             if 'source-location' in config.semantics:
                 self._config_result.required_context['source-location'] = config.semantics['source-location']
             if 'location' in config.context and 'id' in config.context['location']:
                 self._config_result.required_context['source-location'] = config.context['location']['id']
-            return
-        # Now we can assume we picked up the item!
 
+            # If necessary request an object from the given category
+            # ToDo this needs the grammar to make a difference between CATEGORY and NAMED_OBJECT
+            if 'category' in config.semantics:
+                del config.semantics['category']
+                self._config_result.required_context['object'] = config.semantics['object']
+            return
+
+        # Now we can assume we picked up the item!
         # We should have navigated to the place where we should hand over
         at_destination = (self.context.location is not None and
                           (self.context.location == self.semantics.target_location or
