@@ -1,16 +1,19 @@
-from action import Action, ConfigurationData
-from robot_smach_states import SSLLookatAndRotate
 import threading
-
 import rospy
+from robot_smach_states import SSLLookatAndRotate
+from action import Action, ConfigurationData
 
 
 class TurnTowardSound(Action):
-    """
-    The TurnTowardSound class implements the action to turn towards the sound source provided by SSL
-    """
     def __init__(self):
-        Action.__init__(self)
+        """
+        The TurnTowardSound class implements the action to turn towards the sound source provided by SSL
+        """
+        super(TurnTowardSound, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=[],  # ToDo: add SSL
+        )
         self._canceled = False
 
     def listen_and_rotate(self):

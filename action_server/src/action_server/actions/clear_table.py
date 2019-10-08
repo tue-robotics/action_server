@@ -1,9 +1,15 @@
-from action import Action, ConfigurationData
+from action import Action
+# ToDo: move dishwasher stuff or remove action?
 from challenge_dishwasher.dishwasher import NavigateAndPlaceDishwasher, GrabRobust, NavigateAndOpenDishwasher
+
 
 class ClearTable(Action):
     def __init__(self):
-        Action.__init__(self)
+        super(ClearTable, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=[],
+        )
 
     def _configure(self, robot, config):
         self._state_machines = [GrabRobust(robot), NavigateAndOpenDishwasher(robot), NavigateAndPlaceDishwasher(robot)]

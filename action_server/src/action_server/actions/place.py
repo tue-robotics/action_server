@@ -1,28 +1,29 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
-
-from robot_skills.arms import PublicArm
+import rospy
 import robot_smach_states
+from robot_skills.arms import PublicArm
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
 from robot_smach_states.util.designators import ArmDesignator
-
-import rospy
+from action import Action, ConfigurationData
+from entity_description import resolve_entity_description
 
 
 class Place(Action):
-    ''' The Place class implements the action to place something on an object.
-
-    Parameters to pass to the configure() method are:
-     - `entity` (required): Entity to place the object on;
-     - `arm-designator` (required): Designator resolving to the arm to place with
-    '''
     def __init__(self):
-        Action.__init__(self)
+        """
+        The Place class implements the action to place something on an object.
 
-        self._required_field_prompts = {'target-location': " Where should I leave the object? "}
-
-        self._required_skills = ['arms']
+        Parameters to pass to the configure() method are:
+         - `entity` (required): Entity to place the object on;
+         - `arm-designator` (required): Designator resolving to the arm to place with
+        """
+        required_field_prompts = {'target-location': " Where should I leave the object? "}
+        required_skills = ['arms']
+        super(Place, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     class Semantics:
         def __init__(self):

@@ -44,6 +44,7 @@ class ConfigurationResult(object):
                                                   self.missing_field, self.missing_skill, self.message)
 
 
+# Check Issue 23 for Alberts grammar checking: https://github.com/tue-robotics/action_server/issues/23
 class ActionResult(object):
     """
     The ActionResult class defines the data structure that is returned by the run() methods of actions.
@@ -57,16 +58,28 @@ class ActionResult(object):
 
 
 class Action(object):
-    """
-    The Action class defines the interface of actions that can be configured and started by the task_manager.
-    """
-    def __init__(self):
+    def __init__(self, required_field_prompts, required_passed_knowledge, required_skills):
+        # type: (dict, dict, list) -> None
+        """
+        The Action class defines the interface of actions that can be configured and started by the task_manager.
+
+        :param required_field_prompts: maps required fields in the semantics to corresponding error messages that will
+        be fed back to the user. E.g., in case of the 'Say' action, this might be {"sentence": "What would you like me
+        to say?"}. N.B.: no defaults are defined to force inheriting classes to specify this.
+        :param required_passed_knowledge:
+        :param required_skills:
+        """
+        # Action dependent requirements
+        self._required_field_prompts = required_field_prompts
+        self._required_passed_knowledge = required_passed_knowledge
+        self._required_skills = required_skills
+
+        # Static knowledge
+        self._knowledge = load_knowledge('common')
+
+        # State
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
-        self._required_field_prompts = {}
-        self._required_passed_knowledge = {}
-        self._required_skills = []
-        self._knowledge = load_knowledge('common')
 
     def _check_parameters(self, config):
         for k, v in self._required_field_prompts.items():

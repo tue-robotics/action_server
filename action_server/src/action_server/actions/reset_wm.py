@@ -1,13 +1,18 @@
+import rospy
 from action import Action, ConfigurationData
 
-import rospy
 
 class ResetWM(Action):
-    ''' The ResetWM class implements the action reset the robot's world model.
-    '''
     def __init__(self):
-        Action.__init__(self)
-        self._required_skills = ['ed']
+        """
+        The ResetWM class implements the action reset the robot"s world model.
+        """
+        required_skills = ['ed']
+        super(ResetWM, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     def _configure(self, robot, config):
         self._robot = robot

@@ -1,18 +1,21 @@
-from action import Action, ConfigurationData
 import rospy
 import robot_smach_states as states
-
+from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
 
 class SendPicture(Action):
-    """ The Inspect class implements the action to send a picture over a whatsapp client.
-
-    Parameters to pass to the configure() method are:
-     - `target-location` (required): an entity with a segmentation area to inspect
-    """
     def __init__(self):
-        Action.__init__(self)
+        """ The Inspect class implements the action to send a picture over a whatsapp client.
+
+        Parameters to pass to the configure() method are:
+         - `target-location` (required): an entity with a segmentation area to inspect
+        """
+        super(SendPicture, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=[],
+        )
 
     class Semantics:
         def __init__(self):

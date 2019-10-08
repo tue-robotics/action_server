@@ -1,22 +1,25 @@
+import threading
+import rospy
+import robot_skills.util.kdl_conversions as kdl
 from action import Action, ConfigurationData
 from util import entities_from_description
 
-import robot_skills.util.kdl_conversions as kdl
-
-import threading
-import rospy
-
 
 class LookAt(Action):
-    ''' The LookAt class implements the action to look at a world model entity.
-
-    Parameters to pass to the configure() method are:
-     - `entity` (optional): the entity id to look at.
-    '''
     def __init__(self):
-        Action.__init__(self)
-        self._required_field_prompts = {'entity': " What would you like me to look at? "}
-        self._required_skills = ['head']
+        """
+        The LookAt class implements the action to look at a world model entity.
+
+        Parameters to pass to the configure() method are:
+         - `entity` (optional): the entity id to look at.
+        """
+        required_field_prompts = {'entity': " What would you like me to look at? "}
+        required_skills = ['head']
+        super(LookAt, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     def _configure(self, robot, config):
         self._robot = robot

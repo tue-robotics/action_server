@@ -1,16 +1,20 @@
-from action import Action, ConfigurationData
-
 import rospy
+from action import Action, ConfigurationData
+# ToDo: move state or remove this action
 from challenge_presentation import PresentationMachine, PresentationMachineHero
 
 
 class DemoPresentation(Action):
-    """ The DemoPresentation class wraps the demo presentation state machine..
-
-    """
     def __init__(self):
-        Action.__init__(self)
-        # self._required_skills = ['speech', 'hmi']
+        """
+        The DemoPresentation class wraps the demo presentation state machine..
+        """
+        required_skills = ['speech', 'hmi']
+        super(DemoPresentation, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     def _configure(self, robot, config):
         self._robot = robot

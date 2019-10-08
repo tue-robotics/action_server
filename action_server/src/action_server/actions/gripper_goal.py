@@ -1,21 +1,24 @@
-from action import Action, ConfigurationData
-
 import rospy
 import threading
+from action import Action, ConfigurationData
 
 
 class GripperGoal(Action):
-    """ The GripperGoal class implements the action to open or close the gripper.
-
-    Parameters to pass to the configure() method are:
-     - `side` (required): the gripper's side (left or right)
-     - `goal` (required): the goal (open or close).
-    """
     def __init__(self):
-        Action.__init__(self)
-        self._required_field_prompts = {'side' : " Which gripper should I move? ",
+        """ The GripperGoal class implements the action to open or close the gripper.
+
+        Parameters to pass to the configure() method are:
+         - `side` (required): the gripper's side (left or right)
+         - `goal` (required): the goal (open or close).
+        """
+        required_field_prompts = {'side' : " Which gripper should I move? ",
                                         'goal' : " Should I open my gripper, or close it? "}
-        self._required_skills = ['arms']
+        required_skills = ['arms']
+        super(GripperGoal, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     def _configure(self, robot, config):
         side = config.semantics['side']

@@ -1,23 +1,26 @@
 import rospy
-
-from action import Action, ConfigurationData
-
 import robot_smach_states as states
 import robot_smach_states.util.designators as ds
+from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
 
 class Guide(Action):
-    ''' The Guide class navigates to a target, telling someone to follow the robot and about arriving at the target.
+    """
+    The Guide class navigates to a target, telling someone to follow the robot and about arriving at the target.
 
     Parameters to pass to the configure() method are:
      - `object` (required): the id of the entity to navigate to
-    '''
+    """
     def __init__(self):
-        Action.__init__(self)
-        self._required_field_prompts = {'object': " Who would you like me to guide? ",
-                                        'target-location': " Where would you like me to guide them to? "}
-        self._required_skills = ['head', 'base', 'rightArm', 'speech']
+        required_field_prompts = {"object": " Who would you like me to guide? ",
+                                  "target-location": " Where would you like me to guide them to? "}
+        required_skills = ["head", "base", "rightArm", "speech"]
+        super(Guide, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
         self._follower_id = None
         self._target_id = None
 

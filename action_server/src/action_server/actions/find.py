@@ -13,17 +13,21 @@ import robot_skills.util.kdl_conversions as kdl
 
 
 class Find(Action):
-    """ The Find class implements the action to find an object or person at a specified location.
-
-    Parameters to pass to the configure() method are:
-     - `location` (required): location to find the object (room or pre-existing world model entity)
-     - `object` (required): the object to find.
-    """
     def __init__(self):
-        Action.__init__(self)
+        """ The Find class implements the action to find an object or person at a specified location.
+
+        Parameters to pass to the configure() method are:
+         - `location` (required): location to find the object (room or pre-existing world model entity)
+         - `object` (required): the object to find.
+        """
         # TODO: change this to a python dictionary schema
-        self._required_field_prompts = {'object': " What exactly would you like me to find? "}
-        self._required_skills = ['head', 'base', 'rightArm', 'speech']
+        required_field_prompts = {'object': " What exactly would you like me to find? "}
+        required_skills = ['head', 'base', 'rightArm', 'speech']
+        super(Find, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     def _point_at_person(self, person):
         pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',

@@ -1,23 +1,24 @@
-from action import Action, ConfigurationData
-
-from util import entities_from_description
-
-import robot_smach_states
 import threading
-
 import rospy
+import robot_smach_states
+from action import Action, ConfigurationData
+from util import entities_from_description
 
 
 class Inspect(Action):
-    """ The Inspect class implements the action to inspect an area.
-
-    Parameters to pass to the configure() method are:
-     - `entity` (required): an entity with a segmentation area to inspect
-    """
     def __init__(self):
-        Action.__init__(self)
-        self._required_field_prompts = {'entity': " What would you like me to inspect? "}
-        self._required_skills = ['head', 'ed', 'base']
+        """ The Inspect class implements the action to inspect an area.
+
+        Parameters to pass to the configure() method are:
+         - `entity` (required): an entity with a segmentation area to inspect
+        """
+        required_field_prompts = {'entity': " What would you like me to inspect? "}
+        required_skills = ['head', 'ed', 'base']
+        super(Inspect, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     def _configure(self, robot, config):
         self._robot = robot

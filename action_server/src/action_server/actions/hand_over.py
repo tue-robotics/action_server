@@ -1,21 +1,24 @@
+import rospy
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-import rospy
-
 
 class HandOver(Action):
-    """
-    The HandOver class implements the action to hand over an object to a person.
-
-    Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
-    an object to bring (required).
-    """
     def __init__(self):
-        Action.__init__(self)
-        self._required_field_prompts = {'target-location': " Who would you like me to hand the object? ",
-                                        'object': " What would you like me to hand over? "}
-        self._required_skills = ['base']
+        """
+        The HandOver class implements the action to hand over an object to a person.
+
+        Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
+        an object to bring (required).
+        """
+        required_field_prompts = {"target-location": " Who would you like me to hand the object? ",
+                                  "object": " What would you like me to hand over? "}
+        required_skills = ["base"]
+        super(HandOver, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     class Semantics:
         def __init__(self):

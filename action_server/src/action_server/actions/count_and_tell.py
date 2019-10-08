@@ -1,24 +1,27 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
-
 import rospy
 import robot_smach_states as states
 import robot_smach_states.util.designators as ds
 
+from action import Action, ConfigurationData
+from entity_description import resolve_entity_description
 
 
 class CountAndTell(Action):
-    """
-    The CountAndTell class implements the action to count the number of objects in a specific location and tell the
-        operator the amount of objects, the type and the location.
-
-    Parameters to pass to the configure() method are:
-     - `config` (required): the ConfigurationData defines the input data structure for configuration of an action i.e
-                            a JSON string with for this action a "location" and an " object".
-    """
     def __init__(self):
-        Action.__init__(self)
-        self._required_skills = ['speech']
+        """
+        The CountAndTell class implements the action to count the number of objects in a specific location and tell the
+            operator the amount of objects, the type and the location.
+
+        Parameters to pass to the configure() method are:
+         - `config` (required): the ConfigurationData defines the input data structure for configuration of an action
+           i.e. a JSON string with for this action a "location" and an " object".
+        """
+        required_skills = ['speech']
+        super(CountAndTell, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     class Semantics:
         def __init__(self):

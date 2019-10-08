@@ -1,30 +1,33 @@
-from action import Action, ConfigurationData
-from find import Find
-from entity_description import resolve_entity_description
-
 import rospy
-from robocup_knowledge import load_knowledge
 import hmi
+from robocup_knowledge import load_knowledge
+from action import Action
+from entity_description import resolve_entity_description
 
 
 class TellNameOfPerson(Action):
-    """ The TellNameOfPerson class implements the action to ask someones name and report it to the operator.
-
-    Parameters to pass to the configure() method are:
-     - `sentence` (required): The sentence to speak. May be a keyword to tell something more intelligent.
-    """
-
     def __init__(self):
-        Action.__init__(self)
-        self._required_skills = ['speech', 'hmi']
-        self._preempt_requested = False
+        """
+        The TellNameOfPerson class implements the action to ask someones name and report it to the operator.
 
+        Parameters to pass to the configure() method are:
+         - `sentence` (required): The sentence to speak. May be a keyword to tell something more intelligent.
+        """
+        required_skills = ['speech', 'hmi']
+        super(TellNameOfPerson, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
+
+        # Grammar stuff
         common_knowledge = load_knowledge('common')
-
         self._grammar = ""
-
         for name in common_knowledge.names:
             self._grammar += "\nNAME['%s'] -> %s" % (name, name)
+
+        # State variable indicating if a preempt is requested
+        self._preempt_requested = False
 
     class Semantics:
         def __init__(self):

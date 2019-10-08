@@ -1,22 +1,25 @@
+import rospy
+from robot_smach_states.navigation import NavigateToWaypoint, NavigateToSymbolic
+from robot_smach_states.util.designators import EdEntityDesignator, EntityByIdDesignator
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-import rospy
-
-from robot_smach_states.navigation import NavigateToWaypoint, NavigateToSymbolic
-from robot_smach_states.util.designators import EdEntityDesignator, EntityByIdDesignator
-
 
 class NavigateTo(Action):
-    ''' The NavigateTo class implements the action to navigate to a world model entity.
-
-    Parameters to pass to the configure() method are:
-     - `object` (required): the id of the entity to navigate to
-    '''
     def __init__(self):
-        Action.__init__(self)
-        self._required_parameters = {'target-location': ' Where would you like me to go? '}
-        self._required_skills = ['base']
+        """
+        The NavigateTo class implements the action to navigate to a world model entity.
+
+        Parameters to pass to the configure() method are:
+         - `object` (required): the id of the entity to navigate to
+        """
+        required_field_prompts = {'target-location': ' Where would you like me to go? '}
+        required_skills = ['base']
+        super(NavigateTo, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     class Semantics:
         def __init__(self):

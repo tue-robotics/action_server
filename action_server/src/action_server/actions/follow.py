@@ -30,16 +30,21 @@ def navigate(robot, entity_description):
 
 
 class Follow(Action):
-    ''' The Follow class implements the action to follow a person.
-
-    Parameters to pass to the configure() method are:
-     - `target` (required): the target id to assign to the id that is followed
-     - `location-from` (optional): the location to find the target to follow
-    '''
     def __init__(self):
-        Action.__init__(self)
-        self._required_field_prompts = {'target': " Who would you like me to follow? "}
-        self._required_skills = ['base']
+        """
+        The Follow class implements the action to follow a person.
+
+        Parameters to pass to the configure() method are:
+         - `target` (required): the target id to assign to the id that is followed
+         - `location-from` (optional): the location to find the target to follow
+        """
+        required_field_prompts = {'target': " Who would you like me to follow? "}
+        required_skills = ['base']
+        super(Follow, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     class Semantics:
         def __init__(self):

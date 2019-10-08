@@ -9,16 +9,21 @@ import hmi
 
 
 class AnswerQuestion(Action):
-    """ The AnswerQuestion class implements the action of answering a question
-
-    It requires that the robot to perform this action has a speech and an ears skill. It will ask the user what
-    the question is, try to answer it based on the grammar defined in the knowledge defined for the speech and
-    person recognition challenge and answer it based on the same knowledge.
-
-    """
     def __init__(self):
-        Action.__init__(self)
-        self._required_skills = ['speech', 'hmi']
+        """
+        The AnswerQuestion class implements the action of answering a question
+
+        It requires that the robot to perform this action has a speech and an ears skill. It will ask the user what
+        the question is, try to answer it based on the grammar defined in the knowledge defined for the speech and
+        person recognition challenge and answer it based on the same knowledge.
+
+        """
+        required_skills = ['speech', 'hmi']
+        super(AnswerQuestion, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
         self._preempt_requested = False
 
     class Semantics:

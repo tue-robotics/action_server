@@ -1,22 +1,25 @@
-from action import Action, ConfigurationData
-
 import threading
 import rospy
+from action import Action, ConfigurationData
 
 
 class ArmGoal(Action):
-    """
-    The ArmGoal class implements the action of moving the arm to a predefined joint position.
-
-    Parameters to pass to the configure method are 'side' (optional) and 'symbolic' (required). The 'symbolic'
-     parameter must be a string as defined in Arm.default_joint_configurations.
-    """
 
     def __init__(self):
-        Action.__init__(self)
-        self._required_field_prompts = {'side' : " Which arm should I move? ",
-                                        'symbolic' : " What should I do with my arm? "}
-        self._required_skills = ['arms']
+        """
+        The ArmGoal class implements the action of moving the arm to a predefined joint position.
+
+        Parameters to pass to the configure method are 'side' (optional) and 'symbolic' (required). The 'symbolic'
+         parameter must be a string as defined in Arm.default_joint_configurations.
+        """
+        required_field_prompts = {"side": " Which arm should I move? ",
+                                  "symbolic": " What should I do with my arm? "}
+        required_skills = ["arms"]
+        super(ArmGoal, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     def _configure(self, robot, config):
         if config.semantics['side'] == 'left':

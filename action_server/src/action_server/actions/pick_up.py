@@ -1,26 +1,28 @@
-from action import Action, ConfigurationData
-
-from util import entities_from_description
-from entity_description import resolve_entity_description
-
-import robot_smach_states
-
-from robot_smach_states.util.designators import UnoccupiedArmDesignator, EdEntityDesignator
 import rospy
+import robot_smach_states
+from robot_smach_states.util.designators import UnoccupiedArmDesignator, EdEntityDesignator
+from action import Action, ConfigurationData
+from entity_description import resolve_entity_description
 
 
 class PickUp(Action):
-    ''' The PickUp class implements the action to grasp an object.
-
-    Parameters to pass to the configure() method are:
-     - `object` (required): the id of the object to grab
-     - `object-designator` (required): a designator resolving to the object to grab
-    '''
     def __init__(self):
-        Action.__init__(self)
-        self._required_skills = ['arms']
-        self._required_field_prompts = {'object': " What would you like me to pick up? ",
-                                        'source-location': " Where would you like me to pick that up? "}  # TODO: handle source location from context?
+        """
+        The PickUp class implements the action to grasp an object.
+
+        Parameters to pass to the configure() method are:
+         - `object` (required): the id of the object to grab
+         - `object-designator` (required): a designator resolving to the object to grab
+        """
+        required_skills = ["arms"]
+        required_field_prompts = {"object": " What would you like me to pick up? ",
+                                  "source-location": " Where would you like me to pick that up? "}
+        # TODO: handle source location from context?
+        super(PickUp, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge={},
+            required_skills=required_skills,
+        )
 
     class Semantics:
         def __init__(self):

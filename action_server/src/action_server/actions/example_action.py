@@ -5,23 +5,21 @@ from robot_smach_states.util.designators import VariableDesignator
 
 
 class ExampleAction(Action):
-    """
-    The ExampleAction class explains how Actions, as handled by the TaskManager, work.
-
-    As by example, it takes passed context of a color passed by a previous Action, passes an Entity to the next
-    Action and uses a dict mapping from object types to colors from the common knowledge. A practical use would be the
-    following:
-
-    Task: "Ask for a color, select an item of that color and grab it." (Completely made up task BTW)
-
-    This Action would perform the middle part of the task: "select an item of that color". It takes the color from the
-    Action asking for a color, and passes the selected item (Entity) to the Action for grabbing an entity. Typically,
-    one would wrap higher level behavior in an Action than this, but this is just for illustration purposes.
-
-    """
     def __init__(self):
-        # Call the base class constructor
-        Action.__init__(self)
+        """
+        The ExampleAction class explains how Actions, as handled by the TaskManager, work.
+
+        As by example, it takes passed context of a color passed by a previous Action, passes an Entity to the next
+        Action and uses a dict mapping from object types to colors from the common knowledge. A practical use would be the
+        following:
+
+        Task: "Ask for a color, select an item of that color and grab it." (Completely made up task BTW)
+
+        This Action would perform the middle part of the task: "select an item of that color". It takes the color from the
+        Action asking for a color, and passes the selected item (Entity) to the Action for grabbing an entity. Typically,
+        one would wrap higher level behavior in an Action than this, but this is just for illustration purposes.
+
+        """
         """
         The base class constructor initializes the following fields:
          - self._config_result = ConfigurationResult()
@@ -38,13 +36,13 @@ class ExampleAction(Action):
         You can set the required robot skills here. During the configure step, the given robot object is checked for
         their availability.
         """
-        self._required_skills = ['ed']
+        required_skills = ['ed']
 
         """
         Similarly, you can set the required keys in the context. Their availability is also checked in the configure
         step.
         """
-        self._required_passed_knowledge = ['color']
+        required_passed_knowledge = {'color': 'Which color do you mean?'}
 
         """
         Similarly, you can set the required keys in the semantics. Their availability is also checked in the configure
@@ -57,7 +55,13 @@ class ExampleAction(Action):
 
         Actually, we don't require any fields in the configuration in this case, but this would be the way to do that.
         """
-        # self._required_field_prompts = {'object': " What object would you like me to work with? "}
+        # required_field_prompts = {'object': " What object would you like me to work with? "}
+        required_field_prompts = {}
+        super(ExampleAction, self).__init__(
+            required_field_prompts=required_field_prompts,
+            required_passed_knowledge=required_passed_knowledge,
+            required_skills=required_skills,
+        )
 
     def _configure(self, robot, config):
         """

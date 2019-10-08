@@ -1,16 +1,18 @@
-from action import Action, ConfigurationData
+from action import Action
 from challenge_storing_groceries.open_door import OpenDoorMachine
 
 
 class OpenDoor(Action):
-    """
-    The Open Door action wraps the state machine to open the door of the cupboard at RWC 2018.
-
-    """
     def __init__(self):
-        # Call the base class constructor
-        Action.__init__(self)
-        # self._required_field_prompts = {'object': " What object would you like me to work with? "}
+        """
+        The Open Door action wraps the state machine to open the door of the cupboard at RWC 2018.
+
+        """
+        super(OpenDoor, self).__init__(
+            required_field_prompts={},
+            required_passed_knowledge={},
+            required_skills=[],
+        )
 
     def _configure(self, robot, config):
         self._state_machine = OpenDoorMachine(robot, "cupboard", "in_front_of", "shelf6")
