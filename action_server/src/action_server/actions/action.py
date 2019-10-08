@@ -1,5 +1,5 @@
 import rospy
-
+from voluptuous import Schema, Required
 from robot_skills.robot import Robot
 from robocup_knowledge import load_knowledge
 
@@ -82,6 +82,12 @@ class Action(object):
         self._execute_result = ActionResult()
 
     def _check_parameters(self, config):
+
+        schema_params = {Required(k): str for k in self._required_field_prompts.iterkeys()}
+        schema_params["action"] = str
+        schema = Schema(schema_params)
+        schema(config.semantics)
+
         for k, v in self._required_field_prompts.items():
             if k not in config.semantics:
                 rospy.logerr("Missing required parameter {}".format(k))
@@ -95,6 +101,17 @@ class Action(object):
                 self._config_result.missing_field = k
                 self._config_result.message = v
                 return False
+
+        # Check for superfluous parameters
+        for k, v in config.semantics.iteritems():
+            if k == "action":
+                continue
+            if k not in self._required_field_prompts:
+                print("Parameter {}: {} superfluous, this is probably wrong".format(
+                    k, v
+                ))
+                return False
+
         return True
 
     def _check_skills(self, robot):
