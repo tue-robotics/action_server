@@ -37,7 +37,7 @@ def test_grammar(grammar, grammar_target):
 
         # For each conjunct, we want to have a viable option
         for conjunct in option.conjuncts:  # type: Conjunct
-            result_str += _resolve_conjunct(conjunct.name)
+            result_str += _resolve_conjunct(parser, conjunct.name)
         result_str = result_str.rstrip(" ")  # type: str
 
         # Now, we can parse the result string to get the action description
