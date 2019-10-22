@@ -1,8 +1,17 @@
 import threading
+import voluptuous
 import rospy
 import robot_skills.util.kdl_conversions as kdl
 from action import Action, ConfigurationData
-from util import entities_from_description
+# from util import entities_from_description
+from .util.entities_from_description import entities_from_description, EntitySchema
+
+REQUIRED_FIELD_PROMPTS = voluptuous.Schema({
+    voluptuous.Required(
+        "entity",
+        description="What would you like me to look at?"
+    ): EntitySchema,
+})
 
 
 class LookAt(Action):
@@ -13,10 +22,23 @@ class LookAt(Action):
         Parameters to pass to the configure() method are:
          - `entity` (optional): the entity id to look at.
         """
-        required_field_prompts = {'entity': " What would you like me to look at? "}
+        # required_field_prompts = {'entity': " What would you like me to look at? "}
+
+        # Idea 1: required field prompts becomes a list of NamedTuples(key, schema, question)
+        # required_field_prompts = [
+        #     RequiredField('entity', EntitySchema, "What would you like me to look at?")
+        # ]
+
+        # Idea 2: required field prompts becomes a schema with a specific check method
+        # required_field_prompts = voluptuous.Schema({
+        #     voluptuous.Required(
+        #         "entity",
+        #         description="What would you like me to look at?"
+        #     ): EntitySchema,
+        # })
         required_skills = ['head']
         super(LookAt, self).__init__(
-            required_field_prompts=required_field_prompts,
+            required_field_prompts=REQUIRED_FIELD_PROMPTS,
             required_passed_knowledge={},
             required_skills=required_skills,
         )

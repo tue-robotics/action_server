@@ -55,6 +55,7 @@ class TestActions(unittest.TestCase):
     def setUp(self):
         self.task_manager = TaskManager(robot=Mockbot())
 
+    @unittest.skip("Temp disabled")
     def test_entity_schema(self):
         # Check 'correct' options
         EntitySchema({"id": "foo"})
@@ -79,4 +80,40 @@ class TestActions(unittest.TestCase):
 
         # ToDo: add emtpy dict (this won't work yet)
         # ToDo: check for multiple things (this won't work yet)
+
+    def test_look_at(self):
+        print("Testing look at")
+        # Usual situation
+        config_data = {"action": "look-at",
+                       "entity": {"id": "cabinet"}
+                       }
+        config_result = self.task_manager.set_up_state_machine(recipe=[config_data])
+        self.assertTrue(config_result.succeeded, "Configuration of lookat failed: {}".format(config_result))
+
+        # Missing information
+        config_data = {"action": "look-at",
+                       }
+        config_result = self.task_manager.set_up_state_machine(recipe=[config_data])
+        self.assertFalse(config_result.succeeded, "Configuration of lookat failed: {}".format(config_result))
+        # The following '].' is due to peculiarities in TaskManager.set_up_state_machine
+        self.assertIn("].entity", config_result.missing_field)
+
+        # Wrong definition of entity
+        with self.assertRaises(Exception):
+            config_data = {"action": "look-at",
+                           "entity": "cabinet",
+                           }
+            self.task_manager.set_up_state_machine(recipe=[config_data])
+
+        # Superfluous data
+        with self.assertRaises(Exception):
+            config_data = {"action": "look-at",
+                           "entity": {"id": "cabinet"},
+                           "foo": "bar",
+                           }
+            self.task_manager.set_up_state_machine(recipe=[config_data])
+
+
+
+
 

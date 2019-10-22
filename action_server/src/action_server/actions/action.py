@@ -1,5 +1,5 @@
 import rospy
-from voluptuous import Schema, Required
+from voluptuous import MultipleInvalid, Schema, Required
 from robot_skills.robot import Robot
 from robocup_knowledge import load_knowledge
 
@@ -70,7 +70,7 @@ class Action(object):
         :param required_skills:
         """
         # Action dependent requirements
-        self._required_field_prompts = required_field_prompts
+        self._required_field_prompts = required_field_prompts.extend({"action": str})
         self._required_passed_knowledge = required_passed_knowledge
         self._required_skills = required_skills
 
@@ -83,17 +83,30 @@ class Action(object):
 
     def _check_parameters(self, config):
 
-        schema_params = {Required(k): str for k in self._required_field_prompts.iterkeys()}
-        schema_params["action"] = str
-        schema = Schema(schema_params)
-        schema(config.semantics)
+        # schema_params = {Required(k): str for k in self._required_field_prompts.iterkeys()}
+        # schema_params["action"] = str
+        # schema = Schema(schema_params)
+        # schema(config.semantics)
 
-        for k, v in self._required_field_prompts.items():
-            if k not in config.semantics:
-                rospy.logerr("Missing required parameter {}".format(k))
-                self._config_result.missing_field = k
-                self._config_result.message = v
-                return False
+        try:
+            self._required_field_prompts(config.semantics)
+        except MultipleInvalid as exception:
+            # ToDo: the following will raise if something is terribly wrong. Is this desired?
+            assert all([len(e.path) == 1 for e in exception.errors])
+            # ToDo: the following will also raise: is this desired?
+            assert all([e.path[0].description for e in exception.errors])
+            # ToDo: do we need any recursion? E.g., for an action in an action
+
+            self._config_result.missing_field = exception.errors[0].path[0].schema
+            self._config_result.message = exception.errors[0].path[0].description
+            return False
+
+        # for k, v in self._required_field_prompts.items():
+        #     if k not in config.semantics:
+        #         rospy.logerr("Missing required parameter {}".format(k))
+        #         self._config_result.missing_field = k
+        #         self._config_result.message = v
+        #         return False
 
         for k, v in self._required_passed_knowledge.items():
             if k not in config.context:
@@ -102,15 +115,15 @@ class Action(object):
                 self._config_result.message = v
                 return False
 
-        # Check for superfluous parameters
-        for k, v in config.semantics.iteritems():
-            if k == "action":
-                continue
-            if k not in self._required_field_prompts:
-                print("Parameter {}: {} superfluous, this is probably wrong".format(
-                    k, v
-                ))
-                return False
+        # # Check for superfluous parameters
+        # for k, v in config.semantics.iteritems():
+        #     if k == "action":
+        #         continue
+        #     if k not in self._required_field_prompts:
+        #         print("Parameter {}: {} superfluous, this is probably wrong".format(
+        #             k, v
+        #         ))
+        #         return False
 
         return True
 
