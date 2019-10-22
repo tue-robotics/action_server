@@ -81,6 +81,11 @@ class TestActions(unittest.TestCase):
         # ToDo: add emtpy dict (this won't work yet)
         # ToDo: check for multiple things (this won't work yet)
 
+    def test_find(self):
+        config_data = {"action": "find"}
+        config_result = self.task_manager.set_up_state_machine(recipe=[config_data])
+        self.assertTrue(config_result.succeeded, "Configuration of find failed: {}".format(config_result))
+
     def test_look_at(self):
         print("Testing look at")
         # Usual situation
@@ -112,6 +117,10 @@ class TestActions(unittest.TestCase):
                            "foo": "bar",
                            }
             self.task_manager.set_up_state_machine(recipe=[config_data])
+
+    @unittest.skip("Cannot test 'Say' before being able to test 'Find'")
+    def test_say(self):
+        pass
 
 
 

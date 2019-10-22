@@ -1,3 +1,4 @@
+import voluptuous
 from action import Action, ConfigurationData
 
 from entity_description import resolve_entity_description, EntityDescription
@@ -12,6 +13,14 @@ from robot_skills.util.entity import Entity
 import robot_skills.util.kdl_conversions as kdl
 
 
+REQUIRED_FIELD_PROMPTS = voluptuous.Schema({
+    voluptuous.Required(
+        "object",
+        description="What exactly would you like me to find?"
+    ): ObjectSchema,
+})
+
+
 class Find(Action):
     def __init__(self):
         """ The Find class implements the action to find an object or person at a specified location.
@@ -21,7 +30,7 @@ class Find(Action):
          - `object` (required): the object to find.
         """
         # TODO: change this to a python dictionary schema
-        required_field_prompts = {'object': " What exactly would you like me to find? "}
+        required_field_prompts = REQUIRED_FIELD_PROMPTS
         required_skills = ['head', 'base', 'rightArm', 'speech']
         super(Find, self).__init__(
             required_field_prompts=required_field_prompts,
