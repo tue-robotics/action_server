@@ -1,4 +1,17 @@
+from voluptuous import Optional, Required, Schema
 from robot_skills.robot import Robot
+
+LocationSchema = Schema({
+    Required("id"): str,
+    Optional("area"): str,
+})
+
+# This is not yet perfect: we don't catch empty dicts yet or if both id and type are provided
+EntitySchema = Schema({
+    Optional("id"): str,
+    Optional("type"): str,
+    Optional("location"): LocationSchema,
+})
 
 
 def entities_from_description(entity_descr, robot):
