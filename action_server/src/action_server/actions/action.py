@@ -91,6 +91,9 @@ class Action(object):
         try:
             self._required_field_prompts(config.semantics)
         except MultipleInvalid as exception:
+            # Check for extra keys: if so: raise
+            assert "extra keys not allowed" not in exception.error_message, "{}: {}".format(
+                exception.error_message, exception.path)
             # ToDo: the following will raise if something is terribly wrong. Is this desired?
             assert all([len(e.path) == 1 for e in exception.errors])
             # ToDo: the following will also raise: is this desired?
