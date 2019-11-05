@@ -86,7 +86,16 @@ class TestActions(unittest.TestCase):
             EntitySchema({"id": "foo", "type": "bar"})
 
     def test_find(self):
-        config_data = {"action": "find"}
+        # Valid, complete config
+        config_data = {"action": "find",
+                       "object": {"id": "coke"},
+                       "source-location": {
+                           "location": {
+                               "id": "cabinet",
+                               "area": "on_top_of",
+                           },
+                       },
+                       }
         config_result = self.task_manager.set_up_state_machine(recipe=[config_data])
         self.assertTrue(config_result.succeeded, "Configuration of find failed: {}".format(config_result))
 

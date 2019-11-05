@@ -11,13 +11,17 @@ from robot_smach_states.util.designators import EdEntityDesignator, VariableDesi
 from robot_skills.util.entity import Entity
 
 import robot_skills.util.kdl_conversions as kdl
-
+from .util.entities_from_description import EntitySchema
 
 REQUIRED_FIELD_PROMPTS = voluptuous.Schema({
     voluptuous.Required(
         "object",
         description="What exactly would you like me to find?"
-    ): ObjectSchema,
+    ): EntitySchema,
+    voluptuous.Optional(
+        "source-location",
+        description="I don't know yet what I need this for...",  # ToDo: fill in,
+    ): EntitySchema,
 })
 
 
