@@ -55,7 +55,6 @@ class TestActions(unittest.TestCase):
     def setUp(self):
         self.task_manager = TaskManager(robot=Mockbot())
 
-    @unittest.skip("Temp disabled")
     def test_entity_schema(self):
         # Check 'correct' options
         EntitySchema({"id": "foo"})
@@ -78,7 +77,10 @@ class TestActions(unittest.TestCase):
         with self.assertRaises(voluptuous.Invalid):
             EntitySchema({"location": "foo"})
 
-        # ToDo: add emtpy dict (this won't work yet)
+        # Test empty dict
+        with self.assertRaises(voluptuous.InInvalid):
+            EntitySchema({})
+
         # ToDo: check for multiple things (this won't work yet)
 
     def test_find(self):
