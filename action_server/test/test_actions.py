@@ -81,7 +81,9 @@ class TestActions(unittest.TestCase):
         with self.assertRaises(voluptuous.InInvalid):
             EntitySchema({})
 
-        # ToDo: check for multiple things (this won't work yet)
+        # id and type are exclusive
+        with self.assertRaises(voluptuous.InInvalid):
+            EntitySchema({"id": "foo", "type": "bar"})
 
     def test_find(self):
         config_data = {"action": "find"}
