@@ -1,4 +1,5 @@
-from voluptuous import Optional, Required, Schema
+from voluptuous import Exclusive, Optional, Required, Schema
+from voluptuous.validators import All, Any, Or
 from robot_skills.robot import Robot
 
 LocationSchema = Schema({
@@ -6,12 +7,16 @@ LocationSchema = Schema({
     Optional("area"): str,
 })
 
-# This is not yet perfect: we don't catch empty dicts yet or if both id and type are provided
-EntitySchema = Schema({
-    Optional("id"): str,
-    Optional("type"): str,
-    Optional("location"): LocationSchema,
-})
+EntitySchema = All(
+    {
+        Exclusive("id", "id_type_location"): str,
+        Exclusive("type", "id_type_location"): str,
+        Exclusive("location", "id_type_location"): LocationSchema
+    },
+    {
+        Required(Any("id", "type", "location")): Or(str, LocationSchema),
+    }
+)
 
 
 def entities_from_description(entity_descr, robot):
