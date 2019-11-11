@@ -81,7 +81,7 @@ def test_grammar(grammar, grammar_target):
 
 
 def _resolve_conjunct(parser, target):
-    # type: (str) -> str
+    # type: (CFGParser, str) -> str
     """
     Recursive method that tries to resolve a conjunct, i.e., to find an option
 
