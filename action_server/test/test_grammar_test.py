@@ -1,3 +1,4 @@
+import os
 import unittest
 from action_server.test_tools import test_grammar
 
@@ -148,4 +149,5 @@ class TestGrammarTest(unittest.TestCase):
         The test is based on the current (at the time of writing) grammar of the demo challenge (which is therefore
         copied to this file)
         """
+        os.environ["ROBOT_ENV"] = "robotics_testlabs"
         test_grammar(grammar=GRAMMAR, grammar_target="T")
