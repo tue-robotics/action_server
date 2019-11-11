@@ -1,5 +1,6 @@
 from __future__ import print_function
 import collections
+from nose.tools import nottest
 
 from grammar_parser.cfgparser import CFGParser, Conjunct, Option, Rule
 from robot_skills.mockbot import Mockbot
@@ -9,6 +10,7 @@ from action_server.task_manager import TaskManager
 TMTestResult = collections.namedtuple("TMTestResult", ["recipe", "config_result"])
 
 
+@nottest
 def test_grammar(grammar, grammar_target):
     """
     Tests grammars against the capabilities of the action server, to be used in unit tests of challenges.
