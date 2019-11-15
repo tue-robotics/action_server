@@ -1,6 +1,8 @@
 from __future__ import print_function
 import collections
 from nose.tools import nottest
+import sys
+import traceback
 
 from grammar_parser.cfgparser import CFGParser, Conjunct, Option, Rule
 from robot_skills.mockbot import Mockbot
@@ -55,8 +57,10 @@ def test_grammar(grammar, grammar_target):
                 recipe=actions_definition["actions"],
             )  # type: ConfigurationResult
         except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            tb = "".join((traceback.format_exception(exc_type, exc_value, exc_traceback)))
             test_result = ConfigurationResult()
-            test_result.message = "Configuration crashed: {}".format(e.message)
+            test_result.message = "Configuration crashed: {}\n{}".format(e.message, tb)
         test_results[result_str] = TMTestResult(actions_definition["actions"], test_result)
 
     failed_test_results = {}
