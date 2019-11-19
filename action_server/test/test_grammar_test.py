@@ -149,5 +149,8 @@ class TestGrammarTest(unittest.TestCase):
         The test is based on the current (at the time of writing) grammar of the demo challenge (which is therefore
         copied to this file)
         """
+        # Export a (default) robot env. This is necessary because the action server
+        # loads knowledge on construction of actions.
+        # It is desirable to improve this in the future.
         os.environ["ROBOT_ENV"] = "robotics_testlabs"
         test_grammar(grammar=GRAMMAR, grammar_target="T")

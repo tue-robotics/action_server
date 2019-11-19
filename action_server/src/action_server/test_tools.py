@@ -99,6 +99,9 @@ def _resolve_conjunct(parser, target):
     result = ""
     rule = parser.rules[target]  # type: Rule
     # For now, take the first available option
+    # This makes sure that, e.g., we don't test both
+    # "go to the couch table" and "go to the dinner table"
+    #
     # If we want to make this method entirely recursive (from the root of the grammar), we might want to cook up
     # something more generic.
     option = rule.options[0]  # type: Option
