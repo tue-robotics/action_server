@@ -11,6 +11,8 @@ from action_server.task_manager import TaskManager
 TMTestResult = collections.namedtuple("TMTestResult", ["recipe", "config_result"])
 
 
+# This 'nottest' decorator is necessary because it prevents nose from running this as a
+# testcase (which would happen because this method is imported in unit testfiles)
 @nottest
 def test_grammar(robot, grammar, grammar_target):
     """
