@@ -5,7 +5,6 @@ import sys
 import traceback
 
 from grammar_parser.cfgparser import CFGParser, Conjunct, Option, Rule
-from robot_skills.mockbot import Mockbot
 from action_server.actions.action import ConfigurationResult
 from action_server.task_manager import TaskManager
 
@@ -13,7 +12,7 @@ TMTestResult = collections.namedtuple("TMTestResult", ["recipe", "config_result"
 
 
 @nottest
-def test_grammar(grammar, grammar_target):
+def test_grammar(robot, grammar, grammar_target):
     """
     Tests grammars against the capabilities of the action server, to be used in unit tests of challenges.
 
@@ -23,13 +22,14 @@ def test_grammar(grammar, grammar_target):
     all positive results are printed and if negative results have occurred, an AssertionError is raised with a
     message containing all failed options.
 
+    :param robot: Robot object. N.B.: robot.ed should contain the relevant entities
     :param grammar: grammar that is used
     :param grammar_target: top level grammar_target of the grammar
     :raises: AssertionError if the test has failed
     """
     # Create variables
     parser = CFGParser.fromstring(grammar)
-    task_manager = TaskManager(robot=Mockbot())
+    task_manager = TaskManager(robot=robot)
     actions_rule = _find_actions_rule(parser, grammar_target)
 
     test_results = {}
