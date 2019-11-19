@@ -4,7 +4,7 @@ import rospy
 from robot_smach_states import GetFurnitureFromOperatorPose
 
 
-class GetFurniture(Action):
+class PointTarget(Action):
     """ The DemoPresentation class wraps the demo presentation state machine..
 
     """
@@ -22,10 +22,10 @@ class GetFurniture(Action):
         outcome = self._point_sm.execute()
 
         if outcome == 'done':
-            self._execute_result.message = " I saw what you pointed at! "
+            self._execute_result.message = "I saw what you pointed at!"
             self._execute_result.succeeded = True
         elif outcome == 'failed':
-            self._execute_result.message = " Something went wrong. Sorry! "
+            self._execute_result.message = "Something went wrong. Sorry!"
             self._execute_result.succeeded = False
 
         return
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     robot = Robot()
 
     action = GetFurniture()
-    config = ConfigurationData({'action': 'demo-point_at'})
+    config = ConfigurationData({'action': 'point-at'})
 
     action.configure(robot, config)
     action.start()
