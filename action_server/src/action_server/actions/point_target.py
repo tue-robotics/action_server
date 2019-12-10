@@ -2,6 +2,7 @@ from action import Action, ConfigurationData
 
 import rospy
 from robot_smach_states import GetFurnitureFromOperatorPose
+from robocup_knowledge import load_knowledge
 
 
 class PointTarget(Action):
@@ -14,14 +15,15 @@ class PointTarget(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
-        self._point_sm = GetFurnitureFromOperatorPose(robot)
+        self._knowledge = load_knowledge('common')
+        self._point_sm = GetFurnitureFromOperatorPose(robot, self._knowledge)
         self._config_result.succeeded = True
         return
 
     def _start(self):
         outcome = self._point_sm.execute()
 
-        if outcome == 'done':
+        if outcome == 'succeeded':
             self._execute_result.message = "I saw what you pointed at!"
             self._execute_result.succeeded = True
         elif outcome == 'failed':
