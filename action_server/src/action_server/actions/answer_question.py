@@ -1,10 +1,9 @@
-from action import Action, ConfigurationData
-from find import Find
+from action import Action
 from entity_description import resolve_entity_description
 
 import rospy
 from robocup_knowledge import load_knowledge
-import challenge_spr
+from robot_smach_states.human_interaction.answer_questions import answer
 import hmi
 
 
@@ -92,8 +91,8 @@ class AnswerQuestion(Action):
 
             if res.semantics and "actions" in res.semantics:
                 try:
-                    # TODO: remove this from challenge states, because apparently, this is more generic.
-                    challenge_spr.riddle_game.answer(self._robot, res, None)
+                    # ToDo: check result?
+                    answer(self._robot, self._knowledge, res, None)
                     self._execute_result.message = " I answered the question {}".format(res.sentence)
                     self._execute_result.succeeded = True
                     return
