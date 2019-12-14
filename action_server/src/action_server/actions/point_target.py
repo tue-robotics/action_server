@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     robot = Robot()
 
-    action = GetFurniture()
+    action = PointTarget()
     config = ConfigurationData({'action': 'point-at'})
 
     action.configure(robot, config)
