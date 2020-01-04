@@ -1,44 +1,33 @@
 from action import Action, ConfigurationData
-from robot_smach_states import ShowOpenPose
-import threading
-
+from robot_smach_states import ShowOpenPoseLoop
 import rospy
 
 
 class ShowOpenposeAction(Action):
     """
-    The ShowOpenposeAction class implements the action to turn towards the sound source provided by SSL
+    The ShowOpenposeAction class implements the action to show openpose on the screen of Hero
     """
     def __init__(self):
         Action.__init__(self)
-        self._canceled = False
-
-    def show_openpose(self):
-        while not self._canceled:
-            self._state_machine.execute(userdata={})
-            rospy.sleep(rospy.Duration(1))
 
     def _configure(self, robot, config):
-        if 'duration' in config.semantics:
-            self._duration = rospy.Duration(int(config.semantics['duration']))
+        if 'iterations' in config.semantics:
+            self._iterations = int(config.semantics['iterations'])
         else:
-            self._duration = rospy.Duration(10)
+            self._iterations = 15
 
         self._config_result.succeeded = True
-        self._state_machine = ShowOpenPose(robot)
-        self._thread = threading.Thread(target=self.show_openpose)
+        self._state_machine = ShowOpenPoseLoop(robot, iterations=self._iterations)
         return
 
     def _start(self):
         rospy.loginfo('Starting ShowOpenPoseAction action')
-        self._thread.start()
-        rospy.sleep(self._duration)
-        self._cancel()
-        self._thread.join()
-        self._execute_result.succeeded = True
+        outcome = self._state_machine.execute()
+        if outcome == 'done':
+            self._execute_result.succeeded = True
+        else:
+            self._execute_result.succeeded = False
 
-    def _cancel(self):
-        self._canceled = True
 
 if __name__ == "__main__":
     rospy.init_node('show_openpose_test')
@@ -60,7 +49,7 @@ if __name__ == "__main__":
 
     config = ConfigurationData(
         semantics={'action': 'show-openpose',
-                   'duration': '30'}
+                   'iterations': '15'}
     )
 
     action.configure(robot, config)
