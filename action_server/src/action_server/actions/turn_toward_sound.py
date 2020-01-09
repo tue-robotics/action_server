@@ -1,5 +1,5 @@
 from action import Action, ConfigurationData
-from robot_smach_states import SSLLookatAndRotate
+from robot_smach_states.human_interaction import SSLLookatAndRotate
 import threading
 
 import rospy
