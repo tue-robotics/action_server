@@ -16,7 +16,7 @@ class PointTarget(Action):
     def _configure(self, robot, config):
         self._robot = robot
         self._knowledge = load_knowledge('common')
-        self._point_sm = GetFurnitureFromOperatorPose(robot, self._knowledge)
+        self._point_sm = GetFurnitureFromOperatorPose(robot, self._knowledge.location_names)
         self._config_result.succeeded = True
         return
 
