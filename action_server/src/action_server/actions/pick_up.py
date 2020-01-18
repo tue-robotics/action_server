@@ -4,7 +4,7 @@ from util import entities_from_description
 from entity_description import resolve_entity_description
 
 import robot_smach_states
-
+from robot_skills import arms
 from robot_smach_states.util.designators import UnoccupiedArmDesignator, EdEntityDesignator
 import rospy
 
@@ -95,7 +95,10 @@ class PickUp(Action):
 
         # side = config.semantics['side'] if 'side' in config.semantics else 'right'
 
-        arm_des = UnoccupiedArmDesignator(self._robot, {}).lockable()
+        arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": "perpare_grasp",
+                                                        "required_goals": "carrying_pose",
+                                                        "required_gripper_types": [arms.GripperTypes.GRASPING]}
+                                          ).lockable()
         arm_des.lock()
 
         self._fsm = robot_smach_states.grab.Grab(self._robot,
