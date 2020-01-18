@@ -134,7 +134,7 @@ class Place(Action):
             arm_designator = self.context.arm_designator
         else:
             arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type],
-                                                         "required_trajectories": "perpare_place",
+                                                         "required_trajectories": "prepare_place",
                                                          "required_gripper_types": [GripperTypes.GRASPING]})
 
         if not arm_designator:

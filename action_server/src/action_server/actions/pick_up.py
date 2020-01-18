@@ -95,7 +95,7 @@ class PickUp(Action):
 
         # side = config.semantics['side'] if 'side' in config.semantics else 'right'
 
-        arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": "perpare_grasp",
+        arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": "prepare_grasp",
                                                         "required_goals": "carrying_pose",
                                                         "required_gripper_types": [arms.GripperTypes.GRASPING]}
                                           ).lockable()
