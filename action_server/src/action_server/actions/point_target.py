@@ -6,19 +6,17 @@ from robocup_knowledge import load_knowledge
 
 
 class PointTarget(Action):
-    """ The DemoPresentation class wraps the demo presentation state machine..
-
+    """
+    The DemoPresentation class wraps the demo presentation state machine..
     """
     def __init__(self):
         Action.__init__(self)
-        # self._required_skills = ['speech', 'hmi']
 
     def _configure(self, robot, config):
         self._robot = robot
         self._knowledge = load_knowledge('common')
         self._point_sm = GetFurnitureFromOperatorPose(robot, self._knowledge.location_names)
         self._config_result.succeeded = True
-        return
 
     def _start(self):
         outcome = self._point_sm.execute()
