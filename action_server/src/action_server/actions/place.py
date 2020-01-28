@@ -22,7 +22,7 @@ class Place(Action):
 
         self._required_field_prompts = {'target-location': " Where should I leave the object? "}
 
-        self._required_skills = ['arms']
+        self._required_skills = ['_arms']
 
     class Semantics:
         def __init__(self):
