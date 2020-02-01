@@ -95,8 +95,10 @@ class PickUp(Action):
 
         # side = config.semantics['side'] if 'side' in config.semantics else 'right'
 
-        arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": "prepare_grasp",
-                                                        "required_goals": "carrying_pose",
+        # Next to the arm_properties of the Pick_up action this ArmDesignator also needs the properties of the Place and
+        # Hand_over actions since these actions (can) rely on the Pick_up action for the context.
+        arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": ["prepare_grasp", "prepare_place"],
+                                                        "required_goals": ["carrying_pose", "handover_to_human"],
                                                         "required_gripper_types": [arms.GripperTypes.GRASPING]}
                                           ).lockable()
         arm_des.lock()

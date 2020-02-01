@@ -85,7 +85,7 @@ class Place(Action):
 
         object_in_gripper = False
         if not got_object_in_task:
-            arm_des = ArmDesignator(self._robot, {"required_trajectories": "prepare_place",
+            arm_des = ArmDesignator(self._robot, {"required_trajectories": ["prepare_place"],
                                                   "required_objects": [self.semantics.object.type],
                                                   "required_gripper_types": [GripperTypes.GRASPING]})
             if arm_des.resolve() is not None:
@@ -134,7 +134,7 @@ class Place(Action):
             arm_designator = self.context.arm_designator
         else:
             arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type],
-                                                         "required_trajectories": "prepare_place",
+                                                         "required_trajectories": ["prepare_place"],
                                                          "required_gripper_types": [GripperTypes.GRASPING]})
 
         if not arm_designator:
