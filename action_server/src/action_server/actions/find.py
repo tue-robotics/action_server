@@ -5,7 +5,7 @@ from entity_description import resolve_entity_description, EntityDescription
 import rospy
 import math
 
-import robot_smach_states as states
+import robot_smach_states as rss
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
 from robot_skills.util.entity import Entity
 
@@ -134,8 +134,8 @@ class Find(Action):
                 discard_other_labels = True
             self._found_entity_designator = VariableDesignator(resolve_type=Entity)
             self._find_state_machines = [
-                states.FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
-                                        discard_other_labels, self._found_entity_designator.writeable)]
+                rss.human_interaction.FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
+                                                       discard_other_labels, self._found_entity_designator.writeable)]
             self._config_result.context['location'] = {
                 'designator': EdEntityDesignator(self._robot, id=self._semantics.source_location.id)
             }
@@ -147,7 +147,7 @@ class Find(Action):
             self._config_result.succeeded = True
 
             # TODO: Robocup hack to make sure the robot moves to the found person
-            self._navigation_state_machine = states.NavigateToWaypoint(
+            self._navigation_state_machine = rss.navigation.NavigateToWaypoint(
                 self._robot,
                 waypoint_designator=self._found_entity_designator,
                 radius=1.0,
@@ -188,13 +188,12 @@ class Find(Action):
                 # Set up the Find state machine
                 rospy.loginfo("Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area,
                                                                                                         nav_area))
-                self._find_state_machines.append(states.Find(robot=self._robot,
-                                                             knowledge=self._knowledge,
-                                                             source_entity_designator=location_designator,
-                                                             description_designator=description_designator,
-                                                             area_name_designator=area_designator,
-                                                             navigation_area_designator=navigation_area_designator,
-                                                             found_entity_designator=self._found_entity_designator))
+                self._find_state_machines.append(rss.navigation.Find(robot=self._robot, knowledge=self._knowledge,
+                                                                     source_entity_designator=location_designator,
+                                                                     description_designator=description_designator,
+                                                                     area_name_designator=area_designator,
+                                                                     navigation_area_designator=navigation_area_designator,
+                                                                     found_entity_designator=self._found_entity_designator))
 
         self._config_result.context['object'] = {'designator': self._found_entity_designator,
                                                  'type': self._semantics.object.type,
