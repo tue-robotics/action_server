@@ -1,7 +1,7 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-from robot_skills.arms import PublicArm
+from robot_skills.arms import PublicArm, GripperTypes
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
@@ -85,7 +85,9 @@ class Place(Action):
 
         object_in_gripper = False
         if not got_object_in_task:
-            arm_des = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type]})
+            arm_des = ArmDesignator(self._robot, {"required_trajectories": ["prepare_place"],
+                                                  "required_objects": [self.semantics.object.type],
+                                                  "required_gripper_types": [GripperTypes.GRASPING]})
             if arm_des.resolve() is not None:
                 object_in_gripper = True
                 self.context.arm_designator = arm_des
@@ -131,7 +133,9 @@ class Place(Action):
         elif self.context.arm_designator:
             arm_designator = self.context.arm_designator
         else:
-            arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type]})
+            arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type],
+                                                         "required_trajectories": ["prepare_place"],
+                                                         "required_gripper_types": [GripperTypes.GRASPING]})
 
         if not arm_designator:
             self._execute_result.message = " I was unable to resolve which arm to place with."
