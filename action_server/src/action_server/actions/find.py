@@ -1,12 +1,13 @@
 from action import Action, ConfigurationData
 
-from entity_description import resolve_entity_description, EntityDescription
+from entity_description import resolve_entity_description
 
 import rospy
 import math
 
 from robot_smach_states.human_interaction import FindPersonInRoom
-from robot_smach_states.navigation import Find, NavigateToWaypoint
+from robot_smach_states.navigation import NavigateToWaypoint
+from robot_smach_states.navigation import Find as StatesFind
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
 from robot_skills.util.entity import Entity
 
@@ -189,12 +190,12 @@ class Find(Action):
                 # Set up the Find state machine
                 rospy.loginfo("Setting up state machine with loc = {}, area = {}, nav_area = {}".format(loc, area,
                                                                                                         nav_area))
-                self._find_state_machines.append(Find(robot=self._robot, knowledge=self._knowledge,
-                                                      source_entity_designator=location_designator,
-                                                      description_designator=description_designator,
-                                                      area_name_designator=area_designator,
-                                                      navigation_area_designator=navigation_area_designator,
-                                                      found_entity_designator=self._found_entity_designator))
+                self._find_state_machines.append(StatesFind(robot=self._robot, knowledge=self._knowledge,
+                                                            source_entity_designator=location_designator,
+                                                            description_designator=description_designator,
+                                                            area_name_designator=area_designator,
+                                                            navigation_area_designator=navigation_area_designator,
+                                                            found_entity_designator=self._found_entity_designator))
 
         self._config_result.context['object'] = {'designator': self._found_entity_designator,
                                                  'type': self._semantics.object.type,
