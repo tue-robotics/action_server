@@ -3,9 +3,9 @@ from action import Action, ConfigurationData
 from util import entities_from_description
 from entity_description import resolve_entity_description
 
-import robot_smach_states
+from robot_smach_states.manipulation import Grab
 from robot_skills import arms
-from robot_smach_states.util.designators import UnoccupiedArmDesignator, EdEntityDesignator
+from robot_smach_states.util.designators import UnoccupiedArmDesignator
 import rospy
 
 
@@ -103,9 +103,7 @@ class PickUp(Action):
                                           ).lockable()
         arm_des.lock()
 
-        self._fsm = robot_smach_states.grab.Grab(self._robot,
-                                                 item=context.object.designator,
-                                                 arm=arm_des)
+        self._fsm = Grab(self._robot, item=context.object.designator, arm=arm_des)
 
         self._config_result.context['arm-designator'] = arm_des
         self._config_result.succeeded = True
