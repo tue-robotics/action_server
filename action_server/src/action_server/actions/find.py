@@ -193,7 +193,7 @@ class Find(Action):
                 self._find_state_machines.append(StatesFind(robot=self._robot, knowledge=self._knowledge,
                                                             source_entity_designator=location_designator,
                                                             description_designator=description_designator,
-                                                            area_name_designator=area_designator,
+                                                            area_name=area_designator,
                                                             navigation_area_designator=navigation_area_designator,
                                                             found_entity_designator=self._found_entity_designator))
 
