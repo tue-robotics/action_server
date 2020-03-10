@@ -1,7 +1,7 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-from robot_skills.arms import PublicArm
+from robot_skills.arms import PublicArm, GripperTypes
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
@@ -85,7 +85,9 @@ class Place(Action):
 
         object_in_gripper = False
         if not got_object_in_task:
-            arm_des = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type]})
+            arm_des = ArmDesignator(self._robot, {"required_trajectories": ["prepare_place"],
+                                                  "required_objects": [self.semantics.object.type],
+                                                  "required_gripper_types": [GripperTypes.GRASPING]})
             if arm_des.resolve() is not None:
                 object_in_gripper = True
                 self.context.arm_designator = arm_des
@@ -131,7 +133,9 @@ class Place(Action):
         elif self.context.arm_designator:
             arm_designator = self.context.arm_designator
         else:
-            arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type]})
+            arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type],
+                                                         "required_trajectories": ["prepare_place"],
+                                                         "required_gripper_types": [GripperTypes.GRASPING]})
 
         if not arm_designator:
             self._execute_result.message = " I was unable to resolve which arm to place with."
@@ -141,14 +145,11 @@ class Place(Action):
         item_to_place = robot_smach_states.util.designators.Designator(arm_designator.resolve().occupied_by,
                                                                        resolve_type=Entity)
 
-        place_position = robot_smach_states.util.designators.EmptySpotDesignator(
-            self._robot,
-            robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id),
-            area="on_top_of"
-        )
-
-        self._place = PlaceSmachState(self._robot, item_to_place, place_position,
-                                      arm_designator)
+        entity_to_place_on = robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id)
+        self._place = PlaceSmachState(self._robot, item_to_place,
+                                      entity_to_place_on,
+                                      arm_designator,
+                                      place_volume="on_top_of")
 
         state_machine_result = self._place.execute()
         if state_machine_result == 'done':

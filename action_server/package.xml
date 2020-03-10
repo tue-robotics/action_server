@@ -9,12 +9,15 @@
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-
+  
   <exec_depend>action_server_msgs</exec_depend>
   <exec_depend>grammar_parser</exec_depend>
+  <exec_depend>python-nose</exec_depend>
   <exec_depend>robocup_knowledge</exec_depend>
   <exec_depend>robot_skills</exec_depend>
   <exec_depend>robot_smach_states</exec_depend>
   <exec_depend>actionlib</exec_depend>
   <exec_depend>challenge_presentation</exec_depend>
+  
+  <test_depend>ed_msgs</test_depend>
 </package>
