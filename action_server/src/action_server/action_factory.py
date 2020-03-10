@@ -30,6 +30,7 @@ class ActionFactory(object):
     def _register_skill(self, action_type, skill):
         rospy.loginfo("Registering skill '%s' (%s)" % (action_type, skill))
         self._action_name_to_class[action_type] = skill
+
     def get_action_names(self):
         """Get a list of the action names of the registered actions"""
         names = self._action_name_to_class.keys()
