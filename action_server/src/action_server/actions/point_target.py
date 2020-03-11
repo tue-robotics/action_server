@@ -1,7 +1,7 @@
 from action import Action, ConfigurationData
 
 import rospy
-from robot_smach_states import GetFurnitureFromOperatorPose
+from robot_smach_states.human_interaction import GetFurnitureFromOperatorPose
 from robocup_knowledge import load_knowledge
 
 
