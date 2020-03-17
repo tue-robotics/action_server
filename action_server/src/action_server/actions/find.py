@@ -194,7 +194,7 @@ class Find(Action):
                                                             source_entity_designator=location_designator,
                                                             description_designator=description_designator,
                                                             area_name=area_designator,
-                                                            navigation_area_designator=navigation_area_designator,
+                                                            navigation_area_designator=navigation_area,
                                                             found_entity_designator=self._found_entity_designator))
 
         self._config_result.context['object'] = {'designator': self._found_entity_designator,
