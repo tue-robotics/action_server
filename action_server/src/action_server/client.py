@@ -139,6 +139,10 @@ class Client(object):
             self.cancel_all()
             raise KeyboardInterrupt
 
+        if not isinstance(result, action_server_msgs.msg.TaskResult):
+            rospy.logerr("Result not instance of 'action_server_msgs.msg.TaskResult', but {}".format(type(result)))
+            return False
+
         return task_outcome_from_result(result=result)
 
     def cancel_all(self):
