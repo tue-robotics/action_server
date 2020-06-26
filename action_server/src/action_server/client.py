@@ -142,7 +142,8 @@ class Client(object):
 
         if not isinstance(result, action_server_msgs.msg.TaskResult):
             msg = "Result not instance of 'action_server_msgs.msg.TaskResult', but {}".format(type(result))
-            rospy.logerr(msg)
+            if result is None:
+                rospy.logerr(msg)
             return TaskOutcome(messages=[msg])
 
         return task_outcome_from_result(result=result)
