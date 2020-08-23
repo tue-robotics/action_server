@@ -1,0 +1,3 @@
+[submodule "action_server/docs"]
+	path = action_server/docs
+	url = https://github.com/tue-robotics/tue_documentation_python.git
