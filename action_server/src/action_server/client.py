@@ -125,7 +125,8 @@ class Client(object):
         A task is composed of one or multiple actions.
         :param semantics: A json string with a list of dicts, every dict in the list has at least an 'action' field,
         and depending on the type of action, several parameter fields may be required.
-        :return: True or false, and a message specifying the outcome of the task
+        :return: (TaskOutcome) result output, which provides information about success of the task execution and some
+        information messages
         """
         goal = action_server_msgs.msg.TaskGoal(recipe=semantics)
         self._action_client.send_goal(goal)
@@ -138,6 +139,12 @@ class Client(object):
         except KeyboardInterrupt:
             self.cancel_all()
             raise KeyboardInterrupt
+
+        if not isinstance(result, action_server_msgs.msg.TaskResult):
+            msg = "Result not instance of 'action_server_msgs.msg.TaskResult', but {}".format(type(result))
+            if result is None:
+                rospy.logerr(msg)
+            return TaskOutcome(messages=[msg])
 
         return task_outcome_from_result(result=result)
 

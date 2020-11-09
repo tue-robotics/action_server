@@ -2,13 +2,11 @@ from action import Action, ConfigurationData
 
 from util import entities_from_description
 from entity_description import resolve_entity_description
-from find import Find
 
-import robot_smach_states
-
-from robot_smach_states.util.designators import UnoccupiedArmDesignator, EdEntityDesignator
+from robot_smach_states.manipulation import Grab
+from robot_skills import arms
+from robot_smach_states.util.designators import UnoccupiedArmDesignator
 import rospy
-import threading
 
 
 class PickUp(Action):
@@ -21,109 +19,118 @@ class PickUp(Action):
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['arms']
-        self._find_action = None
+        self._required_field_prompts = {'object': " What would you like me to pick up? ",
+                                        'source-location': " Where would you like me to pick that up? "}  # TODO: handle source location from context?
+
+    class Semantics:
+        def __init__(self):
+            self.object = None
+            self.source_location = None
+
+    @staticmethod
+    def _parse_semantics(semantics_dict):
+        semantics = PickUp.Semantics()
+
+        semantics.object = resolve_entity_description(semantics_dict['object'])
+
+        if 'source-location' in semantics_dict:
+            semantics.source_location = resolve_entity_description(semantics_dict['source-location'])
+
+        return semantics
+
+    class Context:
+        def __init__(self):
+            self.arm_designator = None
+            self.object = None
+            self.location = None
+
+    @staticmethod
+    def _parse_context(context_dict):
+        context = PickUp.Context()
+
+        if 'arm-designator' in context_dict:
+            context.arm_designator = context_dict['arm-designator']
+
+        if 'object' in context_dict:
+            context.object = resolve_entity_description(context_dict['object'])
+
+        if 'location' in context_dict:
+            context.location = resolve_entity_description(context_dict['location'])
+
+        return context
 
     def _configure(self, robot, config):
-        # Check if the task included an object to grab, otherwise try to get the information from previous actions'
-        # context.
-        using_context_for_object = False
-        if 'object' in config.semantics:
-            if config.semantics['object']['type'] == 'reference':
-                if 'object-designator' in config.context:
-                    using_context_for_object = True
-                    pass
-                else:
-                    self._config_result.missing_field = 'object'
-                    self._config_result.message = " What would you like me to pick up? "
-                    return
-            else:
-                pass
-
-        else:
-            self._config_result.missing_field = 'object'
-            self._config_result.message = " What would you like me to pick up? "
-            return
-
-        if not using_context_for_object:
-            # Check if the task included a location to grasp from, otherwise try to get the information from previous
-            # actions' context.
-            if 'source-location' in config.semantics:
-                pass
-            elif 'location-designator' in config.context:
-                pass
-            elif 'object-designator' in config.context:
-                using_context_for_object = True
-                pass
-            else:
-                self._config_result.missing_field = 'source-location'
-                self._config_result.message = " Where would you like me to pick that up? "
-                return
-
-        if not using_context_for_object:
-            # Only filter to entities that can be picked up, e.g not furniture etc
-            manipulable_object_types = [o['name'] for o in self._knowledge.objects]
-            if not config.semantics['object']['type'] in manipulable_object_types:
-                self._config_result.message = " A {} is not something I can pick up. ".\
-                    format(config.semantics['object']['type'])
-                return
-
-            self._find_action = Find()
-            find_config = ConfigurationData(config.semantics, config.context)
-            find_config_result = self._find_action.configure(robot, find_config)
-            if not find_config_result.succeeded:
-                self._config_result = find_config_result
-                return
-            config.context['object-designator'] = find_config_result.context['object-designator']
-
-        # Add the found object to the context that is passed to the next task
-        self._config_result.context['object-designator'] = config.context['object-designator']
-
         self._robot = robot
 
-        side = config.semantics['side'] if 'side' in config.semantics else 'right'
+        semantics = PickUp._parse_semantics(config.semantics)
+        context = PickUp._parse_context(config.context)
 
-        arm_des = UnoccupiedArmDesignator(self._robot.arms, self._robot.arms[side]).lockable()
+        # Check if a previous action had us find the object already...
+        object_found = False
+        if context.object:  # we got some object from a previous action
+            if semantics.object.type:  # we got some sort of type, could still be a reference...
+                if semantics.object.type != 'reference':  # an object type was specified in the task
+                    if semantics.object.type == context.object.type:  # then they need to be the same
+                        object_found = True
+                else:  # the object was a reference, then we don't care what the type of context object is
+                    object_found = True
+            elif semantics.object.category:  # no type, but a category was specified
+                # Then the context object must be one of that category
+                if self._knowledge.get_object_category(context.object.type) == semantics.object.category:
+                    object_found = True
+                if context.object.category == semantics.object.category:
+                    object_found = True
+
+        if not object_found:
+            self._config_result.required_context = {
+                'action': 'find',
+                'object': config.semantics['object']
+            }
+            if semantics.source_location:
+                self._config_result.required_context['source-location'] = config.semantics['source-location']
+            return
+
+        # Add the found object to the context that is passed to the next task
+        self._config_result.context['object'] = config.context['object']
+
+        # side = config.semantics['side'] if 'side' in config.semantics else 'right'
+
+        # Next to the arm_properties of the Pick_up action this ArmDesignator also needs the properties of the Place and
+        # Hand_over actions since these actions (can) rely on the Pick_up action for the context.
+        arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": ["prepare_grasp", "prepare_place"],
+                                                        "required_goals": ["carrying_pose", "handover_to_human"],
+                                                        "required_gripper_types": [arms.GripperTypes.GRASPING]}
+                                          ).lockable()
         arm_des.lock()
 
-        self._fsm = robot_smach_states.grab.Grab(self._robot,
-                                                 item=config.context['object-designator'],
-                                                 arm=arm_des)
+        self._fsm = Grab(self._robot, item=context.object.designator, arm=arm_des)
 
         self._config_result.context['arm-designator'] = arm_des
-        self._config_result.context['object-type'] = config.semantics['object']['type']
         self._config_result.succeeded = True
 
     def _start(self):
-        if self._find_action:
-            find_action_result = self._find_action.start()
-
-            self._execute_result.message += find_action_result.message
-            if not find_action_result.succeeded:
-                return
-
         fsm_result = self._fsm.execute()
 
         if fsm_result == "done":
             self._execute_result.succeeded = True
-            if self._find_action:
-                self._execute_result.message += " And I picked it up. "
-            elif not self._config_result.context['object-designator'].resolve():
+            if not self._config_result.context['object']['designator'].resolve():
                 self._execute_result.message += " I could not pick anything up. ".\
                     format(self._config_result.context)
             else:
                 self._execute_result.message += " I picked up the {}. ".\
-                    format(self._config_result.context['object-designator'].resolve().type)
+                    format(self._config_result.context['object']['designator'].resolve().type)
         else:
-            if not self._config_result.context['object-designator'].resolve():
+            if not self._config_result.context['object']['designator'].resolve():
                 self._execute_result.message += " I could not pick anything up. ". \
                     format(self._config_result.context)
             else:
                 self._execute_result.message += " I could not pick up the {}. ".\
-                    format(self._config_result.context['object-designator'].resolve().type)
+                    format(self._config_result.context['object']['designator'].resolve().type)
 
     def _cancel(self):
         if self._fsm.is_running:
             self._fsm.request_preempt()
+
 
 if __name__ == "__main__":
     rospy.init_node('place_test')
@@ -134,6 +141,8 @@ if __name__ == "__main__":
         from robot_skills.amigo import Amigo as Robot
     elif robot_name == 'sergio':
         from robot_skills.sergio import Sergio as Robot
+    elif robot_name == 'hero':
+        from robot_skills.hero import Hero as Robot
     else:
         from robot_skills.mockbot import Mockbot as Robot
 
@@ -142,9 +151,9 @@ if __name__ == "__main__":
     action = PickUp()
 
     config = ConfigurationData({'action': 'pick_up',
-              'entity': {'id': 'cabinet'},
-              'side': 'left',
-              'height': 0.8})
+                                'entity': {'id': 'cabinet'},
+                                'side': 'left',
+                                'height': 0.8})
 
     action.configure(robot, config)
     action.start()

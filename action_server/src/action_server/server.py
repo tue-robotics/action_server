@@ -35,7 +35,7 @@ class Server(object):
         return res
 
     def _add_action_cb(self, goal):
-        recipe = yaml.load(goal.recipe)
+        recipe = yaml.load(goal.recipe.lower())
         rospy.logdebug("Received action recipe: {}".format(goal.recipe))
 
         try:
@@ -89,6 +89,7 @@ class Server(object):
                     return
         except Exception as e:
             rospy.logerr("An error occurred using task recipe: %s\n" % goal.recipe)
+            self._result.result = action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
             self._result.log_messages = [' I failed to perform the task. ']
             self._action_server.set_aborted(self._result)
             raise

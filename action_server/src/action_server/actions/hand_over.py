@@ -38,9 +38,7 @@ class HandOver(Action):
     class Context:
         def __init__(self):
             self.arm_designator = None
-            self.object_designator = None  # TODO: bundle object_designator and object (as a description and a ref)
-            self.object_type = None
-            self.location_designator = None
+            self.object = None
             self.location = None
 
     @staticmethod
@@ -50,14 +48,8 @@ class HandOver(Action):
         if 'arm-designator' in context_dict:
             context.arm_designator = context_dict['arm-designator']
 
-        if 'object-designator' in context_dict:
-            context.object_designator = context_dict['object-designator']
-
-        if 'object-type' in context_dict:
-            context.object_type = context_dict['object-type']
-
-        if 'location-designator' in context_dict:
-            context.location_designator = context_dict['location-designator']
+        if 'object' in context_dict:
+            context.object = resolve_entity_description(context_dict['object'])
 
         if 'location' in context_dict:
             context.location = resolve_entity_description(context_dict['location'])
@@ -75,19 +67,31 @@ class HandOver(Action):
         # We assume we already got the object if previous action passed an arm, an object and this object has the
         # required type, or the required type is a reference.
         got_object = (
-            self.context.arm_designator is not None and (self.context.object_type == self.semantics.object.type or
+            self.context.arm_designator is not None and (self.context.object.type == self.semantics.object.type or
                                                          self.semantics.object.type == 'reference'))
-
         # If precondition not met, request prior action from the task manager
         if not got_object:
             # Request pick_up action
-            self._config_result.required_context = {'action': 'pick-up',
-                                                    'object': config.semantics['object']}
+            self._config_result.required_context = {'action': 'pick-up'}
+            if 'object' in config.semantics and 'type' in config.semantics['object']:
+                if config.semantics['object']['type'] != 'reference':
+                    self._config_result.required_context['object'] = config.semantics['object']
+                elif 'object' in config.context and 'type' in config.context['object']:
+                    self._config_result.required_context['object'] = {'type': config.context['object']['type']}
+
             if 'source-location' in config.semantics:
                 self._config_result.required_context['source-location'] = config.semantics['source-location']
-            return
-        # Now we can assume we picked up the item!
+            if 'location' in config.context and 'id' in config.context['location']:
+                self._config_result.required_context['source-location'] = config.context['location']['id']
 
+            # If necessary request an object from the given category
+            # ToDo this needs the grammar to make a difference between CATEGORY and NAMED_OBJECT
+            if 'category' in config.semantics:
+                del config.semantics['category']
+                self._config_result.required_context['object'] = config.semantics['object']
+            return
+
+        # Now we can assume we picked up the item!
         # We should have navigated to the place where we should hand over
         at_destination = (self.context.location is not None and
                           (self.context.location == self.semantics.target_location or

@@ -1,11 +1,11 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-from robot_skills.arms import Arm
+from robot_skills.arms import PublicArm, GripperTypes
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
-from robot_smach_states.util.designators import ArmDesignator, EdEntityDesignator
+from robot_smach_states.util.designators import ArmDesignator
 
 import rospy
 
@@ -51,9 +51,7 @@ class Place(Action):
     class Context:
         def __init__(self):
             self.arm_designator = None
-            self.object_designator = None
-            self.object_type = None
-            self.location_designator = None
+            self.object = None
             self.location = None
 
     @staticmethod
@@ -63,14 +61,8 @@ class Place(Action):
         if 'arm-designator' in context_dict:
             context.arm_designator = context_dict['arm-designator']
 
-        if 'object-designator' in context_dict:
-            context.object_designator = context_dict['object-designator']
-
-        if 'object-type' in context_dict:
-            context.object_type = context_dict['object-type']
-
-        if 'location-designator' in context_dict:
-            context.location_designator = context_dict['location-designator']
+        if 'object' in context_dict:
+            context.object = resolve_entity_description(context_dict['object'])
 
         if 'location' in context_dict:
             context.location = resolve_entity_description(context_dict['location'])
@@ -88,29 +80,33 @@ class Place(Action):
         # We assume we already got the object if previous action passed an arm, an object and this object has the
         # required type, or the required type is a reference.
         got_object_in_task = (
-            self.context.arm_designator is not None and (self.context.object_type == self.semantics.object.type or
+            self.context.arm_designator is not None and (self.context.object.type == self.semantics.object.type or
                                                          self.semantics.object.type == 'reference'))
 
         object_in_gripper = False
         if not got_object_in_task:
-            object_to_arm_dict = {arm.occupied_by.type: arm for arm_name, arm in self._robot.arms.iteritems() if
-                                  arm.occupied_by and arm.occupied_by.is_a(self.semantics.object.type)}
-
-            if bool(object_to_arm_dict):
+            arm_des = ArmDesignator(self._robot, {"required_trajectories": ["prepare_place"],
+                                                  "required_objects": [self.semantics.object.type],
+                                                  "required_gripper_types": [GripperTypes.GRASPING]})
+            if arm_des.resolve() is not None:
                 object_in_gripper = True
-                arm = object_to_arm_dict[self.semantics.object.type]
-                self.context.arm_designator = \
-                    ArmDesignator({arm.side: arm})
+                self.context.arm_designator = arm_des
 
         got_object = got_object_in_task or object_in_gripper
 
         # If precondition not met, request prior action from the task manager
         if not got_object:
             # Request pick_up action
-            self._config_result.required_context = {'action': 'pick-up',
-                                                    'object': config.semantics['object']}
+            self._config_result.required_context = {'action': 'pick-up'}
+            if 'object' in config.semantics and 'type' in config.semantics['object']:
+                if config.semantics['object']['type'] != 'reference':
+                    self._config_result.required_context['object'] = config.semantics['object']
+                elif 'object' in config.context and 'type' in config.context['object']:
+                    self._config_result.required_context['object'] = {'type': config.context['object']['type']}
             if 'source-location' in config.semantics:
                 self._config_result.required_context['source-location'] = config.semantics['source-location']
+            if 'location' in config.context and 'id' in config.context['location']:
+                self._config_result.required_context['source-location'] = config.context['location']['id']
             return
         # Now we can assume we picked up the item!
 
@@ -133,30 +129,27 @@ class Place(Action):
         # We either got an arm, or we know which arm to place with
         arm_designator = None
         if self.semantics.arm:
-            arm_designator = robot_smach_states.util.designators.Designator(self.semantics.arm, resolve_type=Arm)
+            arm_designator = robot_smach_states.util.designators.Designator(self.semantics.arm, resolve_type=PublicArm)
         elif self.context.arm_designator:
             arm_designator = self.context.arm_designator
         else:
-            arms = [arm for arm_name, arm in self._robot.arms.iteritems() if
-                    arm.occupied_by == self.semantics.object.type]
-            if arms:
-                arm_designator = robot_smach_states.util.designators.Designator(arms[0], resolve_type=Arm)
+            arm_designator = ArmDesignator(self._robot, {"required_objects": [self.semantics.object.type],
+                                                         "required_trajectories": ["prepare_place"],
+                                                         "required_gripper_types": [GripperTypes.GRASPING]})
 
         if not arm_designator:
-            self._execute_result.message = " I was unable to resolve which arm to place with. "
+            self._execute_result.message = " I was unable to resolve which arm to place with."
             self._execute_result.succeeded = False
             return
 
         item_to_place = robot_smach_states.util.designators.Designator(arm_designator.resolve().occupied_by,
                                                                        resolve_type=Entity)
 
-       # place_position = robot_smach_states.util.designators.EmptySpotDesignator(
-       #     self._robot,
-       #     robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id),
-       #     area="on_top_of"
-       # )
-
-        self._place = PlaceSmachState(self._robot, item_to_place, robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id), arm_designator, place_volume="on_top_of")
+        entity_to_place_on = robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id)
+        self._place = PlaceSmachState(self._robot, item_to_place,
+                                      entity_to_place_on,
+                                      arm_designator,
+                                      place_volume="on_top_of")
 
         state_machine_result = self._place.execute()
         if state_machine_result == 'done':
