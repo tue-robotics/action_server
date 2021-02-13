@@ -4,7 +4,7 @@ from util import entities_from_description
 from entity_description import resolve_entity_description
 
 from robot_smach_states.manipulation import Grab
-from robot_skills import arms
+from robot_skills.arm.arms import GripperTypes
 from robot_smach_states.util.designators import UnoccupiedArmDesignator
 import rospy
 
@@ -99,7 +99,7 @@ class PickUp(Action):
         # Hand_over actions since these actions (can) rely on the Pick_up action for the context.
         arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": ["prepare_grasp", "prepare_place"],
                                                         "required_goals": ["carrying_pose", "handover_to_human"],
-                                                        "required_gripper_types": [arms.GripperTypes.GRASPING]}
+                                                        "required_gripper_types": [GripperTypes.GRASPING]}
                                           ).lockable()
         arm_des.lock()
 
