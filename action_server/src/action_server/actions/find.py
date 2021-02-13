@@ -16,7 +16,6 @@ import robot_skills.util.kdl_conversions as kdl
 
 class Find(Action):
     """ The Find class implements the action to find an object or person at a specified location.
-
     Parameters to pass to the configure() method are:
      - `location` (required): location to find the object (room or pre-existing world model entity)
      - `object` (required): the object to find.
@@ -152,7 +151,7 @@ class Find(Action):
             self._navigation_state_machine = NavigateToWaypoint(
                 self._robot,
                 waypoint_designator=self._found_entity_designator,
-                radius=1.0,
+                radius=0.7,
                 look_at_designator=self._found_entity_designator
             )
             return
@@ -226,6 +225,7 @@ class Find(Action):
                             self._execute_result.message = " I found a person at the {}. ".format(location)
                         else:
                             self._execute_result.message = " I found a person. "
+
                     self._point_at_person(self._found_entity_designator.resolve())
                     self._navigation_state_machine.execute()
                     self._robot.speech.speak("Hi there!")

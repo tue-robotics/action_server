@@ -1,9 +1,10 @@
 from action import Action, ConfigurationData
 import rospy
 import robot_smach_states as states
+from sensor_msgs.msg import Image
 
 from entity_description import resolve_entity_description
-
+from robot_smach_states.util.designators import EdEntityDesignator
 
 class SendPicture(Action):
     """ The Inspect class implements the action to send a picture over a whatsapp client.
@@ -52,20 +53,26 @@ class SendPicture(Action):
             return
         # We can now assume we arrived at the place to take the picture from.
 
-        self.detect_face_state_machine = states.DetectFace(self._robot)
+        # self.detect_face_state_machine = states.DetectFace(self._robot)
+
+        entity_to_inspect = resolve_entity_description(config.semantics['target-location'])
+	entity_designator = EdEntityDesignator(self._robot, id=entity_to_inspect.id)
+	entity = entity_designator.resolve()
+        self.look_at_sm = states.LookOnTopOfEntity(self._robot, entity)
 
         self._config_result.succeeded = True
         return
 
     def _start(self):
-        result = self.detect_face_state_machine.execute(self._robot)
+        self._robot.speech.speak("I will take a picture and send it to my operator now. ")
 
-        if result == 'failed':
-            self._execute_result.message = " I didn't see anyone. "
-            self._execute_result.succeeded = False
-        else:
-            self._execute_result.message = " I found someone at the door. "
-            self._execute_result.succeeded = True
+        image_pub = rospy.Publisher("/hero/image_from_ros", Image, queue_size=1)
+        self.look_at_sm.run()
+        rospy.sleep(1)
+        image_pub.publish(self._robot.perception.get_image())
+        self._robot.head.close()
+        result = self.detect_face_state_machine.execute(self._robot)
+        self._execute_result.succeeded = True
 
     def _cancel(self):
         return
