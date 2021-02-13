@@ -27,7 +27,7 @@ class Find(Action):
         Action.__init__(self)
         # TODO: change this to a python dictionary schema
         self._required_field_prompts = {'object': " What exactly would you like me to find? "}
-        self._required_skills = ['head', 'base', 'rightArm', 'speech']
+        self._required_skills = ['head', 'base', 'arms', 'speech']  # ToDO: Still calls rightArm directly
 
     def _point_at_person(self, person):
         pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',
