@@ -34,7 +34,8 @@ class TaskOutcome(object):
 
 
 def task_outcome_from_result(result):
-    """ Converts action_server_msgs.msg.TaskResult to TaskOutcome class
+    """
+    Converts action_server_msgs.msg.TaskResult to TaskOutcome class
 
     :param result: (action_server_msgs.msg.TaskResult) result input
     :return: (TaskOutcome) result output
@@ -63,7 +64,8 @@ def task_outcome_from_result(result):
 
 
 class Client(object):
-    """ A client for the action server
+    """
+    A client for the action server
 
     Wraps the client side of the actionlib interface so that it can be easily used in client side applications.
 
@@ -97,7 +99,8 @@ class Client(object):
         return res.actions
 
     def send_async_task(self, semantics, done_cb=None, feedback_cb=None):
-        """ Send a task to the action server and return immediately. A task is composed of one or multiple actions.
+        """
+        Send a task to the action server and return immediately. A task is composed of one or multiple actions.
 
         :param semantics: A json string with a list of dicts, every dict in the list has at least an 'action' field,
         and depending on the type of action, several parameter fields may be required.
@@ -149,7 +152,8 @@ class Client(object):
         return task_outcome_from_result(result=result)
 
     def cancel_all(self):
-        """ Cancels all goals of the action client
+        """
+        Cancels all goals of the action client
         """
         rospy.logdebug("cancelling all goals...")
         self._action_client.cancel_all_goals()
@@ -157,7 +161,8 @@ class Client(object):
         rospy.logdebug("... all goals cancelled!")
 
     def cancel_all_async(self):
-        """ Cancels all goals of the action client and returns directly without waiting for the result
+        """
+        Cancels all goals of the action client and returns directly without waiting for the result
         """
         rospy.logdebug("cancelling all goals async...")
         self._action_client.cancel_all_goals()

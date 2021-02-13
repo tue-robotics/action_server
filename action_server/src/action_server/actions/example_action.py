@@ -17,8 +17,8 @@ class ExampleAction(Action):
     This Action would perform the middle part of the task: "select an item of that color". It takes the color from the
     Action asking for a color, and passes the selected item (Entity) to the Action for grabbing an entity. Typically,
     one would wrap higher level behavior in an Action than this, but this is just for illustration purposes.
-
     """
+
     def __init__(self):
         # Call the base class constructor
         Action.__init__(self)
@@ -177,6 +177,7 @@ class ExampleAction(Action):
         if self._action_fsm.is_running():
             self._action_fsm.request_preempt()
         """
+
 
 """
 The below code should not be in the Action implementation file. An action should always wrap an existing smach State

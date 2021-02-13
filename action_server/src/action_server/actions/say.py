@@ -5,12 +5,15 @@ import rospy
 import random
 from datetime import datetime, timedelta
 
+
 class Say(Action):
-    ''' The Say class implements the action to say something.
+    """
+    The Say class implements the action to say something.
 
     Parameters to pass to the configure() method are:
      - `sentence` (required): The sentence to speak. May be a keyword to tell something more intelligent.
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'sentence': "What would you like me to say?"}
@@ -123,7 +126,7 @@ class Say(Action):
                     "I can't subtly drive over my charging cable. That does not keep me from trying though.",
                     "I have really funny ears, they allow me to hear whatever I want to hear!.",
                     "I think I'm a lot fatter than I am, which makes me too scared to go into a lot of places."
-                ]) 
+                ])
             self._execute_result.message = " I told something about myself. "
         else:
             line = self._sentence
@@ -132,14 +135,15 @@ class Say(Action):
         self._robot.speech.speak(line)
         self._execute_result.succeeded = True
 
-
     def _cancel(self):
         pass
+
 
 if __name__ == "__main__":
     rospy.init_node('say_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

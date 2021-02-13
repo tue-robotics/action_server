@@ -1,5 +1,4 @@
 from action import Action, ConfigurationData
-from find import Find
 from entity_description import resolve_entity_description
 
 import rospy
@@ -121,7 +120,7 @@ if __name__ == "__main__":
 
     action = TellNameOfPerson()
 
-    config = {'action': 'tell_name_of_person'}
+    config = ConfigurationData({'action': 'tell_name_of_person'})
 
     action.configure(robot, config)
     action.start()

@@ -14,8 +14,8 @@ class ArmGoal(Action):
 
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'side' : " Which arm should I move? ",
-                                        'symbolic' : " What should I do with my arm? "}
+        self._required_field_prompts = {'side': " Which arm should I move? ",
+                                        'symbolic': " What should I do with my arm? "}
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
@@ -43,10 +43,12 @@ class ArmGoal(Action):
     def _cancel(self):
         pass
 
+
 if __name__ == "__main__":
     rospy.init_node('arm_goal_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

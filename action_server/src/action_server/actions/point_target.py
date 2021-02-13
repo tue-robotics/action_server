@@ -9,6 +9,7 @@ class PointTarget(Action):
     """
     The DemoPresentation class wraps the demo presentation state machine..
     """
+
     def __init__(self):
         Action.__init__(self)
 

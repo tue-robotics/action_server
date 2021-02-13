@@ -5,16 +5,18 @@ import threading
 
 
 class GripperGoal(Action):
-    """ The GripperGoal class implements the action to open or close the gripper.
+    """
+    The GripperGoal class implements the action to open or close the gripper.
 
     Parameters to pass to the configure() method are:
      - `side` (required): the gripper's side (left or right)
      - `goal` (required): the goal (open or close).
     """
+
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'side' : " Which gripper should I move? ",
-                                        'goal' : " Should I open my gripper, or close it? "}
+        self._required_field_prompts = {'side': " Which gripper should I move? ",
+                                        'goal': " Should I open my gripper, or close it? "}
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
@@ -47,6 +49,7 @@ if __name__ == "__main__":
     rospy.init_node('gripper_goal_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
@@ -60,8 +63,8 @@ if __name__ == "__main__":
     action = GripperGoal()
 
     config = ConfigurationData({'action': 'gripper_goal',
-              'side': 'left',
-              'goal': 'close'})
+                                'side': 'left',
+                                'goal': 'close'})
 
     action.configure(robot, config)
     action.start()

@@ -8,9 +8,10 @@ from actions.action import ConfigurationResult
 
 
 class Server(object):
-    '''
+    """
     The Server wraps the TaskManager to expose a ROS actionlib interface.
-    '''
+    """
+
     def __init__(self, robot):
         self._robot = robot
         self._task_manager = TaskManager(self._robot)

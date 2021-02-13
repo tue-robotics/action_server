@@ -1,5 +1,4 @@
 from action import Action, ConfigurationData
-from find import Find
 from entity_description import resolve_entity_description, EntityDescription
 from robot_smach_states.navigation import NavigateToSymbolic
 
@@ -7,6 +6,7 @@ from robot_smach_states.navigation import FollowOperator
 from robot_smach_states.util.designators import EdEntityDesignator
 
 import rospy
+
 
 def navigate(robot, entity_description):
     if not entity_description.type:
@@ -30,12 +30,14 @@ def navigate(robot, entity_description):
 
 
 class Follow(Action):
-    ''' The Follow class implements the action to follow a person.
+    """
+    The Follow class implements the action to follow a person.
 
     Parameters to pass to the configure() method are:
      - `target` (required): the target id to assign to the id that is followed
      - `location-from` (optional): the location to find the target to follow
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'target': " Who would you like me to follow? "}
@@ -139,6 +141,7 @@ if __name__ == "__main__":
     rospy.init_node('follow_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
@@ -152,7 +155,7 @@ if __name__ == "__main__":
     action = Follow()
 
     config = ConfigurationData({'action': 'follow',
-              'entity': {'special': 'me'}})
+                                'entity': {'special': 'me'}})
 
     action.configure(robot, config)
     action.start()
