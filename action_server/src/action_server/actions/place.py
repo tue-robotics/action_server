@@ -11,12 +11,13 @@ import rospy
 
 
 class Place(Action):
-    ''' The Place class implements the action to place something on an object.
+    """
+    The Place class implements the action to place something on an object.
 
     Parameters to pass to the configure() method are:
      - `entity` (required): Entity to place the object on;
      - `arm-designator` (required): Designator resolving to the arm to place with
-    '''
+    """
     def __init__(self):
         Action.__init__(self)
 
