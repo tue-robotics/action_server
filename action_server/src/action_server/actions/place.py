@@ -1,7 +1,7 @@
 from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 
-from robot_skills.arms import PublicArm, GripperTypes
+from robot_skills.arm.arms import PublicArm, GripperTypes
 import robot_smach_states
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_skills.util.entity import Entity
