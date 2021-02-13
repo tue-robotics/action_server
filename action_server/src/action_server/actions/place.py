@@ -18,6 +18,7 @@ class Place(Action):
      - `entity` (required): Entity to place the object on;
      - `arm-designator` (required): Designator resolving to the arm to place with
     """
+
     def __init__(self):
         Action.__init__(self)
 
@@ -146,7 +147,8 @@ class Place(Action):
         item_to_place = robot_smach_states.util.designators.Designator(arm_designator.resolve().occupied_by,
                                                                        resolve_type=Entity)
 
-        entity_to_place_on = robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id)
+        entity_to_place_on = robot_smach_states.util.designators.EdEntityDesignator(self._robot,
+                                                                                    id=self.context.location.id)
         self._place = PlaceSmachState(self._robot, item_to_place,
                                       entity_to_place_on,
                                       arm_designator,
@@ -170,6 +172,7 @@ if __name__ == "__main__":
     rospy.init_node('place_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

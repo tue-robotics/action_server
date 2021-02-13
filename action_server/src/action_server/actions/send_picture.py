@@ -11,6 +11,7 @@ class SendPicture(Action):
     Parameters to pass to the configure() method are:
      - `target-location` (required): an entity with a segmentation area to inspect
     """
+
     def __init__(self):
         Action.__init__(self)
 
@@ -75,6 +76,7 @@ if __name__ == "__main__":
     rospy.init_node('send_picture_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

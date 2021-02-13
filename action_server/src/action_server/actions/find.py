@@ -15,12 +15,14 @@ import robot_skills.util.kdl_conversions as kdl
 
 
 class Find(Action):
-    """ The Find class implements the action to find an object or person at a specified location.
+    """
+    The Find class implements the action to find an object or person at a specified location.
 
     Parameters to pass to the configure() method are:
      - `location` (required): location to find the object (room or pre-existing world model entity)
      - `object` (required): the object to find.
     """
+
     def __init__(self):
         Action.__init__(self)
         # TODO: change this to a python dictionary schema
@@ -245,8 +247,9 @@ class Find(Action):
                     self._robot.speech.speak("I don't see what I am looking for here.")
 
                 self._execute_result.message = " I couldn't find {} {} the {} ".format(
-                    self._semantics.object.id if self._semantics.object.id and not self._semantics.object.id == "None" else \
-                        "a " + self._semantics.object.type if self._semantics.object.type else "a " + self._semantics.object.category,
+                    self._semantics.object.id if self._semantics.object.id and not self._semantics.object.id == "None"
+                    else "a " + self._semantics.object.type if self._semantics.object.type else
+                    "a " + self._semantics.object.category,
                     "in" if self._semantics.source_location.id in self._knowledge.location_rooms else "at",
                     self._semantics.source_location.id
                 )
@@ -254,8 +257,8 @@ class Find(Action):
                 self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._semantics.source_location.id))
                 self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
                     self._semantics.source_location.id,
-                    self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type if self._semantics.object.type else \
-                        "a " + self._semantics.object.category
+                    self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type if
+                    self._semantics.object.type else "a " + self._semantics.object.category
                 )
 
     def _cancel(self):
@@ -280,17 +283,17 @@ if __name__ == "__main__":
     action = Find()
 
     config = ConfigurationData({'action': 'find',
-              'source-location': {'id': 'cabinet',
-                           'area': 'on_top_of'},
-              'object': {'type': 'coke'}})
+                                'source-location': {'id': 'cabinet',
+                                                    'area': 'on_top_of'},
+                                'object': {'type': 'coke'}})
 
     action.configure(robot, config)
     action.start()
 
     config = ConfigurationData({'action': 'find',
-              'source-location': {'id': 'livingroom',
-                           'area': 'in'},
-              'object': {'type': 'person'}})
+                                'source-location': {'id': 'livingroom',
+                                                    'area': 'in'},
+                                'object': {'type': 'person'}})
 
     action.configure(robot, config)
     action.start()

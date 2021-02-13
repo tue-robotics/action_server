@@ -1,6 +1,5 @@
 from action import Action, ConfigurationData
 
-from util import entities_from_description
 from entity_description import resolve_entity_description
 
 from robot_smach_states.manipulation import Grab
@@ -10,12 +9,14 @@ import rospy
 
 
 class PickUp(Action):
-    ''' The PickUp class implements the action to grasp an object.
+    """
+    The PickUp class implements the action to grasp an object.
 
     Parameters to pass to the configure() method are:
      - `object` (required): the id of the object to grab
      - `object-designator` (required): a designator resolving to the object to grab
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['arms']
@@ -114,17 +115,17 @@ class PickUp(Action):
         if fsm_result == "done":
             self._execute_result.succeeded = True
             if not self._config_result.context['object']['designator'].resolve():
-                self._execute_result.message += " I could not pick anything up. ".\
+                self._execute_result.message += " I could not pick anything up. ". \
                     format(self._config_result.context)
             else:
-                self._execute_result.message += " I picked up the {}. ".\
+                self._execute_result.message += " I picked up the {}. ". \
                     format(self._config_result.context['object']['designator'].resolve().type)
         else:
             if not self._config_result.context['object']['designator'].resolve():
                 self._execute_result.message += " I could not pick anything up. ". \
                     format(self._config_result.context)
             else:
-                self._execute_result.message += " I could not pick up the {}. ".\
+                self._execute_result.message += " I could not pick up the {}. ". \
                     format(self._config_result.context['object']['designator'].resolve().type)
 
     def _cancel(self):
@@ -136,6 +137,7 @@ if __name__ == "__main__":
     rospy.init_node('place_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

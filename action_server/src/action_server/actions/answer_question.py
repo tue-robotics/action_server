@@ -8,13 +8,14 @@ import hmi
 
 
 class AnswerQuestion(Action):
-    """ The AnswerQuestion class implements the action of answering a question
+    """
+    The AnswerQuestion class implements the action of answering a question
 
     It requires that the robot to perform this action has a speech and an ears skill. It will ask the user what
     the question is, try to answer it based on the grammar defined in the knowledge defined for the speech and
     person recognition challenge and answer it based on the same knowledge.
-
     """
+
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['speech', 'hmi']
@@ -105,7 +106,8 @@ class AnswerQuestion(Action):
                 if tries < 2:
                     self._robot.speech.speak("Sorry, I did not understand your question, try another one.")
                 else:
-                    self._robot.speech.speak("Sorry, I was unable to understand any of your questions. I'll leave you puzzled by them. ")
+                    self._robot.speech.speak(
+                        "Sorry, I was unable to understand any of your questions. I'll leave you puzzled by them. ")
                     self._execute_result.message = " I did not understand the question. "
                 tries += 1
 

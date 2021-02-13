@@ -6,7 +6,6 @@ import robot_smach_states as states
 import robot_smach_states.util.designators as ds
 
 
-
 class CountAndTell(Action):
     """
     The CountAndTell class implements the action to count the number of objects in a specific location and tell the
@@ -16,6 +15,7 @@ class CountAndTell(Action):
      - `config` (required): the ConfigurationData defines the input data structure for configuration of an action i.e
                             a JSON string with for this action a "location" and an " object".
     """
+
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['speech']
@@ -74,6 +74,7 @@ if __name__ == "__main__":
     rospy.init_node('say_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
@@ -87,8 +88,8 @@ if __name__ == "__main__":
     action = CountAndTell()
 
     config = ConfigurationData({'action': 'count-and-tell',
-              'location': {'id': 'counter'},
-              'object': {'type': 'apple'}})
+                                'location': {'id': 'counter'},
+                                'object': {'type': 'apple'}})
 
     action.configure(robot, config)
     action.start()

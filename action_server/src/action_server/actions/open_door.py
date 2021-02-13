@@ -7,6 +7,7 @@ class OpenDoor(Action):
     The Open Door action wraps the state machine to open the door of the cupboard at RWC 2018.
 
     """
+
     def __init__(self):
         # Call the base class constructor
         Action.__init__(self)

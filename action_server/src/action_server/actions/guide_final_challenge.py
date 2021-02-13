@@ -3,15 +3,15 @@ import robot_smach_states as states
 import robot_smach_states.util.designators as ds
 from entity_description import resolve_entity_description
 
-import rospy
-
 
 class GuideFinalChallenge(Action):
-    ''' The GuideFinalChallenge. class navigates to a target, telling someone to follow the robot and about arriving at the target.
+    """
+    The GuideFinalChallenge. class navigates to a target, telling someone to follow the robot and about arriving at the target.
 
     Parameters to pass to the configure() method are:
      - `object` (required): the id of the entity to navigate to
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'object': " Who would you like me to guide? ",
@@ -53,10 +53,9 @@ class GuideFinalChallenge(Action):
             area = "in"
 
         self._state_machine = states.NavigateToSymbolic(robot=self._robot,
-                                                              entity_designator_area_name_map={
-                                                                  target_location_designator: area
-                                                              },
-                                                              entity_lookat_designator=target_location_designator)
+                                                        entity_designator_area_name_map={
+                                                            target_location_designator: area},
+                                                        entity_lookat_designator=target_location_designator)
 
         self._config_result.succeeded = True
 

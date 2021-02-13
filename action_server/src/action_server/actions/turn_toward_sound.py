@@ -9,6 +9,7 @@ class TurnTowardSound(Action):
     """
     The TurnTowardSound class implements the action to turn towards the sound source provided by SSL
     """
+
     def __init__(self):
         Action.__init__(self)
         self._canceled = False
@@ -40,10 +41,12 @@ class TurnTowardSound(Action):
     def _cancel(self):
         self._canceled = True
 
+
 if __name__ == "__main__":
     rospy.init_node('turn_toward_sound_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

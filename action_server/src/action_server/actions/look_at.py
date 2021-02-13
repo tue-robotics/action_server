@@ -8,11 +8,13 @@ import rospy
 
 
 class LookAt(Action):
-    ''' The LookAt class implements the action to look at a world model entity.
+    """
+    The LookAt class implements the action to look at a world model entity.
 
     Parameters to pass to the configure() method are:
      - `entity` (optional): the entity id to look at.
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'entity': " What would you like me to look at? "}
@@ -48,10 +50,12 @@ class LookAt(Action):
     def _cancel(self):
         self._robot.head.cancel_goal()
 
+
 if __name__ == "__main__":
     rospy.init_node('look_at_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
@@ -65,7 +69,7 @@ if __name__ == "__main__":
     action = LookAt()
 
     config = ConfigurationData({'action': 'look_at',
-              'entity': {'id': 'cabinet'}})
+                                'entity': {'id': 'cabinet'}})
 
     action.configure(robot, config)
     action.start()

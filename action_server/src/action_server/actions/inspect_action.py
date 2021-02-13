@@ -9,11 +9,13 @@ import rospy
 
 
 class Inspect(Action):
-    """ The Inspect class implements the action to inspect an area.
+    """
+    The Inspect class implements the action to inspect an area.
 
     Parameters to pass to the configure() method are:
      - `entity` (required): an entity with a segmentation area to inspect
     """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'entity': " What would you like me to inspect? "}
@@ -61,6 +63,7 @@ if __name__ == "__main__":
     rospy.init_node('inspect_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot
@@ -74,7 +77,7 @@ if __name__ == "__main__":
     action = Inspect()
 
     config = ConfigurationData({'action': 'inspect',
-              'entity': {'id': 'cabinet'}})
+                                'entity': {'id': 'cabinet'}})
 
     action.configure(robot, config)
     action.start()

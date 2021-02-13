@@ -11,6 +11,7 @@ class HandOver(Action):
     Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
     an object to bring (required).
     """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'target-location': " Who would you like me to hand the object? ",
@@ -155,6 +156,7 @@ if __name__ == "__main__":
     rospy.init_node('bring_test')
 
     import sys
+
     robot_name = sys.argv[1]
     if robot_name == 'amigo':
         from robot_skills.amigo import Amigo as Robot

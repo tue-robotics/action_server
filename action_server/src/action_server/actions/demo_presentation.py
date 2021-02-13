@@ -5,9 +5,10 @@ from challenge_presentation import PresentationMachine, PresentationMachineHero
 
 
 class DemoPresentation(Action):
-    """ The DemoPresentation class wraps the demo presentation state machine..
-
     """
+    The DemoPresentation class wraps the demo presentation state machine
+    """
+
     def __init__(self):
         Action.__init__(self)
         # self._required_skills = ['speech', 'hmi']

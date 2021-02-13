@@ -8,6 +8,7 @@ class ConfigurationData(object):
     """
     The ConfigurationData class defines the input data structure for configuration of an action.
     """
+
     def __init__(self, semantics, context=None):
         """
         :param semantics: Dictionary of the following structure: {'action': <action-name>, 'param1': <param-value>}.
@@ -27,6 +28,7 @@ class ConfigurationResult(object):
     """
     The ConfigurationResult class defines the data structure that is returned by the configure() methods of actions
     """
+
     def __init__(self, succeeded=False, context=None):
         if context is None:
             context = {}
@@ -41,13 +43,14 @@ class ConfigurationResult(object):
     def __repr__(self):
         return "ConfigurationResult(succeeded={}, context={}, required_context={}, missing_field={}, " \
                "missing_skill={}, message={})".format(self.succeeded, self.context, self.required_context,
-                                                  self.missing_field, self.missing_skill, self.message)
+                                                      self.missing_field, self.missing_skill, self.message)
 
 
 class ActionResult(object):
     """
     The ActionResult class defines the data structure that is returned by the run() methods of actions.
     """
+
     def __init__(self, succeeded=False, message=""):
         self.succeeded = succeeded
         self.message = message
@@ -60,6 +63,7 @@ class Action(object):
     """
     The Action class defines the interface of actions that can be configured and started by the task_manager.
     """
+
     def __init__(self):
         self._config_result = ConfigurationResult()
         self._execute_result = ActionResult()
@@ -96,6 +100,7 @@ class Action(object):
     def configure(self, robot, config):
         """
         Configure the action with a robot and configuration data
+
         :param robot: The robot to use for this action
         :type robot: Robot
         :param config: The configuration data. Contains semantics from input and implied context from previous tasks.
@@ -131,6 +136,7 @@ class Action(object):
     def start(self):
         """
         Runs the execution of the action. Blocks until the action is finished or canceled.
+
         :return: ActionResult
         """
         rospy.loginfo("Starting executing of action {}.".format(self.get_name()))
