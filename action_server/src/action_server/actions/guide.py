@@ -19,7 +19,7 @@ class Guide(Action):
         Action.__init__(self)
         self._required_field_prompts = {'object': " Who would you like me to guide? ",
                                         'target-location': " Where would you like me to guide them to? "}
-        self._required_skills = ['head', 'base', 'rightArm', 'speech']
+        self._required_skills = ['head', 'base', 'speech']
         self._follower_id = None
         self._target_id = None
 
