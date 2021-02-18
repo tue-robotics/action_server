@@ -66,7 +66,7 @@ def test_grammar(robot, grammar, grammar_target):
         test_results[result_str] = TMTestResult(actions_definition["actions"], test_result)
 
     failed_test_results = {}
-    for action, test_result in test_results.iteritems():
+    for action, test_result in test_results.items():
         if test_result.config_result.succeeded:
             print("Configuration of '{}' succeeded".format(action))
         elif test_result.config_result.message and test_result.config_result.missing_field:
@@ -77,7 +77,7 @@ def test_grammar(robot, grammar, grammar_target):
             failed_test_results[action] = test_result
 
     error_str = "\n"
-    for action, test_result in failed_test_results.iteritems():
+    for action, test_result in failed_test_results.items():
         error_str += "\nConfiguration of action '{}' failed.\n\tRecipe: {}\n\tError: {}".format(
             action,
             test_result.recipe,

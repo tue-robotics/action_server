@@ -181,7 +181,7 @@ class Find(Action):
         location_designator = None
         self._find_state_machines = []
         self._found_entity_designator = VariableDesignator(resolve_type=Entity)
-        for loc, areas in self._areas.iteritems():
+        for loc, areas in self._areas.items():
             location_designator = EdEntityDesignator(self._robot, id=loc)
             nav_area = self._nav_areas[loc]
             for area in areas:
