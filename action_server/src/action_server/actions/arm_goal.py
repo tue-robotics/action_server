@@ -1,4 +1,4 @@
-from action import Action, ConfigurationData
+from .action import Action, ConfigurationData
 
 import threading
 import rospy

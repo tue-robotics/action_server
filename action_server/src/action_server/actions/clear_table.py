@@ -1,4 +1,4 @@
-from action import Action, ConfigurationData
+from .action import Action, ConfigurationData
 from challenge_dishwasher.dishwasher import NavigateAndPlaceDishwasher, GrabRobust, NavigateAndOpenDishwasher
 
 

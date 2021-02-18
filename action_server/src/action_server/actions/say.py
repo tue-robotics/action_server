@@ -1,4 +1,4 @@
-from action import Action, ConfigurationData
+from .action import Action, ConfigurationData
 from find import Find
 
 import rospy

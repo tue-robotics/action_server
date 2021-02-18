@@ -1,5 +1,5 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description, EntityDescription
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description, EntityDescription
 from robot_smach_states.navigation import NavigateToSymbolic
 
 from robot_smach_states.navigation import FollowOperator

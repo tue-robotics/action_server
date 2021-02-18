@@ -1,6 +1,6 @@
-from action import Action, ConfigurationData
+from .action import Action, ConfigurationData
 
-from entity_description import resolve_entity_description
+from .entity_description import resolve_entity_description
 
 from robot_smach_states.manipulation import Grab
 from robot_skills.arm.arms import GripperTypes

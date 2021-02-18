@@ -1,4 +1,4 @@
-from action import Action, ConfigurationData
+from .action import Action, ConfigurationData
 from util import entities_from_description
 
 import robot_skills.util.kdl_conversions as kdl
