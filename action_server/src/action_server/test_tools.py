@@ -62,7 +62,7 @@ def test_grammar(robot, grammar, grammar_target):
             exc_type, exc_value, exc_traceback = sys.exc_info()
             tb = "".join((traceback.format_exception(exc_type, exc_value, exc_traceback)))
             test_result = ConfigurationResult()
-            test_result.message = "Configuration crashed: {}\n{}".format(e.message, tb)
+            test_result.message = "Configuration crashed: {}\n{}".format(e, tb)
         test_results[result_str] = TMTestResult(actions_definition["actions"], test_result)
 
     failed_test_results = {}
