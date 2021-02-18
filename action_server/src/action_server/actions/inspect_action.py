@@ -1,6 +1,6 @@
 from .action import Action, ConfigurationData
 
-from util import entities_from_description
+from .util import entities_from_description
 
 import robot_smach_states
 import threading

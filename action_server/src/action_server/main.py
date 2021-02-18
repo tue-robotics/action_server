@@ -4,8 +4,9 @@
 The Action Server ROS node running an instance of the server for a specific robot.
 """
 
-import rospy, sys
-from server import Server
+import rospy
+import sys
+from .server import Server
 
 
 if __name__ == "__main__":

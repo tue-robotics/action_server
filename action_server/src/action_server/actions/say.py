@@ -1,5 +1,5 @@
 from .action import Action, ConfigurationData
-from find import Find
+from .find import Find
 
 import rospy
 import random

@@ -1,6 +1,6 @@
 import rospy
-from action_factory import ActionFactory
-from actions.action import ConfigurationResult, ConfigurationData
+from .action_factory import ActionFactory
+from .actions.action import ConfigurationResult, ConfigurationData
 
 """
 The TaskManager sets up a state machine according to a task recipe and executes it.

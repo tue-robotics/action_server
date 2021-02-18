@@ -1,10 +1,11 @@
-import rospy, yaml
+import rospy
+import yaml
 
 import actionlib
 import action_server_msgs.msg
 from action_server_msgs.srv import GetActions, GetActionsResponse
-from task_manager import TaskManager
-from actions.action import ConfigurationResult
+from .task_manager import TaskManager
+from .actions.action import ConfigurationResult
 
 
 class Server(object):

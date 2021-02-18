@@ -1,7 +1,7 @@
 import rospy
 import inspect
 import re
-import actions
+from . import actions
 
 
 def class_name_camelcase_to_dashes(name):

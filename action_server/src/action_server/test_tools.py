@@ -5,8 +5,8 @@ import sys
 import traceback
 
 from grammar_parser.cfgparser import CFGParser, Conjunct, Option, Rule
-from action_server.actions.action import ConfigurationResult
-from action_server.task_manager import TaskManager
+from .actions.action import ConfigurationResult
+from .task_manager import TaskManager
 
 TMTestResult = collections.namedtuple("TMTestResult", ["recipe", "config_result"])
 
