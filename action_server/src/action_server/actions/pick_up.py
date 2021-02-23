@@ -94,8 +94,6 @@ class PickUp(Action):
         # Add the found object to the context that is passed to the next task
         self._config_result.context['object'] = config.context['object']
 
-        # side = config.semantics['side'] if 'side' in config.semantics else 'right'
-
         # Next to the arm_properties of the Pick_up action this ArmDesignator also needs the properties of the Place and
         # Hand_over actions since these actions (can) rely on the Pick_up action for the context.
         arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": ["prepare_grasp", "prepare_place"],
@@ -134,7 +132,7 @@ class PickUp(Action):
 
 
 if __name__ == "__main__":
-    rospy.init_node('place_test')
+    rospy.init_node('pickup_test')
 
     import sys
 
@@ -154,7 +152,6 @@ if __name__ == "__main__":
 
     config = ConfigurationData({'action': 'pick_up',
                                 'entity': {'id': 'cabinet'},
-                                'side': 'left',
                                 'height': 0.8})
 
     action.configure(robot, config)
