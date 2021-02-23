@@ -6,7 +6,7 @@ The Action Server ROS node running an instance of the server for a specific robo
 
 import rospy
 import sys
-from .server import Server
+from action_server.server import Server
 
 
 if __name__ == "__main__":
