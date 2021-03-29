@@ -2,9 +2,10 @@ import os
 import unittest
 
 from ed_msgs.msg import EntityInfo
+
+from action_server.test_tools import test_grammar
 from robot_skills.mockbot import Mockbot
 from robot_skills.util.entity import from_entity_info
-from action_server.test_tools import test_grammar
 
 # noinspection Py
 GRAMMAR = """

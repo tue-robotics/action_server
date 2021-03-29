@@ -1,6 +1,6 @@
-from .action import Action, ConfigurationData
-
 import rospy
+
+from .action import Action, ConfigurationData
 
 
 class ResetWM(Action):

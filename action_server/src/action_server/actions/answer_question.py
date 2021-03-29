@@ -1,10 +1,10 @@
-from .action import Action
-from .entity_description import resolve_entity_description
-
 import rospy
+
+import hmi
 from robocup_knowledge import load_knowledge
 from robot_smach_states.human_interaction.answer_questions import answer
-import hmi
+from .action import Action
+from .entity_description import resolve_entity_description
 
 
 class AnswerQuestion(Action):

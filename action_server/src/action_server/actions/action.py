@@ -1,7 +1,7 @@
 import rospy
 
-from robot_skills.robot import Robot
 from robocup_knowledge import load_knowledge
+from robot_skills.robot import Robot
 
 
 class ConfigurationData(object):

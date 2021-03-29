@@ -1,8 +1,10 @@
 from __future__ import print_function
+
 import collections
-from nose.tools import nottest
 import sys
 import traceback
+
+from nose.tools import nottest
 
 from grammar_parser.cfgparser import CFGParser, Conjunct, Option, Rule
 from .actions.action import ConfigurationResult

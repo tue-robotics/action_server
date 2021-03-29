@@ -1,8 +1,7 @@
-import rospy
-
-import actionlib
 import action_server_msgs.msg
 import action_server_msgs.srv
+import actionlib
+import rospy
 
 
 class TaskOutcome(object):

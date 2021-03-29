@@ -1,7 +1,7 @@
-from .action import Action, ConfigurationData
-
 import rospy
+
 from challenge_presentation import PresentationMachine, PresentationMachineHero
+from .action import Action, ConfigurationData
 
 
 class DemoPresentation(Action):

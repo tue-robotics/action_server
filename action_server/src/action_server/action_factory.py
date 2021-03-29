@@ -1,6 +1,8 @@
-import rospy
 import inspect
 import re
+
+import rospy
+
 from . import actions
 
 

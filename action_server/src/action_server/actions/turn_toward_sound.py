@@ -1,8 +1,9 @@
-from .action import Action, ConfigurationData
-from robot_smach_states.human_interaction import SSLLookatAndRotate
 import threading
 
 import rospy
+
+from robot_smach_states.human_interaction import SSLLookatAndRotate
+from .action import Action, ConfigurationData
 
 
 class TurnTowardSound(Action):

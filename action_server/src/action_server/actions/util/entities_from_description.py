@@ -1,4 +1,3 @@
-import rospy
 from robot_skills.robot import Robot
 
 

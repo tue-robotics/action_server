@@ -1,7 +1,8 @@
-from .action import Action, ConfigurationData
-
 import threading
+
 import rospy
+
+from .action import Action, ConfigurationData
 
 
 class ArmGoal(Action):

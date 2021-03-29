@@ -1,17 +1,14 @@
-from .action import Action, ConfigurationData
-
-from .entity_description import resolve_entity_description
-
-import rospy
 import math
 
-from robot_smach_states.human_interaction import FindPersonInRoom
-from robot_smach_states.navigation import NavigateToWaypoint
-from robot_smach_states.navigation import Find as StatesFind
-from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
-from robot_skills.util.entity import Entity
+import rospy
 
 import robot_skills.util.kdl_conversions as kdl
+from robot_skills.util.entity import Entity
+from robot_smach_states.human_interaction import FindPersonInRoom
+from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
+from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class Find(Action):

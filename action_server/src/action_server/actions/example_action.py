@@ -1,7 +1,6 @@
-from .action import Action, ConfigurationData
 from robot_skills.util.entity import Entity
-
 from robot_smach_states.util.designators import VariableDesignator
+from .action import Action
 
 
 class ExampleAction(Action):
