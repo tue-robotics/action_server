@@ -1,11 +1,10 @@
-from action import Action, ConfigurationData
-
-from util import entities_from_description
-
-import robot_smach_states
 import threading
 
 import rospy
+
+import robot_smach_states
+from .action import Action, ConfigurationData
+from .util import entities_from_description
 
 
 class Inspect(Action):

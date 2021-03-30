@@ -1,1 +1,1 @@
-from client import Client, TaskOutcome
+from .client import Client, TaskOutcome

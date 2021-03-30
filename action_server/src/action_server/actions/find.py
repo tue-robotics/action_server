@@ -1,17 +1,14 @@
-from action import Action, ConfigurationData
-
-from entity_description import resolve_entity_description
-
-import rospy
 import math
 
-from robot_smach_states.human_interaction import FindPersonInRoom
-from robot_smach_states.navigation import NavigateToWaypoint
-from robot_smach_states.navigation import Find as StatesFind
-from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
-from robot_skills.util.entity import Entity
+import rospy
 
 import robot_skills.util.kdl_conversions as kdl
+from robot_skills.util.entity import Entity
+from robot_smach_states.human_interaction import FindPersonInRoom
+from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
+from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class Find(Action):
@@ -181,7 +178,7 @@ class Find(Action):
         location_designator = None
         self._find_state_machines = []
         self._found_entity_designator = VariableDesignator(resolve_type=Entity)
-        for loc, areas in self._areas.iteritems():
+        for loc, areas in self._areas.items():
             location_designator = EdEntityDesignator(self._robot, id=loc)
             nav_area = self._nav_areas[loc]
             for area in areas:

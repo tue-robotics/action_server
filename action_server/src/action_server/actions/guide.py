@@ -1,10 +1,9 @@
 import rospy
 
-from action import Action, ConfigurationData
-
 import robot_smach_states as states
 import robot_smach_states.util.designators as ds
-from entity_description import resolve_entity_description
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class Guide(Action):

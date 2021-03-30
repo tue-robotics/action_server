@@ -1,9 +1,9 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
-
 import rospy
-from robocup_knowledge import load_knowledge
+
 import hmi
+from robocup_knowledge import load_knowledge
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class TellNameOfPerson(Action):

@@ -1,1 +1,1 @@
-from entities_from_description import entities_from_description
+from .entities_from_description import entities_from_description

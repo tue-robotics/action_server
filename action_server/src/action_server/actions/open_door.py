@@ -1,5 +1,6 @@
-from action import Action, ConfigurationData
 from challenge_storing_groceries.open_door import OpenDoorMachine
+
+from .action import Action
 
 
 class OpenDoor(Action):

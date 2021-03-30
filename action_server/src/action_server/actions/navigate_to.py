@@ -1,10 +1,9 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
-
 import rospy
 
-from robot_smach_states.navigation import NavigateToWaypoint, NavigateToSymbolic
+from robot_smach_states.navigation import NavigateToSymbolic, NavigateToWaypoint
 from robot_smach_states.util.designators import EntityByIdDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class NavigateTo(Action):

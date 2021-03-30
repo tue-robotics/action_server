@@ -1,10 +1,10 @@
-from action import Action, ConfigurationData
-from util import entities_from_description
+import threading
+
+import rospy
 
 import robot_skills.util.kdl_conversions as kdl
-
-import threading
-import rospy
+from .action import Action, ConfigurationData
+from .util import entities_from_description
 
 
 class LookAt(Action):

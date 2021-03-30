@@ -1,8 +1,8 @@
-from action import Action, ConfigurationData
 import rospy
-import robot_smach_states as states
 
-from entity_description import resolve_entity_description
+import robot_smach_states as states
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class SendPicture(Action):

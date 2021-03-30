@@ -1,13 +1,12 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
-
-from robot_skills.arm.arms import PublicArm, GripperTypes
-import robot_smach_states
-from robot_smach_states.manipulation import Place as PlaceSmachState
-from robot_skills.util.entity import Entity
-from robot_smach_states.util.designators import ArmDesignator
-
 import rospy
+
+import robot_smach_states
+from robot_skills.arm.arms import GripperTypes, PublicArm
+from robot_skills.util.entity import Entity
+from robot_smach_states.manipulation import Place as PlaceSmachState
+from robot_smach_states.util.designators import ArmDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class Place(Action):

@@ -1,7 +1,8 @@
-from action import Action, ConfigurationData
+import threading
 
 import rospy
-import threading
+
+from .action import Action, ConfigurationData
 
 
 class GripperGoal(Action):
