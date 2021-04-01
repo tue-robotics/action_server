@@ -43,7 +43,7 @@ class LookAt(Action):
 
         if self._entity:
             pos = self._entity._pose.p
-            self._robot.head.look_at_point(kdl.VectorStamped(vector=pos, frame_id="/map"), timeout=10)
+            self._robot.head.look_at_point(kdl.VectorStamped(vector=pos, frame_id="map"), timeout=10)
 
         self._execute_result.succeeded = True
 
