@@ -4,11 +4,11 @@
 The Action Server ROS node running an instance of the server for a specific robot.
 """
 
-import sys
-
 import rospy
 
-from action_server.server import Server
+from robot_skills import get_robot
+
+from action_server import Server
 
 if __name__ == "__main__":
     rospy.init_node('action_server')
@@ -22,17 +22,7 @@ if __name__ == "__main__":
     rospy.loginfo("Parameters:")
     rospy.loginfo("robot_name = {}".format(robot_name))
 
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    elif robot_name == 'hero':
-        from robot_skills.hero import Hero as Robot
-    else:
-        rospy.logerr("'robot_name' must be 'amigo', 'sergio' or 'hero'")
-        sys.exit()
-
-    robot = Robot()
+    robot = get_robot(robot_name)
 
     server = Server(robot)
 

@@ -46,17 +46,9 @@ class TurnTowardSound(Action):
 if __name__ == "__main__":
     rospy.init_node('turn_toward_sound_test')
 
-    import sys
+    from robot_skills import get_robot_from_argv
 
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
-
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = TurnTowardSound()
 
