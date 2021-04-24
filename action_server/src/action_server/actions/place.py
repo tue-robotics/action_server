@@ -178,7 +178,6 @@ if __name__ == "__main__":
 
     semantics = {'action': 'place',
                  'entity': {'id': 'cabinet'},
-                 'side': 'left',
                  'height': 0.8}
 
     action.configure(robot, ConfigurationData(semantics))

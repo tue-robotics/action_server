@@ -9,22 +9,18 @@ class ArmGoal(Action):
     """
     The ArmGoal class implements the action of moving the arm to a predefined joint position.
 
-    Parameters to pass to the configure method are 'side' (optional) and 'symbolic' (required). The 'symbolic'
+    Parameters to pass to the configure method are 'arm_name' (optional) and 'symbolic' (required). The 'symbolic'
      parameter must be a string as defined in Arm.default_joint_configurations.
     """
 
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'side': " Which arm should I move? ",
-                                        'symbolic': " What should I do with my arm? "}
+        self._required_field_prompts = {'arm_name' : " Which arm should I move? ",
+                                        'symbolic' : " What should I do with my arm? "}
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
-        if config.semantics['side'] == 'left':
-            self._arm = robot.leftArm
-        else:
-            self._arm = robot.rightArm
-
+        self._arm = robot.parts[config.semantics['arm_name']]
         self._symbolic_goal = config.semantics["symbolic"]
         self._config_result.succeeded = True
 
@@ -55,7 +51,7 @@ if __name__ == "__main__":
     action = ArmGoal()
 
     semantics = {'action': 'arm_goal',
-                 'side': 'right',
+                 'arm_name': 'rightArm',
                  'symbolic': 'carrying_box_pose'}
 
     action.configure(robot, ConfigurationData(semantics))
