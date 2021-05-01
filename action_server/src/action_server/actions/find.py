@@ -28,7 +28,7 @@ class Find(Action):
 
     def _point_at_person(self, person):
         pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',
-                                                        self._robot.tf_listener)
+                                                        self._robot.tf_buffer)
         pose_base_link = kdl.kdl_frame_stamped_to_pose_stamped_msg(pose_base_link_kdl)
 
         x = pose_base_link.pose.position.x
