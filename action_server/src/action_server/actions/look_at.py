@@ -1,8 +1,8 @@
 import threading
 
+from pykdl_ros import VectorStamped
 import rospy
 
-import robot_skills.util.kdl_conversions as kdl
 from .action import Action, ConfigurationData
 from .util import entities_from_description
 
@@ -42,8 +42,7 @@ class LookAt(Action):
         self._robot.head.cancel_goal()
 
         if self._entity:
-            pos = self._entity._pose.p
-            self._robot.head.look_at_point(kdl.VectorStamped(vector=pos, frame_id="map"), timeout=10)
+            self._robot.head.look_at_point(VectorStamped.from_framestamped(self._entity.pose), timeout=10)
 
         self._execute_result.succeeded = True
 

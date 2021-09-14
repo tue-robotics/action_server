@@ -46,7 +46,7 @@ def entities_from_description(entity_descr, robot):
             else:
                 area = "on_top_of"
             entities = [e for e in entities if
-                        location_entity.in_volume(volume_id=area, point=e.pose.extractVectorStamped())]
+                        location_entity.in_volume(volume_id=area, point=VectorStamped.from_framestamped(e.pose))]
 
     if not entities:
         return [], "No such entity"
