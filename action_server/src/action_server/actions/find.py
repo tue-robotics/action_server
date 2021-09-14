@@ -2,7 +2,6 @@ import math
 
 import rospy
 
-import robot_skills.util.kdl_conversions as kdl
 from robot_skills.util.entity import Entity
 from robot_smach_states.human_interaction import FindPersonInRoom
 from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
@@ -27,12 +26,10 @@ class Find(Action):
         self._required_skills = ['head', 'base', 'speech']  # ToDO: Still calls rightArm directly
 
     def _point_at_person(self, person):
-        pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',
-                                                        self._robot.tf_buffer)
-        pose_base_link = kdl.kdl_frame_stamped_to_pose_stamped_msg(pose_base_link_kdl)
+        pose_base_link = self._robot.tf_buffer.transform(person.pose, self._robot.base_link_frame)
 
-        x = pose_base_link.pose.position.x
-        y = pose_base_link.pose.position.y
+        x = pose_base_link.frame.p.x()
+        y = pose_base_link.frame.p.y()
 
         th = math.atan2(y, x)
         vth = 0.5
