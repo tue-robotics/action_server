@@ -54,8 +54,8 @@ class NavigateTo(Action):
         # If we need to navigate to "me", which resolves to "operator", plant a waypoint at the current position to
         # navigate to.
         # TODO: learn to recognize the operator so that you know you found him later on
-        self._robot.ed.update_entity(id="operator", frame_stamped=self._robot.base.get_location(),
-                                     type="waypoint")
+        self._robot.ed.update_entity(uuid="operator", frame_stamped=self._robot.base.get_location(),
+                                     etype="waypoint")
 
         semantics = self._parse_semantics(config.semantics)
         context = self._parse_context(config.context)
@@ -97,7 +97,7 @@ class NavigateTo(Action):
 
         if semantics.target_location.id and \
             (semantics.target_location.type != 'person' or semantics.target_location.id == 'operator'):
-            entity_designator = EntityByIdDesignator(self._robot, id=semantics.target_location.id)
+            entity_designator = EntityByIdDesignator(self._robot, uuid=semantics.target_location.id)
             e = entity_designator.resolve()  # TODO: nasty assumption that we can resolve this entity here?!
 
             if e.is_a("waypoint"):

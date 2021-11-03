@@ -1,11 +1,11 @@
 import os
 import unittest
 
+from ed.entity import from_entity_info
 from ed_msgs.msg import EntityInfo
 
 from action_server.test_tools import test_grammar
 from robot_skills import get_robot
-from robot_skills.util.entity import from_entity_info
 
 # noinspection Py
 GRAMMAR = """

@@ -2,7 +2,7 @@ import math
 
 import rospy
 
-from robot_skills.util.entity import Entity
+from ed.entity import Entity
 from robot_smach_states.human_interaction import FindPersonInRoom
 from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
@@ -135,12 +135,12 @@ class Find(Action):
                 FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
                                  discard_other_labels, self._found_entity_designator.writeable)]
             self._config_result.context['location'] = {
-                'designator': EdEntityDesignator(self._robot, id=self._semantics.source_location.id)
+                'designator': EdEntityDesignator(self._robot, uuid=self._semantics.source_location.id)
             }
             if self._semantics.source_location.id:
                 self._config_result.context['location']['id'] = self._semantics.source_location.id
 
-            self._found_entity_designator = EdEntityDesignator(self._robot, id=self._semantics.object.id)
+            self._found_entity_designator = EdEntityDesignator(self._robot, uuid=self._semantics.object.id)
             self._config_result.context['object']['designator'] = self._found_entity_designator
             self._config_result.succeeded = True
 
@@ -176,7 +176,7 @@ class Find(Action):
         self._find_state_machines = []
         self._found_entity_designator = VariableDesignator(resolve_type=Entity)
         for loc, areas in self._areas.items():
-            location_designator = EdEntityDesignator(self._robot, id=loc)
+            location_designator = EdEntityDesignator(self._robot, uuid=loc)
             nav_area = self._nav_areas[loc]
             for area in areas:
                 area_designator = VariableDesignator(area)
