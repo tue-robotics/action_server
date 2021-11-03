@@ -1,3 +1,5 @@
+from pykdl_ros import VectorStamped
+
 from robot_skills.robot import Robot
 
 
@@ -38,7 +40,7 @@ def entities_from_description(entity_descr, robot):
         entities = robot.ed.get_entities()
 
     if "location" in entity_descr:
-        location_entity = robot.ed.get_entity(id=entity_descr["location"]["id"])
+        location_entity = robot.ed.get_entity(uuid=entity_descr["location"]["uuid"])
 
         if location_entity:
             if "area" in entity_descr and entity_descr["area"] in location_entity.volumes:
