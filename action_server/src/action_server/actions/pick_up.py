@@ -116,14 +116,14 @@ class PickUp(Action):
                     format(self._config_result.context)
             else:
                 self._execute_result.message += " I picked up the {}. ". \
-                    format(self._config_result.context['object']['designator'].resolve().type)
+                    format(self._config_result.context['object']['designator'].resolve().etype)
         else:
             if not self._config_result.context['object']['designator'].resolve():
                 self._execute_result.message += " I could not pick anything up. ". \
                     format(self._config_result.context)
             else:
                 self._execute_result.message += " I could not pick up the {}. ". \
-                    format(self._config_result.context['object']['designator'].resolve().type)
+                    format(self._config_result.context['object']['designator'].resolve().etype)
 
     def _cancel(self):
         if self._fsm.is_running:
