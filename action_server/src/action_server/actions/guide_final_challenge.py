@@ -46,7 +46,7 @@ class GuideFinalChallenge(Action):
         # We start by parsing semantics and context
         self._semantics = GuideFinalChallenge._parse_semantics(config.semantics)
 
-        target_location_designator = ds.EntityByIdDesignator(self._robot, id=self._semantics.target_location.id)
+        target_location_designator = ds.EntityByIdDesignator(self._robot, uuid=self._semantics.target_location.id)
 
         area = "near"
         if self._semantics.target_location.type == "room":

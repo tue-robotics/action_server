@@ -40,7 +40,7 @@ class CountAndTell(Action):
         semantics = CountAndTell._parse_semantics(config.semantics)
 
         self._count_designator = ds.VariableDesignator(-1)
-        self._where_to_count_designator = ds.EntityByIdDesignator(robot, id=semantics.location.id)
+        self._where_to_count_designator = ds.EntityByIdDesignator(robot, uuid=semantics.location.id)
         self._what_to_count_designator = ds.Designator(semantics.object.type)
         self._count_state_machine = states.InspectAndCount(robot,
                                                            self._where_to_count_designator,

@@ -1,3 +1,5 @@
+from pykdl_ros import VectorStamped
+
 from robot_skills.robot import Robot
 
 
@@ -28,17 +30,17 @@ def entities_from_description(entity_descr, robot):
         return [], "entities_from_description: the specified robot should be a Robot! I received: %s" % str(robot)
 
     if "id" in entity_descr:
-        e = robot.ed.get_entity(id=entity_descr["id"])
+        e = robot.ed.get_entity(uuid=entity_descr["id"])
         if not e:
             return [], "No entity with id '%s'" % entity_descr["id"]
         entities = [e]
     elif "type" in entity_descr:
-        entities = robot.ed.get_entities(type=entity_descr["type"])
+        entities = robot.ed.get_entities(etype=entity_descr["type"])
     else:
         entities = robot.ed.get_entities()
 
     if "location" in entity_descr:
-        location_entity = robot.ed.get_entity(id=entity_descr["location"]["id"])
+        location_entity = robot.ed.get_entity(uuid=entity_descr["location"]["id"])
 
         if location_entity:
             if "area" in entity_descr and entity_descr["area"] in location_entity.volumes:

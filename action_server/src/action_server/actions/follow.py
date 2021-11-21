@@ -15,7 +15,7 @@ def navigate(robot, entity_description):
     else:
         origin_area = "near"
 
-    origin_entity_designator = EdEntityDesignator(robot, id=entity_description.id)
+    origin_entity_designator = EdEntityDesignator(robot, uuid=entity_description.id)
     navigation_sm = NavigateToSymbolic(
         robot=robot,
         entity_designator_area_name_map=

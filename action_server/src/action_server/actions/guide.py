@@ -77,7 +77,7 @@ class Guide(Action):
                 self._config_result.required_context['source-location'] = config.semantics['source-location']
             return
 
-        target_location_designator = ds.EntityByIdDesignator(self._robot, id=self._semantics.target_location.id)
+        target_location_designator = ds.EntityByIdDesignator(self._robot, uuid=self._semantics.target_location.id)
 
         area = "near"
         if self._semantics.target_location.type == "room":

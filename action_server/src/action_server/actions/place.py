@@ -1,8 +1,9 @@
 import rospy
 
+from ed.entity import Entity
+
 import robot_smach_states
 from robot_skills.arm.arms import GripperTypes, PublicArm
-from robot_skills.util.entity import Entity
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_smach_states.util.designators import ArmDesignator
 from .action import Action, ConfigurationData
@@ -147,7 +148,7 @@ class Place(Action):
                                                                        resolve_type=Entity)
 
         entity_to_place_on = robot_smach_states.util.designators.EdEntityDesignator(self._robot,
-                                                                                    id=self.context.location.id)
+                                                                                    uuid=self.context.location.id)
         self._place = PlaceSmachState(self._robot, item_to_place,
                                       entity_to_place_on,
                                       arm_designator,

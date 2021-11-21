@@ -17,6 +17,9 @@
   <buildtool_depend condition="$ROS_PYTHON_VERSION == 3">python3-setuptools</buildtool_depend>
 
   <exec_depend>action_server_msgs</exec_depend>
+  <exec_depend>actionlib</exec_depend>
+  <exec_depend>challenge_presentation</exec_depend>
+  <exec_depend>ed_python</exec_depend>
   <exec_depend>grammar_parser</exec_depend>
   <exec_depend>pykdl_ros</exec_depend>
   <exec_depend condition="$ROS_PYTHON_VERSION == 2">python-nose</exec_depend>
@@ -24,8 +27,6 @@
   <exec_depend>robocup_knowledge</exec_depend>
   <exec_depend>robot_skills</exec_depend>
   <exec_depend>robot_smach_states</exec_depend>
-  <exec_depend>actionlib</exec_depend>
-  <exec_depend>challenge_presentation</exec_depend>
 
   <test_depend>ed_msgs</test_depend>
 
