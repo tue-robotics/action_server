@@ -38,7 +38,7 @@ class Server(object):
         return res
 
     def _add_action_cb(self, goal):
-        recipe = yaml.load(goal.recipe.lower())
+        recipe = yaml.safe_load(goal.recipe.lower())
         rospy.logdebug("Received action recipe: {}".format(goal.recipe))
 
         try:
