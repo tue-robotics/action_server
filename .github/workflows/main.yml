@@ -14,10 +14,10 @@ jobs:
           fetch-depth: 300
       - name: Commit Range
         id: commit-range
-        uses: tue-robotics/tue-env/ci/commit-range@master
+        uses: tue-robotics/tue-env/ci/commit-range@fix/ci_test
       - name: Modified packages
         id: modified-packages
-        uses: tue-robotics/tue-env/ci/modified-packages@master
+        uses: tue-robotics/tue-env/ci/modified-packages@fix/ci_test
         with:
           commit-range: ${{ steps.commit-range.outputs.commit-range }}
           ignored-packages: doc
@@ -31,6 +31,6 @@ jobs:
         package: ${{ fromJson(needs.matrix.outputs.packages) }}
     steps:
       - name: TUe CI
-        uses: tue-robotics/tue-env/ci/main@master
+        uses: tue-robotics/tue-env/ci/main@fix/ci_test
         with:
           package: ${{ matrix.package }}
