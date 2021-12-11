@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 from pykdl_ros import VectorStamped
 
 from robot_skills.robot import Robot
@@ -9,16 +11,16 @@ def length_sq(x, y):
 
 # ----------------------------------------------------------------------------------------------------
 
-def entities_from_description(entity_descr, robot):
+def entities_from_description(entity_descr: dict, robot: Robot) -> Tuple[List, str]:
     """
     Query entities with various methods
 
-    @param entity_descr: A dict that contains an 'id' or 'type' field
-    @param robot: The robot object
+    :param entity_descr: A dict that contains an 'id' or 'type' field
+    :param robot: The robot object
 
-    @return: (entities, error_msg)
+    :return: (entities, error_msg)
         entities  - list of entities that fulfill the description
-                    (each element has type EntityInfo)
+        (each element has type EntityInfo)
         error_msg - If something goes wrong, this contains the message
     """
     if not isinstance(entity_descr, dict):
