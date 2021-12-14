@@ -106,6 +106,9 @@ class NavigateTo(Action):
             entity_designator = EntityByIdDesignator(self._robot, uuid=semantics.target_location.id)
             e = entity_designator.resolve()
 
+            if e is None:
+                return  # self._config_result.succeeded = False
+
             if e.is_a("waypoint"):
                 self._navigation_state_machine = NavigateToWaypoint(self._robot,
                                                                     waypoint_designator=entity_designator,
