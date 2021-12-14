@@ -89,7 +89,7 @@ class NavigateTo(Action):
             return
         # Now we can assume we know the navigation goal entity!
         # operator
-        if semantics.target_location.id and semantics.target_location.id == 'operator':
+        if semantics.target_location.id == 'operator':
             # If we need to navigate to "me", which resolves to "operator", plant a waypoint at the current position to
             # navigate to.
             # TODO: learn to recognize the operator so that you know you found him later on
