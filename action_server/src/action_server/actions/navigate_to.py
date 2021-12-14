@@ -104,7 +104,7 @@ class NavigateTo(Action):
         # known room or object
         elif semantics.target_location.id and semantics.target_location.type != 'person':
             entity_designator = EntityByIdDesignator(self._robot, uuid=semantics.target_location.id)
-            e = entity_designator.resolve()  # TODO: nasty assumption that we can resolve this entity here?!
+            e = entity_designator.resolve()
 
             if e.is_a("waypoint"):
                 self._navigation_state_machine = NavigateToWaypoint(self._robot,
