@@ -2,7 +2,7 @@ import rospy
 from sensor_msgs.msg import Image
 
 import robot_smach_states as states
-from robot_smach_f.util.designators import EdEntityDesignator
+from robot_smach_states.util.designators import EdEntityDesignator
 
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
