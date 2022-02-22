@@ -56,8 +56,7 @@ class SendPicture(Action):
         # self.detect_face_state_machine = states.DetectFace(self._robot)
 
         entity_to_inspect = resolve_entity_description(config.semantics['target-location'])
-	entity_designator = EdEntityDesignator(self._robot, id=entity_to_inspect.id)
-	entity = entity_designator.resolve()
+        entity = EdEntityDesignator(self._robot, id=entity_to_inspect.id).resolve()
         self.look_at_sm = states.LookOnTopOfEntity(self._robot, entity)
 
         self._config_result.succeeded = True
