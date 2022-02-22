@@ -2,7 +2,6 @@ from action import Action, ConfigurationData
 from entity_description import resolve_entity_description
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
 from robot_smach_states.clear import Clear as ClearSmachState
-# from challenge_clear import ClearMachine
 import rospy
 
 
@@ -86,18 +85,9 @@ class Clear(Action):
 if __name__ == "__main__":
     rospy.init_node('clear_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    elif robot_name == 'hero':
-        from robot_skills.hero import Hero as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = Clear()
 
