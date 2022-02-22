@@ -1,7 +1,7 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
-
 import rospy
+
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class HandOver(Action):
@@ -11,6 +11,7 @@ class HandOver(Action):
     Parameters to pass to the configure() method are 'source-location' (required), 'target-location' (required) and
     an object to bring (required).
     """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'target-location': " Who would you like me to hand the object? ",
@@ -125,7 +126,7 @@ class HandOver(Action):
 
         self._robot.speech.speak("I will open my gripper now.", block=False)
 
-        self._robot.ed.update_entity(id=arm.occupied_by.id, action='remove')
+        self._robot.ed.update_entity(uuid=arm.occupied_by.uuid, action='remove')
         arm.send_gripper_goal('open')
         arm.wait_for_motion_done()
 
@@ -154,16 +155,9 @@ class HandOver(Action):
 if __name__ == "__main__":
     rospy.init_node('bring_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = HandOver()
 

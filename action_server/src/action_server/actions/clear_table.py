@@ -1,5 +1,6 @@
-from action import Action, ConfigurationData
-from challenge_dishwasher.dishwasher import NavigateAndPlaceDishwasher, GrabRobust, NavigateAndOpenDishwasher
+from challenge_dishwasher.dishwasher import GrabRobust, NavigateAndOpenDishwasher, NavigateAndPlaceDishwasher
+from .action import Action
+
 
 class ClearTable(Action):
     def __init__(self):

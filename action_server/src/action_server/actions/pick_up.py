@@ -1,21 +1,21 @@
-from action import Action, ConfigurationData
-
-from util import entities_from_description
-from entity_description import resolve_entity_description
-
-from robot_smach_states.manipulation import Grab
-from robot_skills import arms
-from robot_smach_states.util.designators import UnoccupiedArmDesignator
 import rospy
+
+from robot_skills.arm.arms import GripperTypes
+from robot_smach_states.manipulation import Grab
+from robot_smach_states.util.designators import UnoccupiedArmDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class PickUp(Action):
-    ''' The PickUp class implements the action to grasp an object.
+    """
+    The PickUp class implements the action to grasp an object.
 
     Parameters to pass to the configure() method are:
      - `object` (required): the id of the object to grab
      - `object-designator` (required): a designator resolving to the object to grab
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['arms']
@@ -93,13 +93,11 @@ class PickUp(Action):
         # Add the found object to the context that is passed to the next task
         self._config_result.context['object'] = config.context['object']
 
-        # side = config.semantics['side'] if 'side' in config.semantics else 'right'
-
         # Next to the arm_properties of the Pick_up action this ArmDesignator also needs the properties of the Place and
         # Hand_over actions since these actions (can) rely on the Pick_up action for the context.
         arm_des = UnoccupiedArmDesignator(self._robot, {"required_trajectories": ["prepare_grasp", "prepare_place"],
                                                         "required_goals": ["carrying_pose", "handover_to_human"],
-                                                        "required_gripper_types": [arms.GripperTypes.GRASPING]}
+                                                        "required_gripper_types": [GripperTypes.GRASPING]}
                                           ).lockable()
         arm_des.lock()
 
@@ -114,18 +112,18 @@ class PickUp(Action):
         if fsm_result == "done":
             self._execute_result.succeeded = True
             if not self._config_result.context['object']['designator'].resolve():
-                self._execute_result.message += " I could not pick anything up. ".\
+                self._execute_result.message += " I could not pick anything up. ". \
                     format(self._config_result.context)
             else:
-                self._execute_result.message += " I picked up the {}. ".\
-                    format(self._config_result.context['object']['designator'].resolve().type)
+                self._execute_result.message += " I picked up the {}. ". \
+                    format(self._config_result.context['object']['designator'].resolve().etype)
         else:
             if not self._config_result.context['object']['designator'].resolve():
                 self._execute_result.message += " I could not pick anything up. ". \
                     format(self._config_result.context)
             else:
-                self._execute_result.message += " I could not pick up the {}. ".\
-                    format(self._config_result.context['object']['designator'].resolve().type)
+                self._execute_result.message += " I could not pick up the {}. ". \
+                    format(self._config_result.context['object']['designator'].resolve().etype)
 
     def _cancel(self):
         if self._fsm.is_running:
@@ -133,26 +131,16 @@ class PickUp(Action):
 
 
 if __name__ == "__main__":
-    rospy.init_node('place_test')
+    rospy.init_node('pickup_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    elif robot_name == 'hero':
-        from robot_skills.hero import Hero as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = PickUp()
 
     config = ConfigurationData({'action': 'pick_up',
                                 'entity': {'id': 'cabinet'},
-                                'side': 'left',
                                 'height': 0.8})
 
     action.configure(robot, config)

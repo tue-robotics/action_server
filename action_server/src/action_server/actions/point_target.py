@@ -1,14 +1,15 @@
-from action import Action, ConfigurationData
-
 import rospy
-from robot_smach_states.human_interaction import GetFurnitureFromOperatorPose
+
 from robocup_knowledge import load_knowledge
+from robot_smach_states.human_interaction import GetFurnitureFromOperatorPose
+from .action import Action, ConfigurationData
 
 
 class PointTarget(Action):
     """
     The DemoPresentation class wraps the demo presentation state machine..
     """
+
     def __init__(self):
         Action.__init__(self)
 
@@ -37,19 +38,9 @@ class PointTarget(Action):
 if __name__ == "__main__":
     rospy.init_node('demo_point-at_test')
 
-    import sys
+    from robot_skills import get_robot_from_argv
 
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    elif robot_name == 'hero':
-        from robot_skills.hero import Hero as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
-
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = PointTarget()
     config = ConfigurationData({'action': 'point-at'})

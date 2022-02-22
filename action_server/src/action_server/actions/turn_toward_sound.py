@@ -1,14 +1,16 @@
-from action import Action, ConfigurationData
-from robot_smach_states.human_interaction import SSLLookatAndRotate
 import threading
 
 import rospy
+
+from robot_smach_states.human_interaction import SSLLookatAndRotate
+from .action import Action, ConfigurationData
 
 
 class TurnTowardSound(Action):
     """
     The TurnTowardSound class implements the action to turn towards the sound source provided by SSL
     """
+
     def __init__(self):
         Action.__init__(self)
         self._canceled = False
@@ -40,19 +42,13 @@ class TurnTowardSound(Action):
     def _cancel(self):
         self._canceled = True
 
+
 if __name__ == "__main__":
     rospy.init_node('turn_toward_sound_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = TurnTowardSound()
 

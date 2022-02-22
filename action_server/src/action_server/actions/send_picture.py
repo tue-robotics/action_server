@@ -1,10 +1,12 @@
-from action import Action, ConfigurationData
 import rospy
-import robot_smach_states as states
 from sensor_msgs.msg import Image
 
-from entity_description import resolve_entity_description
-from robot_smach_states.util.designators import EdEntityDesignator
+import robot_smach_states as states
+from robot_smach_f.util.designators import EdEntityDesignator
+
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
+
 
 class SendPicture(Action):
     """ The Inspect class implements the action to send a picture over a whatsapp client.
@@ -12,6 +14,7 @@ class SendPicture(Action):
     Parameters to pass to the configure() method are:
      - `target-location` (required): an entity with a segmentation area to inspect
     """
+
     def __init__(self):
         Action.__init__(self)
 
@@ -80,16 +83,9 @@ class SendPicture(Action):
 if __name__ == "__main__":
     rospy.init_node('send_picture_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = SendPicture()
 

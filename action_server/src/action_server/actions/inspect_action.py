@@ -1,19 +1,20 @@
-from action import Action, ConfigurationData
-
-from util import entities_from_description
-
-import robot_smach_states
 import threading
 
 import rospy
 
+import robot_smach_states
+from .action import Action, ConfigurationData
+from .util import entities_from_description
+
 
 class Inspect(Action):
-    """ The Inspect class implements the action to inspect an area.
+    """
+    The Inspect class implements the action to inspect an area.
 
     Parameters to pass to the configure() method are:
      - `entity` (required): an entity with a segmentation area to inspect
     """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'entity': " What would you like me to inspect? "}
@@ -40,7 +41,7 @@ class Inspect(Action):
 
         self._fsm = robot_smach_states.world_model.Inspect(self._robot,
                                                            entityDes=robot_smach_states.util.designators.EdEntityDesignator(
-                                                               self._robot, id=entity.id),
+                                                               self._robot, uuid=entity.uuid),
                                                            navigation_area=area)
 
         self._thread = threading.Thread(name='inspect', target=self._fsm.execute)
@@ -60,21 +61,14 @@ class Inspect(Action):
 if __name__ == "__main__":
     rospy.init_node('inspect_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = Inspect()
 
     config = ConfigurationData({'action': 'inspect',
-              'entity': {'id': 'cabinet'}})
+                                'entity': {'id': 'cabinet'}})
 
     action.configure(robot, config)
     action.start()

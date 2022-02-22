@@ -1,29 +1,32 @@
-from action import Action, ConfigurationData
+import threading
 
 import rospy
-import threading
+
+from .action import Action, ConfigurationData
 
 
 class GripperGoal(Action):
-    """ The GripperGoal class implements the action to open or close the gripper.
+    """
+    The GripperGoal class implements the action to open or close the gripper.
 
     Parameters to pass to the configure() method are:
-     - `side` (required): the gripper's side (left or right)
+     - `arm_name` (required): the arm to use
      - `goal` (required): the goal (open or close).
     """
+
     def __init__(self):
         Action.__init__(self)
-        self._required_field_prompts = {'side' : " Which gripper should I move? ",
-                                        'goal' : " Should I open my gripper, or close it? "}
+        self._required_field_prompts = {'arm_name': " Which gripper should I move? ",
+                                        'goal': " Should I open my gripper, or close it? "}
         self._required_skills = ['arms']
 
     def _configure(self, robot, config):
-        side = config.semantics['side']
+        arm_name = config.semantics['arm_name']
         try:
-            self._arm = robot.arms[side]
+            self._arm = robot.arms[arm_name]
         except KeyError:
-            self._config_result.message = " I don't have a {} arm with grippers to close. ".format(side)
-            self._config_result.missing_skill = side + "Arm"
+            self._config_result.message = " I don't have an arm, {} with grippers to close. ".format(arm_name)
+            self._config_result.missing_skill = arm_name
 
         self._goal = config.semantics["goal"]
 
@@ -46,22 +49,15 @@ class GripperGoal(Action):
 if __name__ == "__main__":
     rospy.init_node('gripper_goal_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = GripperGoal()
 
     config = ConfigurationData({'action': 'gripper_goal',
-              'side': 'left',
-              'goal': 'close'})
+                                'arm_name': 'arm_center',
+                                'goal': 'close'})
 
     action.configure(robot, config)
     action.start()

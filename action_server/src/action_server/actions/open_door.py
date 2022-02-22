@@ -1,5 +1,6 @@
-from action import Action, ConfigurationData
 from challenge_storing_groceries.open_door import OpenDoorMachine
+
+from .action import Action
 
 
 class OpenDoor(Action):
@@ -7,6 +8,7 @@ class OpenDoor(Action):
     The Open Door action wraps the state machine to open the door of the cupboard at RWC 2018.
 
     """
+
     def __init__(self):
         # Call the base class constructor
         Action.__init__(self)

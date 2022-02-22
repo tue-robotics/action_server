@@ -1,5 +1,6 @@
 # Action Server
-[![Build Status](https://travis-ci.com/tue-robotics/action_server.svg?branch=master)](https://travis-ci.com/tue-robotics/action_server)
+
+[![CI](https://github.com/tue-robotics/action_server/workflows/CI/badge.svg)](https://github.com/tue-robotics/action_server/actions)
 
 The Action Server is an actionlib server for managing the execution of high level tasks and their semantic chaining.
 It takes actionlib goals describing series of high level tasks in json form, checks the consistency of the semantics, and executes them.

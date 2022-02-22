@@ -1,13 +1,14 @@
-from action import Action, ConfigurationData
-
 import rospy
+
 from challenge_presentation import PresentationMachine, PresentationMachineHero
+from .action import Action, ConfigurationData
 
 
 class DemoPresentation(Action):
-    """ The DemoPresentation class wraps the demo presentation state machine..
-
     """
+    The DemoPresentation class wraps the demo presentation state machine
+    """
+
     def __init__(self):
         Action.__init__(self)
         # self._required_skills = ['speech', 'hmi']
@@ -44,19 +45,9 @@ class DemoPresentation(Action):
 if __name__ == "__main__":
     rospy.init_node('demo_presentation_test')
 
-    import sys
+    from robot_skills import get_robot_from_argv
 
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    elif robot_name == 'hero':
-        from robot_skills.hero import Hero as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
-
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = DemoPresentation()
     config = ConfigurationData({'action': 'demo-presentation'})

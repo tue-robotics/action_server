@@ -1,16 +1,19 @@
-import rospy, yaml
+import yaml
 
-import actionlib
 import action_server_msgs.msg
+import actionlib
+import rospy
 from action_server_msgs.srv import GetActions, GetActionsResponse
-from task_manager import TaskManager
-from actions.action import ConfigurationResult
+
+from .actions.action import ConfigurationResult
+from .task_manager import TaskManager
 
 
 class Server(object):
-    '''
+    """
     The Server wraps the TaskManager to expose a ROS actionlib interface.
-    '''
+    """
+
     def __init__(self, robot):
         self._robot = robot
         self._task_manager = TaskManager(self._robot)
@@ -35,7 +38,7 @@ class Server(object):
         return res
 
     def _add_action_cb(self, goal):
-        recipe = yaml.load(goal.recipe.lower())
+        recipe = yaml.safe_load(goal.recipe.lower())
         rospy.logdebug("Received action recipe: {}".format(goal.recipe))
 
         try:

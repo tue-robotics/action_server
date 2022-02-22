@@ -1,20 +1,21 @@
-from action import Action
-from entity_description import resolve_entity_description
-
 import rospy
+
+import hmi
 from robocup_knowledge import load_knowledge
 from robot_smach_states.human_interaction.answer_questions import answer
-import hmi
+from .action import Action
+from .entity_description import resolve_entity_description
 
 
 class AnswerQuestion(Action):
-    """ The AnswerQuestion class implements the action of answering a question
+    """
+    The AnswerQuestion class implements the action of answering a question
 
     It requires that the robot to perform this action has a speech and an ears skill. It will ask the user what
     the question is, try to answer it based on the grammar defined in the knowledge defined for the speech and
     person recognition challenge and answer it based on the same knowledge.
-
     """
+
     def __init__(self):
         Action.__init__(self)
         self._required_skills = ['speech', 'hmi']
@@ -105,7 +106,8 @@ class AnswerQuestion(Action):
                 if tries < 2:
                     self._robot.speech.speak("Sorry, I did not understand your question, try another one.")
                 else:
-                    self._robot.speech.speak("Sorry, I was unable to understand any of your questions. I'll leave you puzzled by them. ")
+                    self._robot.speech.speak(
+                        "Sorry, I was unable to understand any of your questions. I'll leave you puzzled by them. ")
                     self._execute_result.message = " I did not understand the question. "
                 tries += 1
 
@@ -116,17 +118,9 @@ class AnswerQuestion(Action):
 if __name__ == "__main__":
     rospy.init_node('answer_question_test')
 
-    import sys
+    from robot_skills import get_robot_from_argv
 
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
-
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = AnswerQuestion()
 

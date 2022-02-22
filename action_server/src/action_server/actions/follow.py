@@ -1,12 +1,10 @@
-from action import Action, ConfigurationData
-from find import Find
-from entity_description import resolve_entity_description, EntityDescription
-from robot_smach_states.navigation import NavigateToSymbolic
-
-from robot_smach_states.navigation import FollowOperator
-from robot_smach_states.util.designators import EdEntityDesignator
-
 import rospy
+
+from robot_smach_states.navigation import FollowOperator, NavigateToSymbolic
+from robot_smach_states.util.designators import EdEntityDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
+
 
 def navigate(robot, entity_description):
     if not entity_description.type:
@@ -17,7 +15,7 @@ def navigate(robot, entity_description):
     else:
         origin_area = "near"
 
-    origin_entity_designator = EdEntityDesignator(robot, id=entity_description.id)
+    origin_entity_designator = EdEntityDesignator(robot, uuid=entity_description.id)
     navigation_sm = NavigateToSymbolic(
         robot=robot,
         entity_designator_area_name_map=
@@ -30,12 +28,14 @@ def navigate(robot, entity_description):
 
 
 class Follow(Action):
-    ''' The Follow class implements the action to follow a person.
+    """
+    The Follow class implements the action to follow a person.
 
     Parameters to pass to the configure() method are:
      - `target` (required): the target id to assign to the id that is followed
      - `location-from` (optional): the location to find the target to follow
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
         self._required_field_prompts = {'target': " Who would you like me to follow? "}
@@ -138,21 +138,14 @@ class Follow(Action):
 if __name__ == "__main__":
     rospy.init_node('follow_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = Follow()
 
     config = ConfigurationData({'action': 'follow',
-              'entity': {'special': 'me'}})
+                                'entity': {'special': 'me'}})
 
     action.configure(robot, config)
     action.start()

@@ -1,38 +1,35 @@
-from action import Action, ConfigurationData
-
-from entity_description import resolve_entity_description
-
-import rospy
 import math
 
-from robot_smach_states.human_interaction import FindPersonInRoom
-from robot_smach_states.navigation import NavigateToWaypoint
-from robot_smach_states.navigation import Find as StatesFind
-from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
-from robot_skills.util.entity import Entity
+import rospy
 
-import robot_skills.util.kdl_conversions as kdl
+from ed.entity import Entity
+from robot_smach_states.human_interaction import FindPersonInRoom
+from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
+from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class Find(Action):
-    """ The Find class implements the action to find an object or person at a specified location.
+    """
+    The Find class implements the action to find an object or person at a specified location.
+
     Parameters to pass to the configure() method are:
      - `location` (required): location to find the object (room or pre-existing world model entity)
      - `object` (required): the object to find.
     """
+
     def __init__(self):
         Action.__init__(self)
         # TODO: change this to a python dictionary schema
         self._required_field_prompts = {'object': " What exactly would you like me to find? "}
-        self._required_skills = ['head', 'base', 'rightArm', 'speech']
+        self._required_skills = ['head', 'base', 'speech']  # ToDO: Still calls rightArm directly
 
     def _point_at_person(self, person):
-        pose_base_link_kdl = person.pose.projectToFrame(self._robot.robot_name + '/base_link',
-                                                        self._robot.tf_listener)
-        pose_base_link = kdl.kdl_frame_stamped_to_pose_stamped_msg(pose_base_link_kdl)
+        pose_base_link = self._robot.tf_buffer.transform(person.pose, self._robot.base_link_frame)
 
-        x = pose_base_link.pose.position.x
-        y = pose_base_link.pose.position.y
+        x = pose_base_link.frame.p.x()
+        y = pose_base_link.frame.p.y()
 
         th = math.atan2(y, x)
         vth = 0.5
@@ -138,12 +135,12 @@ class Find(Action):
                 FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
                                  discard_other_labels, self._found_entity_designator.writeable)]
             self._config_result.context['location'] = {
-                'designator': EdEntityDesignator(self._robot, id=self._semantics.source_location.id)
+                'designator': EdEntityDesignator(self._robot, uuid=self._semantics.source_location.id)
             }
             if self._semantics.source_location.id:
                 self._config_result.context['location']['id'] = self._semantics.source_location.id
 
-            self._found_entity_designator = EdEntityDesignator(self._robot, id=self._semantics.object.id)
+            self._found_entity_designator = EdEntityDesignator(self._robot, uuid=self._semantics.object.id)
             self._config_result.context['object']['designator'] = self._found_entity_designator
             self._config_result.succeeded = True
 
@@ -178,8 +175,8 @@ class Find(Action):
         location_designator = None
         self._find_state_machines = []
         self._found_entity_designator = VariableDesignator(resolve_type=Entity)
-        for loc, areas in self._areas.iteritems():
-            location_designator = EdEntityDesignator(self._robot, id=loc)
+        for loc, areas in self._areas.items():
+            location_designator = EdEntityDesignator(self._robot, uuid=loc)
             nav_area = self._nav_areas[loc]
             for area in areas:
                 area_designator = VariableDesignator(area)
@@ -245,8 +242,9 @@ class Find(Action):
                     self._robot.speech.speak("I don't see what I am looking for here.")
 
                 self._execute_result.message = " I couldn't find {} {} the {} ".format(
-                    self._semantics.object.id if self._semantics.object.id and not self._semantics.object.id == "None" else \
-                        "a " + self._semantics.object.type if self._semantics.object.type else "a " + self._semantics.object.category,
+                    self._semantics.object.id if self._semantics.object.id and not self._semantics.object.id == "None"
+                    else "a " + self._semantics.object.type if self._semantics.object.type else
+                    "a " + self._semantics.object.category,
                     "in" if self._semantics.source_location.id in self._knowledge.location_rooms else "at",
                     self._semantics.source_location.id
                 )
@@ -254,8 +252,8 @@ class Find(Action):
                 self._robot.speech.speak(" I'm unable to inspect the {} ".format(self._semantics.source_location.id))
                 self._execute_result.message = " I was unable to inspect the {} to find {}. ".format(
                     self._semantics.source_location.id,
-                    self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type if self._semantics.object.type else \
-                        "a " + self._semantics.object.category
+                    self._semantics.object.id if self._semantics.object.id else "a " + self._semantics.object.type if
+                    self._semantics.object.type else "a " + self._semantics.object.category
                 )
 
     def _cancel(self):
@@ -265,32 +263,24 @@ class Find(Action):
 if __name__ == "__main__":
     rospy.init_node('find_test')
 
-    import sys
+    from robot_skills import get_robot_from_argv
 
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
-
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = Find()
 
     config = ConfigurationData({'action': 'find',
-              'source-location': {'id': 'cabinet',
-                           'area': 'on_top_of'},
-              'object': {'type': 'coke'}})
+                                'source-location': {'id': 'cabinet',
+                                                    'area': 'on_top_of'},
+                                'object': {'type': 'coke'}})
 
     action.configure(robot, config)
     action.start()
 
     config = ConfigurationData({'action': 'find',
-              'source-location': {'id': 'livingroom',
-                           'area': 'in'},
-              'object': {'type': 'person'}})
+                                'source-location': {'id': 'livingroom',
+                                                    'area': 'in'},
+                                'object': {'type': 'person'}})
 
     action.configure(robot, config)
     action.start()

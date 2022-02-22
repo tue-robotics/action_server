@@ -1,12 +1,14 @@
 from __future__ import print_function
+
 import collections
-from nose.tools import nottest
 import sys
 import traceback
 
+from nose.tools import nottest
+
 from grammar_parser.cfgparser import CFGParser, Conjunct, Option, Rule
-from action_server.actions.action import ConfigurationResult
-from action_server.task_manager import TaskManager
+from .actions.action import ConfigurationResult
+from .task_manager import TaskManager
 
 TMTestResult = collections.namedtuple("TMTestResult", ["recipe", "config_result"])
 
@@ -62,11 +64,11 @@ def test_grammar(robot, grammar, grammar_target):
             exc_type, exc_value, exc_traceback = sys.exc_info()
             tb = "".join((traceback.format_exception(exc_type, exc_value, exc_traceback)))
             test_result = ConfigurationResult()
-            test_result.message = "Configuration crashed: {}\n{}".format(e.message, tb)
+            test_result.message = "Configuration crashed: {}\n{}".format(e, tb)
         test_results[result_str] = TMTestResult(actions_definition["actions"], test_result)
 
     failed_test_results = {}
-    for action, test_result in test_results.iteritems():
+    for action, test_result in test_results.items():
         if test_result.config_result.succeeded:
             print("Configuration of '{}' succeeded".format(action))
         elif test_result.config_result.message and test_result.config_result.missing_field:
@@ -77,7 +79,7 @@ def test_grammar(robot, grammar, grammar_target):
             failed_test_results[action] = test_result
 
     error_str = "\n"
-    for action, test_result in failed_test_results.iteritems():
+    for action, test_result in failed_test_results.items():
         error_str += "\nConfiguration of action '{}' failed.\n\tRecipe: {}\n\tError: {}".format(
             action,
             test_result.recipe,

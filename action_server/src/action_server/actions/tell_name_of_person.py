@@ -1,10 +1,9 @@
-from action import Action, ConfigurationData
-from find import Find
-from entity_description import resolve_entity_description
-
 import rospy
-from robocup_knowledge import load_knowledge
+
 import hmi
+from robocup_knowledge import load_knowledge
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class TellNameOfPerson(Action):
@@ -107,21 +106,13 @@ class TellNameOfPerson(Action):
 if __name__ == "__main__":
     rospy.init_node('tell_name_of_person_test')
 
-    import sys
+    from robot_skills import get_robot_from_argv
 
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
-
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = TellNameOfPerson()
 
-    config = {'action': 'tell_name_of_person'}
+    config = ConfigurationData({'action': 'tell_name_of_person'})
 
     action.configure(robot, config)
     action.start()

@@ -1,22 +1,24 @@
-from action import Action, ConfigurationData
-from entity_description import resolve_entity_description
-
-from robot_skills.arms import PublicArm, GripperTypes
-import robot_smach_states
-from robot_smach_states.manipulation import Place as PlaceSmachState
-from robot_skills.util.entity import Entity
-from robot_smach_states.util.designators import ArmDesignator
-
 import rospy
+
+from ed.entity import Entity
+
+import robot_smach_states
+from robot_skills.arm.arms import GripperTypes, PublicArm
+from robot_smach_states.manipulation import Place as PlaceSmachState
+from robot_smach_states.util.designators import ArmDesignator
+from .action import Action, ConfigurationData
+from .entity_description import resolve_entity_description
 
 
 class Place(Action):
-    ''' The Place class implements the action to place something on an object.
+    """
+    The Place class implements the action to place something on an object.
 
     Parameters to pass to the configure() method are:
      - `entity` (required): Entity to place the object on;
      - `arm-designator` (required): Designator resolving to the arm to place with
-    '''
+    """
+
     def __init__(self):
         Action.__init__(self)
 
@@ -145,7 +147,8 @@ class Place(Action):
         item_to_place = robot_smach_states.util.designators.Designator(arm_designator.resolve().occupied_by,
                                                                        resolve_type=Entity)
 
-        entity_to_place_on = robot_smach_states.util.designators.EdEntityDesignator(self._robot, id=self.context.location.id)
+        entity_to_place_on = robot_smach_states.util.designators.EdEntityDesignator(self._robot,
+                                                                                    uuid=self.context.location.id)
         self._place = PlaceSmachState(self._robot, item_to_place,
                                       entity_to_place_on,
                                       arm_designator,
@@ -168,22 +171,14 @@ if __name__ == "__main__":
 
     rospy.init_node('place_test')
 
-    import sys
-    robot_name = sys.argv[1]
-    if robot_name == 'amigo':
-        from robot_skills.amigo import Amigo as Robot
-    elif robot_name == 'sergio':
-        from robot_skills.sergio import Sergio as Robot
-    else:
-        from robot_skills.mockbot import Mockbot as Robot
+    from robot_skills import get_robot_from_argv
 
-    robot = Robot()
+    robot = get_robot_from_argv(1)
 
     action = Place()
 
     semantics = {'action': 'place',
                  'entity': {'id': 'cabinet'},
-                 'side': 'left',
                  'height': 0.8}
 
     action.configure(robot, ConfigurationData(semantics))
