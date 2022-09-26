@@ -2,6 +2,8 @@ import rospy
 
 from robocup_knowledge import load_knowledge
 from robot_smach_states.human_interaction import GetFurnitureFromOperatorPose
+from robot_smach_states.util.designators import VariableDesignator
+from ed.entity import Entity
 from .action import Action, ConfigurationData
 
 
@@ -16,7 +18,8 @@ class PointTarget(Action):
     def _configure(self, robot, config):
         self._robot = robot
         self._knowledge = load_knowledge('common')
-        self._point_sm = GetFurnitureFromOperatorPose(robot, self._knowledge.location_names)
+        self._entity_des = VariableDesignator(resolve_type=Entity).writeable
+        self._point_sm = GetFurnitureFromOperatorPose(robot, self._entity_des, self._knowledge.location_names)
         self._config_result.succeeded = True
 
     def _start(self):
