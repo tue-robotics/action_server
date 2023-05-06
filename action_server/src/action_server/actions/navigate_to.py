@@ -56,7 +56,7 @@ class NavigateTo(Action):
 
         # navigate to a room
         know_target = False
-        if semantics.target_location.id in self._knowledge.rooms:
+        if semantics.target_location.id in self._knowledge.location_rooms:
             know_target = True
 
         # navigate to a piece of furniture
