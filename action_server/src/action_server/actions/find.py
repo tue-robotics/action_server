@@ -1,9 +1,9 @@
 import math
-
+import numpy as np
 import rospy
 
 from ed.entity import Entity
-from robot_smach_states.human_interaction import FindPersonInRoom
+from robot_smach_states.human_interaction import FindPersonInRoom, FindFirstPerson
 from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
 from .action import Action, ConfigurationData
@@ -131,9 +131,17 @@ class Find(Action):
             else:
                 discard_other_labels = True
             self._found_entity_designator = VariableDesignator(resolve_type=Entity)
-            self._find_state_machines = [
-                FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
-                                 discard_other_labels, self._found_entity_designator.writeable)]
+            if not self._semantics.object.tags:
+                self._find_state_machines = [
+                    FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
+                                     discard_other_labels, self._found_entity_designator.writeable)]
+            else:
+                self._find_state_machines = [FindFirstPerson(robot, self._found_entity_designator.writeable,
+                                                             properties={'tags': ['LWave', 'RWave']},
+                                                             strict=False, nearest=True, speak=True,
+                                                             look_range=(-np.pi / 4, np.pi / 4),
+                                                             look_steps=4, search_timeout=60)]
+
             self._config_result.context['location'] = {
                 'designator': EdEntityDesignator(self._robot, uuid=self._semantics.source_location.id)
             }
