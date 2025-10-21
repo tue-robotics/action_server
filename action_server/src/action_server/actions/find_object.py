@@ -6,8 +6,8 @@ from ed.entity import Entity
 from robot_smach_states.human_interaction import FindPersonInRoom
 from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
-from .action import Action, ConfigurationData
-from .entity_description import resolve_entity_description
+from action_server.actions.action import Action, ConfigurationData
+from action_server.actions.entity_description import resolve_entity_description
 
 class FindObject(Action):
     """
@@ -92,13 +92,21 @@ class FindObject(Action):
         if self._semantics.source_location.id in self._knowledge.location_rooms:
             locations = self._knowledge.get_locations(self._semantics.source_location.id, True)
             for location in locations:
-                self._areas[location] = self._knowledge.get_inspect_areas(location)
-                self._nav_areas[location] = self._knowledge.get_inspect_position(location)
+                inspect_areas = self._knowledge.get_inspect_areas(location)
+                self._areas[location] = inspect_areas
+                # Use the first inspect area to determine navigation position
+                nav_area = inspect_areas[0] if inspect_areas else "on_top_of"
+                nav_position = self._knowledge.get_inspect_position(location, nav_area)
+                # Fallback to "on_top_of" if the navigation position doesn't work
+                self._nav_areas[location] = nav_position if nav_position else "on_top_of"
         else:
-            self._areas[self._semantics.source_location.id] = self._knowledge.get_inspect_areas(
-                self._semantics.source_location.id)
-            self._nav_areas[self._semantics.source_location.id] = self._knowledge.get_inspect_position(
-                self._semantics.source_location.id)
+            inspect_areas = self._knowledge.get_inspect_areas(self._semantics.source_location.id)
+            self._areas[self._semantics.source_location.id] = inspect_areas
+            # Use the first inspect area to determine navigation position  
+            nav_area = inspect_areas[0] if inspect_areas else "on_top_of"
+            nav_position = self._knowledge.get_inspect_position(self._semantics.source_location.id, nav_area)
+            # Fallback to "on_top_of" if the navigation position doesn't work
+            self._nav_areas[self._semantics.source_location.id] = nav_position if nav_position else "on_top_of"
 
         # Set up the designator with the object description
         entity_description = {
@@ -195,7 +203,7 @@ if __name__ == "__main__":
 
     config = ConfigurationData({
         'action': 'find-object',
-        'source-location': {'id': 'cabinet', 'area': 'on_top_of'},
+        'source-location': {'id': 'floor', 'area': 'on_top_of'},
         'object': {'type': 'coke'}
     })
 

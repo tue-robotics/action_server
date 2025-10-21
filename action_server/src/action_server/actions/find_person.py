@@ -6,8 +6,8 @@ from ed.entity import Entity
 from robot_smach_states.human_interaction import FindPersonInRoom
 from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
-from .action import Action, ConfigurationData
-from .entity_description import resolve_entity_description
+from action_server.actions.action import Action, ConfigurationData
+from action_server.actions.entity_description import resolve_entity_description
 
 
 class FindPerson(Action):
@@ -15,6 +15,28 @@ class FindPerson(Action):
         super().__init__()
         self._required_field_prompts = {'person': "Who exactly would you like me to find?"}
         self._required_skills = ['head', 'base', 'speech']
+
+    def _point_at_person(self, person):
+        pose_base_link = self._robot.tf_buffer.transform(person.pose, self._robot.base_link_frame)
+
+        x = pose_base_link.frame.p.x()
+        y = pose_base_link.frame.p.y()
+
+        th = math.atan2(y, x)
+        vth = 0.5
+
+        self._robot.head.cancel_goal()
+        self._robot.base.force_drive(0, 0, math.copysign(1, th) * vth, abs(th / vth))
+
+        self._robot.speech.speak("I will point at you now.")
+
+        self._robot.head.look_at_ground_in_front_of_robot(distance=100)
+        arm = self._robot.get_arm(required_goals=["point_at", "reset"])
+        arm.send_joint_goal("point_at")
+
+        self._robot.speech.speak("You're right there!")
+
+        arm.send_joint_goal("reset")
 
     class Semantics:
         def __init__(self):
