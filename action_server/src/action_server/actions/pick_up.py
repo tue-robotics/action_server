@@ -5,6 +5,7 @@ from robot_smach_states.manipulation import Grab
 from robot_smach_states.util.designators import UnoccupiedArmDesignator
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
+from action_server.vla import maybe_run_vla_manipulation
 
 
 class PickUp(Action):
@@ -61,9 +62,13 @@ class PickUp(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
+        self._raw_semantics = dict(config.semantics)
+        self._raw_context = dict(config.context)
 
         semantics = PickUp._parse_semantics(config.semantics)
         context = PickUp._parse_context(config.context)
+        self.semantics = semantics
+        self.context = context
 
         # Check if a previous action had us find the object already...
         object_found = False
@@ -107,20 +112,29 @@ class PickUp(Action):
         self._config_result.succeeded = True
 
     def _start(self):
+        vla_outcome = maybe_run_vla_manipulation(
+            robot=self._robot,
+            action_name="pick-up",
+            semantics=getattr(self, "_raw_semantics", {}),
+            context=getattr(self, "_raw_context", {}),
+        )
+        if vla_outcome.used:
+            self._execute_result.succeeded = vla_outcome.succeeded
+            self._execute_result.message = " {} ".format(vla_outcome.message)
+            return
+
         fsm_result = self._fsm.execute()
 
         if fsm_result == "done":
             self._execute_result.succeeded = True
             if not self._config_result.context['object']['designator'].resolve():
-                self._execute_result.message += " I could not pick anything up. ". \
-                    format(self._config_result.context)
+                self._execute_result.message += " I could not pick anything up. "
             else:
                 self._execute_result.message += " I picked up the {}. ". \
                     format(self._config_result.context['object']['designator'].resolve().etype)
         else:
             if not self._config_result.context['object']['designator'].resolve():
-                self._execute_result.message += " I could not pick anything up. ". \
-                    format(self._config_result.context)
+                self._execute_result.message += " I could not pick anything up. "
             else:
                 self._execute_result.message += " I could not pick up the {}. ". \
                     format(self._config_result.context['object']['designator'].resolve().etype)

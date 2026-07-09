@@ -8,6 +8,7 @@ from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_smach_states.util.designators import ArmDesignator
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
+from action_server.vla import maybe_run_vla_manipulation
 
 
 class Place(Action):
@@ -73,6 +74,8 @@ class Place(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
+        self._raw_semantics = dict(config.semantics)
+        self._raw_context = dict(config.context)
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
@@ -128,6 +131,17 @@ class Place(Action):
         return
 
     def _start(self):
+        vla_outcome = maybe_run_vla_manipulation(
+            robot=self._robot,
+            action_name="place",
+            semantics=getattr(self, "_raw_semantics", {}),
+            context=getattr(self, "_raw_context", {}),
+        )
+        if vla_outcome.used:
+            self._execute_result.succeeded = vla_outcome.succeeded
+            self._execute_result.message = " {} ".format(vla_outcome.message)
+            return
+
         # We either got an arm, or we know which arm to place with
         arm_designator = None
         if self.semantics.arm:

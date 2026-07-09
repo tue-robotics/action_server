@@ -1,7 +1,8 @@
 import rospy
 
 from .action_factory import ActionFactory
-from .actions.action import ConfigurationData, ConfigurationResult
+from .actions.action import Action, ConfigurationData, ConfigurationResult
+from .vla import maybe_run_vla_action, should_delegate_action_to_vla
 
 """
 The TaskManager sets up a state machine according to a task recipe and executes it.
@@ -26,10 +27,59 @@ class TaskManager(object):
         self.done = True
         self._active_action = None
 
+    class _VLADelegatedAction(Action):
+        """Generic action that delegates execution to the configured VLA backend."""
+
+        def __init__(self, action_name):
+            Action.__init__(self)
+            self._action_name = action_name
+            self._semantics = {}
+            self._context = {}
+            self._robot = None
+
+        def get_name(self):
+            return "VLADelegated({})".format(self._action_name)
+
+        def _configure(self, robot, config):
+            self._robot = robot
+            self._semantics = dict(config.semantics)
+            self._context = dict(config.context)
+
+            # Keep prior context available for any following classic actions.
+            self._config_result.context.update(config.context)
+            self._config_result.succeeded = True
+
+        def _start(self):
+            outcome = maybe_run_vla_action(
+                robot=self._robot,
+                action_name=self._action_name,
+                semantics=self._semantics,
+                context=self._context,
+            )
+            self._execute_result.succeeded = outcome.succeeded
+            if outcome.used:
+                self._execute_result.message = outcome.message
+            else:
+                self._execute_result.message = (
+                    "VLA was configured for '{}' but did not execute this action".format(self._action_name)
+                )
+
+        def _cancel(self):
+            # TODO: Add provider-specific cancellation support.
+            pass
+
+    def _instantiate_action(self, action_name):
+        if should_delegate_action_to_vla(self._robot.robot_name, action_name):
+            rospy.loginfo("[VLA] Delegating action '%s' to VLA backend", action_name)
+            return self._VLADelegatedAction(action_name)
+
+        ActionType = self._action_factory.get_action(action_name)
+        return ActionType()
+
     def get_action_from_context(self, context):
         # TODO: The content of 'context' should be thought out better.
         action_name = context['action']
-        return self._action_factory.get_action(action_name)()
+        return self._instantiate_action(action_name)
 
     def recursive_configure(self, action, configuration_data):
         preconditions_met = False
@@ -86,15 +136,14 @@ class TaskManager(object):
                 return configuration_result
 
             # Set up the action
-            Action = self._action_factory.get_action(action_name)
-            action = Action()
+            action = self._instantiate_action(action_name)
 
             config_data = ConfigurationData(instruction, configuration_result.context)
 
             # Try to configure the action
             try:
                 action_list, configuration_result = self.recursive_configure(action, config_data)
-            except Exception as e:
+            except Exception:
                 # if the action crashes, assume that the other actions in the sequence become invalid,
                 # so clear the action sequence before re-raising the exception
                 rospy.logerr('Action configuration crashed, requesting preempt of action sequence')
@@ -126,7 +175,7 @@ class TaskManager(object):
         self._active_action = self._action_sequence.pop(0)
         try:
             result = self._active_action.start()
-        except Exception as e:
+        except Exception:
             # if the action crashes, assume that the other actions in the sequence become invalid,
             # so clear the action sequence before re-raising the exception
             rospy.logerr('Action execution crashed, requesting preempt of action sequence')
