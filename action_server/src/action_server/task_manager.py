@@ -1,3 +1,5 @@
+import threading
+
 import rospy
 
 from .action_factory import ActionFactory
@@ -17,14 +19,19 @@ class TaskManager(object):
         self.done = True
         self._active_action = None
 
+        # Guards the shared execution state against the preempt callback, which
+        # runs on a different thread than the execution loop.
+        self._lock = threading.RLock()
+
     def get_actions(self):
         return self._action_factory.get_action_names()
 
     def clear(self):
-        self._task_string = None
-        self._action_sequence = []
-        self.done = True
-        self._active_action = None
+        with self._lock:
+            self._task_string = None
+            self._action_sequence = []
+            self.done = True
+            self._active_action = None
 
     def get_action_from_context(self, context):
         # TODO: The content of 'context' should be thought out better.
@@ -117,15 +124,20 @@ class TaskManager(object):
         return configuration_result
 
     def get_next_action_name(self):
-        if self._action_sequence:
-            return self._action_sequence[0].get_name()
-        else:
-            return None
+        with self._lock:
+            if self._action_sequence:
+                return self._action_sequence[0].get_name()
+            else:
+                return None
 
     def execute_next_action(self):
-        self._active_action = self._action_sequence.pop(0)
+        with self._lock:
+            self._active_action = self._action_sequence.pop(0)
+            active_action = self._active_action
         try:
-            result = self._active_action.start()
+            # start() is a long, blocking call; it must run without holding the
+            # lock so the preempt callback can cancel the active action.
+            result = active_action.start()
         except Exception as e:
             # if the action crashes, assume that the other actions in the sequence become invalid,
             # so clear the action sequence before re-raising the exception
@@ -133,15 +145,23 @@ class TaskManager(object):
             self.request_preempt()
             raise
 
-        if not self._action_sequence:
-            self.done = True
+        with self._lock:
+            if not self._action_sequence:
+                self.done = True
         return result
 
     def request_preempt(self):
-        self._action_sequence = []
-        if self._active_action:
+        """
+        Called from the action server's preempt callback (a different thread than
+        the execution loop). It only interrupts the active action and drops the
+        remaining sequence; the execution loop owns terminalization.
+        """
+        with self._lock:
+            self._action_sequence = []
+            active_action = self._active_action
+        if active_action:
             try:
-                self._active_action.cancel()
+                active_action.cancel()
             except Exception as e:
                 rospy.logerr("Cancelling action failed:\n{}".format(e))
         self.clear()
