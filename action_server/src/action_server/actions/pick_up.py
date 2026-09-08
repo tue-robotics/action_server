@@ -1,11 +1,12 @@
 import rospy
-
 from robot_skills.arm.arms import GripperTypes
 from robot_smach_states.manipulation import Grab
 from robot_smach_states.util.designators import UnoccupiedArmDesignator
+
+from action_server.vla import maybe_run_vla_manipulation
+
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
-from action_server.vla import maybe_run_vla_manipulation
 
 
 class PickUp(Action):
@@ -117,6 +118,7 @@ class PickUp(Action):
             action_name="pick-up",
             semantics=getattr(self, "_raw_semantics", {}),
             context=getattr(self, "_raw_context", {}),
+            raw_sentence=getattr(self, "_raw_semantics", {}).get("raw_sentence", ""),
         )
         if vla_outcome.used:
             self._execute_result.succeeded = vla_outcome.succeeded

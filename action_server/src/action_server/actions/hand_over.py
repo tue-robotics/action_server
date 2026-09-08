@@ -1,8 +1,9 @@
 import rospy
 
+from action_server.vla import maybe_run_vla_manipulation
+
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
-from action_server.vla import maybe_run_vla_manipulation
 
 
 class HandOver(Action):
@@ -144,6 +145,7 @@ class HandOver(Action):
             action_name="hand-over",
             semantics=getattr(self, "_raw_semantics", {}),
             context=getattr(self, "_raw_context", {}),
+            raw_sentence=getattr(self, "_raw_semantics", {}).get("raw_sentence", ""),
         )
         if vla_outcome.used:
             self._execute_result.succeeded = vla_outcome.succeeded

@@ -55,6 +55,7 @@ class TaskManager(object):
                 action_name=self._action_name,
                 semantics=self._semantics,
                 context=self._context,
+                raw_sentence=self._semantics.get("raw_sentence", ""),
             )
             self._execute_result.succeeded = outcome.succeeded
             if outcome.used:

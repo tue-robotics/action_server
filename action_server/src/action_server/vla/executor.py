@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import importlib
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
 import rospy
@@ -26,6 +26,7 @@ class ManipulationRequest:
     context: Dict
     output_mode: str
     action_dim: int
+    raw_sentence: str = ""
 
 
 @dataclass
@@ -70,8 +71,9 @@ class NullVLAProvider(BaseVLAProvider):
 class LocalBackendVLAProvider(BaseVLAProvider):
     """In-process provider for on-robot policy execution without network transport."""
 
-    def __init__(self, robot_name: str, config: VLAConfig):
-        self.robot_name = robot_name
+    def __init__(self, robot, config: VLAConfig):
+        self._robot = robot
+        self.robot_name = robot.robot_name
         self._config = config
         self._backend = None
 
@@ -91,7 +93,9 @@ class LocalBackendVLAProvider(BaseVLAProvider):
             return None
 
         backend_cls = self._load_class(self._config.local_backend_class)
-        self._backend = backend_cls(robot_name=self.robot_name)
+        # Backends run in-process and need the live robot object for I/O (cameras,
+        # joint states, controllers) through the robot_skills interfaces.
+        self._backend = backend_cls(robot=self._robot)
         return self._backend
 
     @staticmethod
@@ -128,9 +132,13 @@ class LocalBackendVLAProvider(BaseVLAProvider):
 
 
 _PROVIDER_REGISTRY = {
-    "none": lambda robot_name, config: NullVLAProvider(),
-    "local": lambda robot_name, config: LocalBackendVLAProvider(robot_name, config),
+    "none": lambda robot, config: NullVLAProvider(),
+    "local": lambda robot, config: LocalBackendVLAProvider(robot, config),
 }
+
+# Providers (and the VLA model they load) are expensive to construct, so cache
+# one live instance per robot to avoid reloading the policy on every action.
+_PROVIDER_CACHE = {}  # type: Dict[tuple, BaseVLAProvider]
 
 
 def _get_param_with_fallback(names: List[str], default):
@@ -183,12 +191,19 @@ def load_vla_config(robot_name: str) -> VLAConfig:
     )
 
 
-def _provider_for(robot_name: str, provider_name: str, config: VLAConfig) -> BaseVLAProvider:
+def _provider_for(robot, provider_name: str, config: VLAConfig) -> BaseVLAProvider:
+    cache_key = (robot.robot_name, provider_name)
+    cached = _PROVIDER_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
     factory = _PROVIDER_REGISTRY.get(provider_name)
     if not factory:
         rospy.logwarn("[VLA] Unknown provider '%s', falling back to 'none'", provider_name)
         factory = _PROVIDER_REGISTRY["none"]
-    return factory(robot_name, config)
+    provider = factory(robot, config)
+    _PROVIDER_CACHE[cache_key] = provider
+    return provider
 
 
 def _is_vla_enabled_for_action(config: VLAConfig, action_name: str) -> bool:
@@ -199,7 +214,9 @@ def _is_vla_enabled_for_action(config: VLAConfig, action_name: str) -> bool:
     return action_name in config.enabled_actions
 
 
-def maybe_run_vla_action(robot, action_name: str, semantics: Dict, context: Dict) -> VLAOutcome:
+def maybe_run_vla_action(
+    robot, action_name: str, semantics: Dict, context: Dict, raw_sentence: str = ""
+) -> VLAOutcome:
     """Try VLA execution for one action.
 
     Returns VLAOutcome(used=False, ...) when classic code should continue.
@@ -222,8 +239,9 @@ def maybe_run_vla_action(robot, action_name: str, semantics: Dict, context: Dict
         context=context,
         output_mode=config.output_mode,
         action_dim=config.action_dim,
+        raw_sentence=raw_sentence,
     )
-    provider = _provider_for(robot.robot_name, config.provider, config)
+    provider = _provider_for(robot, config.provider, config)
     response = provider.execute_manipulation(request)
 
     if response.succeeded:
@@ -238,9 +256,13 @@ def maybe_run_vla_action(robot, action_name: str, semantics: Dict, context: Dict
     return VLAOutcome(used=False, succeeded=False, message=response.message)
 
 
-def maybe_run_vla_manipulation(robot, action_name: str, semantics: Dict, context: Dict) -> VLAOutcome:
+def maybe_run_vla_manipulation(
+    robot, action_name: str, semantics: Dict, context: Dict, raw_sentence: str = ""
+) -> VLAOutcome:
     """Backward-compatible wrapper for manipulation actions."""
-    return maybe_run_vla_action(robot, action_name, semantics, context)
+    return maybe_run_vla_action(
+        robot, action_name, semantics, context, raw_sentence=raw_sentence
+    )
 
 
 def should_delegate_action_to_vla(robot_name: str, action_name: str) -> bool:

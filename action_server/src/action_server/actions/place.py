@@ -1,14 +1,14 @@
-import rospy
-
-from ed.entity import Entity
-
 import robot_smach_states
+import rospy
+from ed.entity import Entity
 from robot_skills.arm.arms import GripperTypes, PublicArm
 from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_smach_states.util.designators import ArmDesignator
+
+from action_server.vla import maybe_run_vla_manipulation
+
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
-from action_server.vla import maybe_run_vla_manipulation
 
 
 class Place(Action):
@@ -136,6 +136,7 @@ class Place(Action):
             action_name="place",
             semantics=getattr(self, "_raw_semantics", {}),
             context=getattr(self, "_raw_context", {}),
+            raw_sentence=getattr(self, "_raw_semantics", {}).get("raw_sentence", ""),
         )
         if vla_outcome.used:
             self._execute_result.succeeded = vla_outcome.succeeded
