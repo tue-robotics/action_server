@@ -91,7 +91,12 @@ class HSRObservationSource:
             base + "/state_head_joints", self.DEFAULT_HEAD_JOINTS
         )
         self._image_timeout = rospy.get_param(base + "/image_timeout", 5)
+        self._hand_camera_topic = rospy.get_param(
+            base + "/hand_camera_topic", "/{}/hand_camera/image_raw".format(robot.robot_name)
+        )
         self._bridge = None  # lazy cv_bridge
+        self._hand_camera_sub = None
+        self._hand_camera_last_image = None
 
     def _cv_bridge(self):
         if self._bridge is None:
@@ -138,6 +143,8 @@ class HSRObservationSource:
                 self._image_timeout,
             )
             return None
+
+        return self._image_to_numpy(self._hand_camera_last_image)
 
     def get_state(self) -> Optional[np.ndarray]:
         """Assemble the 8-D proprioceptive vector in the trained joint order."""
@@ -316,13 +323,23 @@ class SmolVLALocalBackend(BaseBackend):
 
     # -- item 7: episode termination --------------------------------------
 
+    def _gripper_occupied(self) -> bool:
+        return self._sink._get_arm().gripper.occupied_by is not None
+
     def _is_episode_done(
-        self, request: ManipulationRequest, executed_steps: int
+        self, request: ManipulationRequest, executed_steps: int, gripper_occupied_at_start: bool
     ) -> bool:
-        # PLACEHOLDER: the VLA has no intrinsic stop condition. This should
-        # decide success/termination, e.g. by checking gripper.occupied_by for a
-        # pick, a placement/force-sensor cue for a place, or a learned success
-        # detector. For now it never stops early and relies on max_chunks.
+        """Detect success from the gripper's occupied_by state.
+
+        - pick-up succeeds once the gripper picks up an entity (occupied_by set).
+        - place/hand-over succeed once the gripper releases its entity (occupied_by cleared).
+        Other actions have no known success signal and always run to max_chunks.
+        """
+        occupied_now = self._gripper_occupied()
+        if request.action_name == "pick-up":
+            return occupied_now and not gripper_occupied_at_start
+        if request.action_name in ("place", "hand-over"):
+            return gripper_occupied_at_start and not occupied_now
         return False
 
     # -- items 5-6-8: control loop, actuation, response mapping -----------
@@ -332,9 +349,10 @@ class SmolVLALocalBackend(BaseBackend):
 
         instruction = request.raw_sentence or request.action_name
         executed: List[List[float]] = []
+        gripper_occupied_at_start = self._gripper_occupied()
 
         for _iteration in range(self._max_chunks):
-            obs = self._obs.get_observation(instruction)
+            obs = self._obs.get_observation(instruction, require_hand=True)
             if obs is None:
                 return {
                     "succeeded": False,
@@ -360,7 +378,7 @@ class SmolVLALocalBackend(BaseBackend):
                     "message": "Arm trajectory execution failed during VLA rollout",
                 }
 
-            if self._is_episode_done(request, len(executed)):
+            if self._is_episode_done(request, len(executed), gripper_occupied_at_start):
                 return {
                     "succeeded": True,
                     "actions": executed,
