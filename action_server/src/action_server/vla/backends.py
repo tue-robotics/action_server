@@ -159,6 +159,11 @@ class HSRObservationSource:
             )
             return None
 
+    def get_gripper_position(self) -> Optional[float]:
+        """Raw hand_motor_joint reading, used as a physical (non-ED) grasp signal."""
+        joint_states = self.robot.get_joint_states()
+        return joint_states.get(self._gripper_joint)
+
     def get_observation(
         self, instruction: str, require_hand: bool = False
     ) -> Optional[Dict]:
@@ -292,6 +297,18 @@ class SmolVLALocalBackend(BaseBackend):
         self._chunk_prefix_steps = rospy.get_param(base + "/chunk_prefix_steps", 10)
         self._step_timeout = rospy.get_param(base + "/step_timeout", 10.0)
 
+        # gripper.occupied_by is only ever set by the classic Grab/Place FSMs
+        # (robot_smach_states), never by this VLA path, so it cannot be used on
+        # its own to detect a VLA-driven grasp/release. This position threshold
+        # is a stand-in physical signal and MUST be calibrated on the actual
+        # gripper (sim or hardware) before being relied on; disabled by default.
+        self._grasp_position_threshold = rospy.get_param(
+            base + "/grasp_position_threshold", None
+        )
+        self._grasp_position_direction = rospy.get_param(
+            base + "/grasp_position_direction", "above"
+        )
+
     # -- items 1-2: model loading + inference ------------------------------
 
     def _load_policy(self):
@@ -324,18 +341,42 @@ class SmolVLALocalBackend(BaseBackend):
     # -- item 7: episode termination --------------------------------------
 
     def _gripper_occupied(self) -> bool:
+        # Only reflects classic Grab/Place bookkeeping; always False on a pure VLA run.
         return self._sink._get_arm().gripper.occupied_by is not None
+
+    def _gripper_grasped_by_position(self) -> Optional[bool]:
+        """Physical stand-in for occupied_by: is the gripper holding something?
+
+        Returns None when the threshold is unset (feature disabled) or the
+        joint reading is unavailable.
+        """
+        if self._grasp_position_threshold is None:
+            return None
+        position = self._obs.get_gripper_position()
+        if position is None:
+            return None
+        if self._grasp_position_direction == "below":
+            return position < self._grasp_position_threshold
+        return position > self._grasp_position_threshold
 
     def _is_episode_done(
         self, request: ManipulationRequest, executed_steps: int, gripper_occupied_at_start: bool
     ) -> bool:
-        """Detect success from the gripper's occupied_by state.
+        """Detect success from the gripper state.
 
-        - pick-up succeeds once the gripper picks up an entity (occupied_by set).
-        - place/hand-over succeed once the gripper releases its entity (occupied_by cleared).
+        Combines two signals:
+        - occupied_by transition: only fires if a classic FSM set it, so it is
+          inert (always False -> False) on a pure VLA run.
+        - grasp_position_threshold: an opt-in physical reading of the gripper
+          joint, calibrated per-robot via ROS params (see __init__).
+        pick-up succeeds on empty->grasped, place/hand-over on grasped->empty.
         Other actions have no known success signal and always run to max_chunks.
         """
         occupied_now = self._gripper_occupied()
+        grasped_by_position = self._gripper_grasped_by_position()
+        if grasped_by_position is not None:
+            occupied_now = occupied_now or grasped_by_position
+
         if request.action_name == "pick-up":
             return occupied_now and not gripper_occupied_at_start
         if request.action_name in ("place", "hand-over"):
@@ -350,6 +391,9 @@ class SmolVLALocalBackend(BaseBackend):
         instruction = request.raw_sentence or request.action_name
         executed: List[List[float]] = []
         gripper_occupied_at_start = self._gripper_occupied()
+        grasped_at_start = self._gripper_grasped_by_position()
+        if grasped_at_start is not None:
+            gripper_occupied_at_start = gripper_occupied_at_start or grasped_at_start
 
         for _iteration in range(self._max_chunks):
             obs = self._obs.get_observation(instruction, require_hand=True)
