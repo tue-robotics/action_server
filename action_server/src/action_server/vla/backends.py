@@ -29,6 +29,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import rospy
+from sensor_msgs.msg import Image
 
 from .executor import ManipulationRequest
 
@@ -107,14 +108,36 @@ class HSRObservationSource:
         img = self.robot.perception.get_image(timeout=self._image_timeout)
         return self._image_to_numpy(img) if img is not None else None
 
+    def _hand_camera_cb(self, image_msg):
+        self._hand_camera_last_image = image_msg
+
     def get_hand_rgb(self) -> Optional[np.ndarray]:
-        # PLACEHOLDER: HERO's in-hand camera is not wired as a robot_skills part.
-        # This should return the latest in-hand RGB frame as (H, W, 3) uint8.
-        # To implement: subscribe to the HSR hand camera topic (e.g.
-        # /hero/hand_camera/image_raw) or add a Perception part for it in
-        # hero_skills/hero.py, then convert with self._image_to_numpy().
-        # Returning None lets get_observation() decide whether hand_rgb is required.
-        return None
+        """Return the latest in-hand RGB frame, or None if unavailable within timeout.
+
+        Subscribes directly to the HSR hand camera topic (usb_cam, started via
+        use_hand_camera:=true in hero_bringup) since it is not exposed as a
+        robot_skills Perception part.
+        """
+        if self._hand_camera_sub is None:
+            self._hand_camera_last_image = None
+            self._hand_camera_sub = rospy.Subscriber(
+                self._hand_camera_topic, Image, self._hand_camera_cb
+            )
+
+        rate = rospy.Rate(10)
+        deadline = rospy.Time.now() + rospy.Duration(self._image_timeout)
+        while self._hand_camera_last_image is None and rospy.Time.now() < deadline:
+            if rospy.is_shutdown():
+                return None
+            rate.sleep()
+
+        if self._hand_camera_last_image is None:
+            rospy.logwarn(
+                "[VLA] No hand camera image received on %s within %ss",
+                self._hand_camera_topic,
+                self._image_timeout,
+            )
+            return None
 
     def get_state(self) -> Optional[np.ndarray]:
         """Assemble the 8-D proprioceptive vector in the trained joint order."""

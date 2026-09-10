@@ -190,20 +190,25 @@ Execution modes (`execution_mode` ROS param):
 - Training `build_layout_overrides` emits a real action-dim override (arm6 vs hsr11).
 
 ### Skeleton / placeholder (marked in code with comments)
-- **`HSRObservationSource.get_hand_rgb` → returns `None`.** HERO's in-hand camera is
-  not wired as a `robot_skills` part. **This is a hard blocker for inference**, because
-  `Server.infer()` requires both `head_rgb` and `hand_rgb` — a missing hand image
-  raises `KeyError`, which is caught and falls back to classic. Must wire the hand
-  camera (topic or a new Perception part) before the VLA path can run.
-- **`SmolVLALocalBackend._is_episode_done` → always `False`.** No success detector yet,
-  so episodes only end via `max_chunks` or arm failure and never report `succeeded=True`.
-  Needs a real detector (e.g. `gripper.occupied_by` for picks, force sensor for places).
 - **`HSRActionSink._apply_base`** assumes base output is a body-frame velocity;
   disabled by default and unverified against the checkpoint convention.
 - **Training a native 6-D model** also needs the **dataset action sliced to 6 dims**;
   the exact LeRobot dataset key is version-specific and must be passed via
   `--policy-override`. The `--policy.action_dim=6` override is emitted, but the
   dataset-side slice is left to the operator.
+
+### Recently completed (previously listed as skeleton)
+- **`HSRObservationSource.get_hand_rgb`** now subscribes directly to the HSR hand
+  camera topic (`/<robot>/hand_camera/image_raw` by default, overridable via the
+  `hand_camera_topic` ROS param) and returns the latest frame, so `hand_rgb` is no
+  longer always `None`. `SmolVLALocalBackend.execute` now requests the observation
+  with `require_hand=True`, so a missing/late hand camera cleanly falls back to
+  classic instead of raising a `KeyError` inside `Server.infer()`. Still requires
+  `use_hand_camera:=true` in the robot bring-up.
+- **`SmolVLALocalBackend._is_episode_done`** now uses `arm.gripper.occupied_by` to
+  detect success: `pick-up` succeeds when the gripper transitions from empty to
+  occupied, `place`/`hand-over` succeed when it transitions from occupied to
+  empty. Other actions still have no success signal and rely on `max_chunks`.
 
 ### Config prerequisites (not code bugs)
 - `per-group-mse-vla` on the robot's `PYTHONPATH` (for `from inference.policy_server import Server`).
