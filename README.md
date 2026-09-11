@@ -131,6 +131,130 @@ The Action life cycle consists of the following phases:
     - performing the actual behavior
     - checking the result and returning appropriate information
 
+## VLA integration
+
+The action server can run the HSR manipulation VLA in-process while retaining
+the existing actionlib API. The public endpoint remains:
+
+```text
+/hero/action_server/task
+```
+
+The VLA implementation is layered as follows:
+
+- `action_server/src/action_server/vla/executor.py` selects `classic`,
+  `hybrid`, or `vla` execution.
+- `action_server/src/action_server/vla/backends.py` provides the HSR
+  observation, inference, and actuation backend.
+- `per-group-mse-vla/inference/policy_server.py` loads the checkpoint and its
+  LeRobot preprocessor/postprocessor files.
+
+The shared ROS launch entry point is
+`hero_bringup/launch/action_server.launch`. It owns `execution_mode` and
+`checkpoint_path`, loads
+`hero_bringup/parameters/action_server/vla.yaml`, and starts `main.py`.
+`hero-free-mode` already includes this launch, so do not start a second action
+server afterward.
+
+Start the classic path:
+
+```bash
+hero-start
+hero-free-mode
+```
+
+Start hybrid mode with the released checkpoint:
+
+```bash
+hero-start
+hero-free-mode \
+  execution_mode:=hybrid \
+  checkpoint_path:=/absolute/path/to/per-group-mse-smolvla
+```
+
+The action-server launch adds the policy repository to the ROS node's
+`PYTHONPATH`. The policy repository must still be importable by the same
+Python interpreter as ROS. On this Noetic setup that interpreter is Python
+3.8; the released LeRobot checkpoint requires a compatible LeRobot install,
+which is not provided by the ROS packages automatically.
+
+For the Docker deployment, install the lightweight ROS-side client packages:
+
+```bash
+python -m pip install -r action_server/requirements-vla.txt
+```
+
+Build and run the Python 3.12 policy server from the `per-group-mse-vla`
+repository:
+
+```bash
+docker build -f inference/Dockerfile -t smolvla-policy-server .
+docker run --rm --runtime=nvidia --gpus all \
+  -v /absolute/path/to/pretrained_model:/checkpoint:ro \
+  -p 8000:8000 \
+  smolvla-policy-server
+```
+
+The container defaults to state indices `0,1,2,3,4,5`. Override them with
+`-e POLICY_STATE_INDICES=...` for another checkpoint.
+
+Then start ROS in another terminal:
+
+```bash
+hero-start
+export ACTION_SERVER_EXECUTION_MODE=hybrid
+export ACTION_SERVER_CHECKPOINT_PATH=/absolute/path/to/pretrained_model
+hero-free-mode
+```
+
+The ROS backend connects to `ws://127.0.0.1:8000`, configured as
+`policy_url` in `hero_bringup/parameters/action_server/vla.yaml`.
+
+Before starting hybrid or full VLA mode, test the model without GPSR:
+
+```bash
+PYTHONPATH=/home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla:$PYTHONPATH \
+python /home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla/inference/local_smoke_test.py \
+  --checkpoint /absolute/path/to/per-group-mse-smolvla \
+  --device cuda \
+  --state-indices 0,1,2,3,4,5
+```
+
+If this reports `No module named 'lerobot'`, install a LeRobot-compatible
+runtime for the interpreter that starts `action_server`. The current ROS
+Python 3.8 environment cannot run the repository's documented Python 3.12
+LeRobot setup unchanged; use a compatible Python/ROS environment or move
+inference to a separate policy process before retrying the robot.
+
+Before GPSR, verify that the action server is alive:
+
+```bash
+rosnode info /hero/action_server
+rostopic list | grep /hero/action_server/task
+rosparam get /hero/action_server/vla/execution_mode
+```
+
+Then run the GPSR test:
+
+```bash
+rosrun challenge_gpsr gpsr.py _robot_name:=hero _test_mode:=true _skip:=true
+rosnode kill /hero/hmi/random_answerer
+```
+
+If GPSR reports `Waiting for task action server to come online...`, the action
+server node is absent or failed during startup. Inspect its terminal for
+`main.py` installation errors, robot initialization failures, or missing Python
+dependencies before investigating the VLA. In hybrid mode, a message such as
+`Local backend call failed: No module named 'lerobot'` means the action server
+is alive and has reached the VLA backend, but the model runtime is unavailable;
+hybrid mode will intentionally fall back to classic execution.
+
+The released checkpoint is `PauMontagut/per-group-mse-smolvla` on Hugging Face.
+Its six state values are mapped from the HSR arm joints and gripper through
+`state_indices: [0, 1, 2, 3, 4, 5]` in the VLA YAML. Modern checkpoints define
+their own state/action dimensions and preprocessing pipelines; older
+checkpoints use the loader's legacy normalization fallback.
+
 ## FAQ
 
  - **Why json?**

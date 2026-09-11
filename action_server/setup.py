@@ -12,6 +12,7 @@ d = generate_distutils_setup(
         'action_server.actions.util',
         'action_server.vla',
     ],
+    scripts=['scripts/main.py'],
     package_dir={'': 'src'}
 )
 

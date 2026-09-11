@@ -22,7 +22,8 @@ policy repository. It covers:
    must not touch challenge or action code.
 3. Keep **regression to the classic pipeline** always possible (config switch,
    plus automatic fallback in hybrid mode).
-4. Run **entirely on the robot's GPU** (offline, in-process, no network transport).
+4. Keep ROS Noetic and LeRobot in separate runtimes: ROS owns robot I/O while
+  the Python 3.12 policy container owns VLA inference.
 
 ---
 
@@ -36,12 +37,20 @@ Challenge (e.g. GPSR) --recipe--> action_server
   TaskManager                         # task-level delegation (full "vla" mode)
     Action (pick_up / place / hand_over)   # action-level hooks (hybrid mode)
       vla.executor                     # provider interface + config + fallback
-        LocalBackendVLAProvider        # in-process transport, provider cache
+        LocalBackendVLAProvider        # provider selection and cache
           backends.BaseBackend         # MODEL interface (replaceable)
-            SmolVLALocalBackend        # concrete policy: obs + infer + actuate
+            SmolVLAWebSocketBackend    # ROS-side remote policy client
               HSRObservationSource     # robot_skills: cameras + joint state
-              inference.policy_server.Server  # reused model load + inference
+              WebSocket/msgpack         # observation and action-chunk transport
               HSRActionSink            # robot_skills: arm/gripper/head/base
+```
+
+The runtime boundary is:
+
+```text
+ROS Python 3.8                         Python 3.12 Docker image
+  cameras + joint state --WebSocket-->  LeRobot + SmolVLA
+  arm/gripper actuation <--actions-----  checkpoint inference
 ```
 
 Two interfaces are kept separate on purpose:
@@ -149,24 +158,24 @@ Execution modes (`execution_mode` ROS param):
 6. executor.maybe_run_vla_action:
       - load_vla_config(robot_name)                # ROS params
       - action enabled + mode hybrid/vla? else return used=False -> classic
-      - _provider_for(robot, ...)                  # CACHED per robot
-           -> LocalBackendVLAProvider(robot, config)
-                -> backend = SmolVLALocalBackend(robot=robot)   # model loads once
+       - _provider_for(robot, ...)                  # CACHED per robot
+         -> LocalBackendVLAProvider(robot, config)
+           -> backend = SmolVLAWebSocketBackend(robot=robot)
       - provider.execute_manipulation(request)
-7. SmolVLALocalBackend.execute(request):
-      a. _load_policy()  -> inference.policy_server.Server (model+tokenizer+stats)
+7. SmolVLAWebSocketBackend.execute(request):
+  a. connect to policy_url (the container loads the model once)
       b. loop up to max_chunks:
            - obs = HSRObservationSource.get_observation(instruction)
                 head_rgb = robot.perception.get_image()
-                hand_rgb = PLACEHOLDER (None)
+                hand_rgb = /<robot>/hand_camera/image_raw
                 state    = robot.get_joint_states() -> 8-D vector
-           - chunk = Server.infer(obs)             # (T, action_dim), robot units
+           - msgpack/WebSocket request -> action chunk (T, action_dim)
            - HSRActionSink.play_chunk(prefix):
                 arm     -> arm._send_joint_trajectory
                 gripper -> arm.gripper.send_goal(open/close)   # arm6 & hsr11
                 head    -> disabled by default
                 base    -> disabled by default
-           - _is_episode_done()  -> PLACEHOLDER (always False)
+           - _is_episode_done()  -> gripper occupancy or calibrated threshold
       c. return {succeeded, actions, message}
 8. VLAOutcome -> action._execute_result.
       - VLA used & ok -> done.
@@ -179,7 +188,7 @@ Execution modes (`execution_mode` ROS param):
 
 ### Ready (validated, compiles, wired end-to-end)
 - Layered provider/backend architecture; `robot` object and args threaded correctly.
-- Provider caching (model loads once per robot).
+- Provider caching (the WebSocket client loads once per robot).
 - Observation via `robot_skills` (`perception.get_image`, `get_joint_states`).
 - 8-D state assembly in trained joint order (matches model `STATE_DIM = 8`).
 - Actuation via `robot_skills` (`_send_joint_trajectory`, `gripper.send_goal`,
@@ -211,10 +220,11 @@ Execution modes (`execution_mode` ROS param):
   empty. Other actions still have no success signal and rely on `max_chunks`.
 
 ### Config prerequisites (not code bugs)
-- `per-group-mse-vla` on the robot's `PYTHONPATH` (for `from inference.policy_server import Server`).
-- `checkpoint_path` ROS param set (else `RuntimeError` → fallback).
-- `torch`, `transformers`, `lerobot`, `safetensors`, `cv_bridge` installed in the
-  action_server environment.
+- ROS-side `msgpack` and `websocket-client` installed in the Noetic Python 3.8
+  environment.
+- The policy image is running and reachable at `policy_url`.
+- The checkpoint is mounted into the policy container at `/checkpoint`.
+- `cv_bridge`, the hand camera, and the ROS robot skills are available.
 
 ---
 
@@ -359,6 +369,134 @@ So all I/O goes through `robot_skills` (cameras, joint states, arm/gripper/head/
 controllers) rather than raw ROS subscribers — consistent with the rest of
 tue_robocup and avoiding duplicate subscribers/action clients.
 
-**Offline-only status.**
-Providers supported: `local`, `none`. The earlier `websocket` transport path was
-removed — everything runs in-process on the robot's GPU.
+**Runtime status.**
+The `local` provider name is retained for configuration compatibility, but its
+backend is `SmolVLAWebSocketBackend`. The ROS process does not load the model;
+the Docker policy server performs inference.
+
+## Current checkpoint loader
+
+`per-group-mse-vla/inference/policy_server.py` now loads modern LeRobot
+checkpoints from their own `config.json`, `policy_preprocessor.json`, and
+`policy_postprocessor.json`. This lets the checkpoint define its policy type,
+state/action dimensions, image resizing, empty-camera handling, tokenization,
+normalization, and action unnormalization. Older checkpoints without processor
+files retain the legacy normalization-statistics fallback.
+
+The released `PauMontagut/per-group-mse-smolvla` checkpoint consumes six state
+values. The ROS configuration selects the first five arm joints and gripper
+through `state_indices: [0, 1, 2, 3, 4, 5]`. Other checkpoints can use a
+different state contract by changing that parameter without changing the
+loader.
+
+## Startup and GPSR validation
+
+The actionlib endpoint is created by `action_server/src/action_server/server.py`:
+
+```text
+/<robot_name>/action_server/task
+```
+
+For Hero this is `/hero/action_server/task`. GPSR waits for this endpoint while
+constructing its action client. A message such as
+`Waiting for task action server to come online...` means that the action-server
+node is absent or died during startup; the client and server action names match.
+
+`hero_bringup/launch/action_server.launch` is the reusable startup surface. It
+loads `hero_bringup/parameters/action_server/vla.yaml`, applies
+`checkpoint_path` and `execution_mode`, and starts `action_server/main.py` with
+screen output. `free_mode.launch` includes this launch file.
+
+Verify the endpoint before starting GPSR:
+
+```bash
+rosnode list | grep action_server
+rosnode info /hero/action_server
+rostopic list | grep /hero/action_server/task
+rosparam get /hero/action_server/vla/execution_mode
+```
+
+Plain `hero-free-mode` defaults to classic mode. For hybrid validation, start
+the policy container and export `ACTION_SERVER_EXECUTION_MODE=hybrid` plus
+`ACTION_SERVER_CHECKPOINT_PATH` before running `hero-free-mode`. Only start
+GPSR after the action endpoint is visible.
+
+The ROS backend no longer imports LeRobot. It imports only the lightweight
+WebSocket client dependencies and sends observations to the policy container.
+The container runs Python 3.12, LeRobot 0.5.1, PyTorch 2.4.1 CUDA 12.1,
+Transformers 4.46.3, and torchvision 0.19.1.
+
+## Docker deployment
+
+The policy image is built from `per-group-mse-vla/inference/Dockerfile`:
+
+```bash
+cd /home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla
+docker build --progress=plain -f inference/Dockerfile \
+  -t smolvla-policy-server .
+```
+
+The verified image tag is `smolvla-policy-server:latest`. It contains no
+checkpoint; mount the downloaded Hugging Face snapshot read-only:
+
+```bash
+docker run --rm --gpus all \
+  -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96:/checkpoint:ro \
+  -p 8000:8000 \
+  smolvla-policy-server
+```
+
+The container listens on `ws://127.0.0.1:8000` from the ROS host. It receives
+head/hand RGB images, the six selected state values, and the raw instruction;
+it returns an 11-column action chunk. `POLICY_STATE_INDICES` defaults to
+`0,1,2,3,4,5` and can be overridden for another checkpoint.
+
+In a second terminal, install the ROS-side client dependencies once:
+
+```bash
+python -m pip install -r \
+  /home/amigo/ros/noetic/repos/github.com/tue-robotics/action_server/action_server/requirements-vla.txt
+```
+
+Then start the simulator, ROS stack, container, and hybrid action server:
+
+```bash
+hero-start
+export ACTION_SERVER_EXECUTION_MODE=hybrid
+export ACTION_SERVER_CHECKPOINT_PATH=/home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96
+hero-free-mode
+```
+
+The action server must be verified before GPSR:
+
+```bash
+rosnode info /hero/action_server
+rostopic list | grep /hero/action_server/task
+rosparam get /hero/action_server/vla/execution_mode
+```
+
+The final image build was validated after removing unused `pynput/evdev`,
+avoiding LeRobot's dependency re-resolution of a second Torch version, and
+pinning the compatible Transformers/torchvision versions. Failed intermediate
+SmolVLA image artifacts were not retained; unrelated Docker images were left
+untouched.
+
+### GPSR wait failure: `main.py` not installed
+
+If GPSR waits indefinitely while `roslaunch` logs
+`Cannot locate node of type [main.py] in package [action_server]`, the action
+server was never started. The ROS package previously installed the Python
+modules but omitted `scripts/main.py` from `setup.py`. The script is now
+registered and must be rebuilt:
+
+```bash
+cd /home/amigo/ros/noetic/system
+catkin build action_server --cmake-args -DCMAKE_BUILD_TYPE=Debug
+source devel/setup.bash
+```
+
+Confirm the installed node exists before retrying:
+
+```bash
+test -x devel/.private/action_server/bin/main.py
+```

@@ -279,6 +279,7 @@ class SmolVLALocalBackend(BaseBackend):
         checkpoint_path     : /path/to/smolvla/checkpoint
         device              : cuda
         action_layout       : hsr11
+        state_indices       : source indices used to build the checkpoint state
         max_chunks          : max re-query iterations before giving up
         chunk_prefix_steps  : how many steps of each chunk to execute before re-querying
     """
@@ -293,6 +294,7 @@ class SmolVLALocalBackend(BaseBackend):
         self._checkpoint_path = rospy.get_param(base + "/checkpoint_path", "")
         self._device = rospy.get_param(base + "/device", "cuda")
         self._action_layout = rospy.get_param(base + "/action_layout", "hsr11")
+        self._state_indices = rospy.get_param(base + "/state_indices", [])
         self._max_chunks = rospy.get_param(base + "/max_chunks", 20)
         self._chunk_prefix_steps = rospy.get_param(base + "/chunk_prefix_steps", 10)
         self._step_timeout = rospy.get_param(base + "/step_timeout", 10.0)
@@ -327,6 +329,7 @@ class SmolVLALocalBackend(BaseBackend):
             checkpoint_dir=Path(self._checkpoint_path),
             device=self._device,
             action_layout=self._action_layout,
+            state_indices=self._state_indices or None,
         )
         rospy.loginfo(
             "[VLA] SmolVLA policy loaded from %s on %s",
@@ -435,3 +438,70 @@ class SmolVLALocalBackend(BaseBackend):
             "actions": executed,
             "message": "VLA reached max_chunks without a completion signal",
         }
+
+
+class SmolVLAWebSocketBackend(SmolVLALocalBackend):
+    """Run SmolVLA in a separate Python process over WebSocket.
+
+    ROS keeps ownership of observations, actuation, and the closed-loop
+    rollout. The policy server can therefore run LeRobot in Python 3.12 while
+    ROS Noetic remains on its Python 3.8 runtime.
+    """
+
+    def __init__(self, robot):
+        SmolVLALocalBackend.__init__(self, robot)
+        base = "/{}/action_server/vla".format(robot.robot_name)
+        self._policy_url = rospy.get_param(base + "/policy_url", "ws://127.0.0.1:8000")
+        self._policy_timeout = float(rospy.get_param(base + "/policy_timeout", 30.0))
+        self._policy_socket = None
+
+    def _load_policy(self):
+        if self._policy_socket is not None:
+            return
+        try:
+            import websocket
+        except ImportError as error:
+            raise RuntimeError(
+                "websocket-client is required for SmolVLAWebSocketBackend"
+            ) from error
+
+        try:
+            self._policy_socket = websocket.create_connection(
+                self._policy_url, timeout=self._policy_timeout
+            )
+        except Exception:
+            self._policy_socket = None
+            raise
+        rospy.loginfo("[VLA] Connected to policy server at %s", self._policy_url)
+
+    def _infer(self, obs: Dict) -> np.ndarray:
+        import msgpack
+
+        payload = {
+            "head_rgb": obs["head_rgb"].tolist(),
+            "hand_rgb": obs["hand_rgb"].tolist(),
+            "state": obs["state"].tolist(),
+            "instruction": obs["instruction"],
+        }
+        try:
+            self._policy_socket.send(msgpack.packb(payload, use_bin_type=True))
+            response = msgpack.unpackb(self._policy_socket.recv(), raw=False)
+        except Exception:
+            self._close_policy_socket()
+            raise
+
+        if "error" in response:
+            raise RuntimeError("Policy server error: {}".format(response["error"]))
+        actions = np.asarray(response.get("actions"), dtype=np.float32)
+        if actions.ndim != 2 or actions.shape[1] < HSRActionSink.ARM_DIM:
+            raise RuntimeError(
+                "Policy server returned invalid action shape {}".format(actions.shape)
+            )
+        return actions
+
+    def _close_policy_socket(self):
+        if self._policy_socket is not None:
+            try:
+                self._policy_socket.close()
+            finally:
+                self._policy_socket = None
