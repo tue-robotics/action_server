@@ -31,14 +31,14 @@ import numpy as np
 import rospy
 from sensor_msgs.msg import Image
 
+from .backend_utils import (
+    as_rgb_uint8,
+    gripper_grasped_by_position,
+    gripper_occupied,
+    is_manipulation_done,
+    pack_image_binary,
+)
 from .executor import ManipulationRequest
-
-
-def _as_rgb_uint8(image) -> np.ndarray:
-    image = np.asarray(image)
-    if image.ndim != 3 or image.shape[2] != 3:
-        raise ValueError("Expected an RGB image with shape (H, W, 3), got {}".format(image.shape))
-    return np.ascontiguousarray(np.clip(image, 0, 255).astype(np.uint8))
 
 
 class BaseBackend(ABC):
@@ -64,14 +64,18 @@ class BaseBackend(ABC):
 class HSRObservationSource:
     """Reads observations for a Toyota HSR through the robot_skills interfaces.
 
-    The VLA was trained on:
+    Default state layout (checkpoint-compatible with the released SmolVLA):
         head_rgb    uint8 (H, W, 3)   head RGB camera
         hand_rgb    uint8 (H, W, 3)   in-hand RGB camera
-        state       float32 (8,)      5 arm + 1 gripper + 2 head joints
+        state       float32 (N,)     joints from `state_joint_groups`, in order
         instruction str               natural-language prompt
 
-    Joint names come from ROS params with HSR defaults, so the same backend
-    keeps working if the URDF/controllers are renamed.
+    The state vector is NOT hardcoded to arm+gripper+head: `state_joint_groups`
+    (a ROS param) selects which joint groups are concatenated and in what
+    order, so a different VLA's state contract can be selected via config
+    instead of editing this class. Joint *names* within each group also come
+    from ROS params with HSR defaults, so the same backend keeps working if
+    the URDF/controllers are renamed.
     """
 
     # Order must match the checkpoint's training layout (see per-group-mse-vla docs).
@@ -84,6 +88,8 @@ class HSRObservationSource:
     ]
     DEFAULT_GRIPPER_JOINT = "hand_motor_joint"
     DEFAULT_HEAD_JOINTS = ["head_pan_joint", "head_tilt_joint"]
+    # Default matches the released checkpoint's 8-D state (arm+gripper+head).
+    DEFAULT_STATE_JOINT_GROUPS = ["arm", "gripper", "head"]
 
     def __init__(self, robot):
         self.robot = robot
@@ -96,6 +102,12 @@ class HSRObservationSource:
         )
         self._head_joints = rospy.get_param(
             base + "/state_head_joints", self.DEFAULT_HEAD_JOINTS
+        )
+        # Which joint groups make up the state vector, and in what order.
+        # Lets a different VLA select e.g. ["arm", "gripper"] (6-D) or
+        # ["head", "arm", "gripper"] without touching this class.
+        self._state_joint_groups = rospy.get_param(
+            base + "/state_joint_groups", self.DEFAULT_STATE_JOINT_GROUPS
         )
         self._image_timeout = rospy.get_param(base + "/image_timeout", 5)
         self._hand_camera_topic = rospy.get_param(
@@ -114,7 +126,7 @@ class HSRObservationSource:
 
     def _image_to_numpy(self, image_msg) -> np.ndarray:
         """Convert a sensor_msgs/Image to an (H, W, 3) uint8 RGB array."""
-        return _as_rgb_uint8(self._cv_bridge().imgmsg_to_cv2(image_msg, "rgb8"))
+        return as_rgb_uint8(self._cv_bridge().imgmsg_to_cv2(image_msg, "rgb8"))
 
     def get_head_rgb(self) -> Optional[np.ndarray]:
         img = self.robot.perception.get_image(timeout=int(self._image_timeout))
@@ -153,10 +165,29 @@ class HSRObservationSource:
 
         return self._image_to_numpy(self._hand_camera_last_image)
 
+    def _joint_group(self, name: str) -> List[str]:
+        if name == "arm":
+            return list(self._arm_joints)
+        if name == "gripper":
+            return [self._gripper_joint]
+        if name == "head":
+            return list(self._head_joints)
+        raise ValueError(
+            "Unknown state_joint_groups entry '{}'; expected 'arm', 'gripper', or 'head'".format(name)
+        )
+
     def get_state(self) -> Optional[np.ndarray]:
-        """Assemble the 8-D proprioceptive vector in the trained joint order."""
+        """Assemble the proprioceptive vector from the configured joint groups.
+
+        Order and composition come from `state_joint_groups` (ROS param), so
+        the state contract is selected per-VLA via config, not hardcoded here.
+        """
         joint_states = self.robot.get_joint_states()  # {joint_name: position}
-        ordered = self._arm_joints + [self._gripper_joint] + self._head_joints
+        ordered = [
+            joint_name
+            for group in self._state_joint_groups
+            for joint_name in self._joint_group(group)
+        ]
         try:
             return np.array([joint_states[name] for name in ordered], dtype=np.float32)
         except KeyError as missing:
@@ -351,47 +382,32 @@ class SmolVLALocalBackend(BaseBackend):
     # -- item 7: episode termination --------------------------------------
 
     def _gripper_occupied(self) -> bool:
-        # Only reflects classic Grab/Place bookkeeping; always False on a pure VLA run.
-        return self._sink._get_arm().gripper.occupied_by is not None
+        return gripper_occupied(self._sink)
 
     def _gripper_grasped_by_position(self) -> Optional[bool]:
-        """Physical stand-in for occupied_by: is the gripper holding something?
-
-        Returns None when the threshold is unset (feature disabled) or the
-        joint reading is unavailable.
-        """
-        if self._grasp_position_threshold is None:
-            return None
-        position = self._obs.get_gripper_position()
-        if position is None:
-            return None
-        if self._grasp_position_direction == "below":
-            return position < self._grasp_position_threshold
-        return position > self._grasp_position_threshold
+        return gripper_grasped_by_position(
+            self._obs.get_gripper_position(),
+            self._grasp_position_threshold,
+            self._grasp_position_direction,
+        )
 
     def _is_episode_done(
         self, request: ManipulationRequest, executed_steps: int, gripper_occupied_at_start: bool
     ) -> bool:
-        """Detect success from the gripper state.
+        """Detect success from the gripper state (see backend_utils.is_manipulation_done).
 
         Combines two signals:
         - occupied_by transition: only fires if a classic FSM set it, so it is
           inert (always False -> False) on a pure VLA run.
         - grasp_position_threshold: an opt-in physical reading of the gripper
           joint, calibrated per-robot via ROS params (see __init__).
-        pick-up succeeds on empty->grasped, place/hand-over on grasped->empty.
         Other actions have no known success signal and always run to max_chunks.
         """
         occupied_now = self._gripper_occupied()
         grasped_by_position = self._gripper_grasped_by_position()
         if grasped_by_position is not None:
             occupied_now = occupied_now or grasped_by_position
-
-        if request.action_name == "pick-up":
-            return occupied_now and not gripper_occupied_at_start
-        if request.action_name in ("place", "hand-over"):
-            return gripper_occupied_at_start and not occupied_now
-        return False
+        return is_manipulation_done(request.action_name, occupied_now, gripper_occupied_at_start)
 
     # -- items 5-6-8: control loop, actuation, response mapping -----------
 
@@ -484,18 +500,12 @@ class SmolVLAWebSocketBackend(SmolVLALocalBackend):
     def _infer(self, obs: Dict) -> np.ndarray:
         import msgpack
 
-        head_rgb = _as_rgb_uint8(obs["head_rgb"])
-        hand_rgb = _as_rgb_uint8(obs["hand_rgb"])
-
-        def pack_image(image):
-            return {
-                "data": image.tobytes(),
-                "shape": tuple(int(dimension) for dimension in image.shape),
-            }
+        head_shape = as_rgb_uint8(obs["head_rgb"]).shape
+        hand_shape = as_rgb_uint8(obs["hand_rgb"]).shape
 
         payload = {
-            "head_rgb": pack_image(head_rgb),
-            "hand_rgb": pack_image(hand_rgb),
+            "head_rgb": pack_image_binary(obs["head_rgb"]),
+            "hand_rgb": pack_image_binary(obs["hand_rgb"]),
             "state": np.asarray(obs["state"], dtype=np.float32).tolist(),
             "instruction": str(obs["instruction"]),
         }
@@ -503,8 +513,8 @@ class SmolVLAWebSocketBackend(SmolVLALocalBackend):
             packed_payload = msgpack.packb(payload, use_bin_type=True)
             rospy.loginfo(
                 "[VLA] Sending observation head=%s hand=%s payload=%d bytes",
-                head_rgb.shape,
-                hand_rgb.shape,
+                head_shape,
+                hand_shape,
                 len(packed_payload),
             )
             self._policy_socket.send_binary(packed_payload)

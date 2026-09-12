@@ -304,17 +304,3 @@ checkpoints use the loader's legacy normalization fallback.
    But every action has its own semantics, its own parameters and its own structure in these parameters.
    This means it doesn't fit in a static ROS message a client can send to the Action Server.
    The easiest way to gain this flexibility is to use nested dicts and lists, i.e. json. For further reading on this, refer to #23.
-
-next AI bug to send from last gprs run:
-2026-09-11 22:18:59,062 [INFO] policy_server Policy server ready on cuda with policy=smolvla state_dim=6 action_dim=11
-2026-09-11 22:18:59,081 [INFO] websockets.server server listening on 0.0.0.0:8000
-2026-09-11 22:18:59,081 [INFO] policy_server Listening on ws://0.0.0.0:8000
-2026-09-11 22:19:57,199 [INFO] websockets.server connection open
-2026-09-11 22:19:57,199 [INFO] policy_server Client connected from ('172.17.0.1', 57470)
-Loading  HuggingFaceTB/SmolVLM2-500M-Video-Instruct weights ...
-Reducing the number of VLM layers to 16 ...
-Loading weights from local directory
-
-[WARN] [1789165197.214603, 181.083000]: [VLA] Provider returned failure, using classic fallback: Local backend call failed: 'float' object cannot be interpreted as an integer : 257
-
-again..
