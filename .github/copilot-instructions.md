@@ -66,7 +66,9 @@ Start the policy container first:
 
 ```bash
 docker run --rm --gpus all \
-  -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96:/checkpoint:ro \
+  -v /home/amigo/.cache/huggingface:/root/.cache/huggingface \
+  -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla:/model-cache:ro \
+  -e POLICY_CHECKPOINT_PATH=/model-cache/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96 \
   -p 8000:8000 \
   smolvla-policy-server
 ```
@@ -95,7 +97,8 @@ Build and run the policy server from the `per-group-mse-vla` repository:
 ```bash
 docker build -f inference/Dockerfile -t smolvla-policy-server .
 docker run --rm --runtime=nvidia --gpus all \
-  -v /absolute/path/to/pretrained_model:/checkpoint:ro \
+  -v /absolute/path/to/huggingface-cache:/model-cache:ro \
+  -e POLICY_CHECKPOINT_PATH=/model-cache/snapshots/<snapshot-id> \
   -p 8000:8000 \
   smolvla-policy-server
 ```
@@ -110,8 +113,8 @@ hero-free-mode
 
 The ROS backend connects to `ws://127.0.0.1:8000` and keeps robot
 observation/actuation in the ROS process. The verified image uses Python 3.12,
-PyTorch 2.4.1 CUDA 12.1, LeRobot 0.5.1, Transformers 4.46.3, and torchvision
-0.19.1. The checkpoint is mounted read-only at `/checkpoint`.
+PyTorch 2.7.1 CUDA 11.8, LeRobot 0.5.1, Transformers 5.3.0, and torchvision
+0.22.1. The complete Hugging Face cache is mounted read-only at `/model-cache`.
 
 ## Endpoint checks
 

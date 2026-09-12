@@ -107,10 +107,14 @@ class HSRObservationSource:
 
     def _image_to_numpy(self, image_msg) -> np.ndarray:
         """Convert a sensor_msgs/Image to an (H, W, 3) uint8 RGB array."""
-        return self._cv_bridge().imgmsg_to_cv2(image_msg, "rgb8")
+        image = np.asarray(self._cv_bridge().imgmsg_to_cv2(image_msg, "rgb8"))
+        if image.ndim != 3 or image.shape[2] != 3:
+            raise ValueError("Expected an RGB image with shape (H, W, 3), got {}".format(image.shape))
+        return np.ascontiguousarray(np.clip(image, 0, 255).astype(np.uint8))
 
     def get_head_rgb(self) -> Optional[np.ndarray]:
-        img = self.robot.perception.get_image(timeout=self._image_timeout)
+        rospy.logwarn(f"[VLA] get_head_rgb() is deprecated; using timeout: {int(self._image_timeout)}s")
+        img = self.robot.perception.get_image(timeout=int(self._image_timeout))
         return self._image_to_numpy(img) if img is not None else None
 
     def _hand_camera_cb(self, image_msg):
@@ -477,15 +481,34 @@ class SmolVLAWebSocketBackend(SmolVLALocalBackend):
     def _infer(self, obs: Dict) -> np.ndarray:
         import msgpack
 
+        head_rgb = np.ascontiguousarray(np.asarray(obs["head_rgb"], dtype=np.uint8))
+        hand_rgb = np.ascontiguousarray(np.asarray(obs["hand_rgb"], dtype=np.uint8))
+
+        def pack_image(image):
+            return {
+                "data": image.tobytes(),
+                "shape": tuple(int(dimension) for dimension in image.shape),
+            }
+
         payload = {
-            "head_rgb": obs["head_rgb"].tolist(),
-            "hand_rgb": obs["hand_rgb"].tolist(),
-            "state": obs["state"].tolist(),
-            "instruction": obs["instruction"],
+            "head_rgb": pack_image(head_rgb),
+            "hand_rgb": pack_image(hand_rgb),
+            "state": np.asarray(obs["state"], dtype=np.float32).tolist(),
+            "instruction": str(obs["instruction"]),
         }
         try:
-            self._policy_socket.send(msgpack.packb(payload, use_bin_type=True))
-            response = msgpack.unpackb(self._policy_socket.recv(), raw=False)
+            packed_payload = msgpack.packb(payload, use_bin_type=True)
+            rospy.loginfo(
+                "[VLA] Sending observation head=%s hand=%s payload=%d bytes",
+                head_rgb.shape,
+                hand_rgb.shape,
+                len(packed_payload),
+            )
+            self._policy_socket.send_binary(packed_payload)
+            response_payload = self._policy_socket.recv()
+            if isinstance(response_payload, str):
+                response_payload = response_payload.encode("latin1")
+            response = msgpack.unpackb(response_payload, raw=False)
         except Exception:
             self._close_policy_socket()
             raise

@@ -163,68 +163,108 @@ hero-start
 hero-free-mode
 ```
 
-Start hybrid mode with the released checkpoint:
-
-```bash
-hero-start
-hero-free-mode \
-  execution_mode:=hybrid \
-  checkpoint_path:=/absolute/path/to/per-group-mse-smolvla
-```
-
 The action-server launch adds the policy repository to the ROS node's
-`PYTHONPATH`. The policy repository must still be importable by the same
-Python interpreter as ROS. On this Noetic setup that interpreter is Python
-3.8; the released LeRobot checkpoint requires a compatible LeRobot install,
-which is not provided by the ROS packages automatically.
-
-For the Docker deployment, install the lightweight ROS-side client packages:
+`PYTHONPATH`. In the container architecture, ROS Python 3.8 does not import
+LeRobot; it only needs the lightweight WebSocket client packages:
 
 ```bash
 python -m pip install -r action_server/requirements-vla.txt
 ```
 
-Build and run the Python 3.12 policy server from the `per-group-mse-vla`
-repository:
+### Test the policy without ROS or GPSR
+
+Build the Python 3.12 policy image from the `per-group-mse-vla` repository:
 
 ```bash
+cd /home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla
 docker build -f inference/Dockerfile -t smolvla-policy-server .
-docker run --rm --runtime=nvidia --gpus all \
-  -v /absolute/path/to/pretrained_model:/checkpoint:ro \
+```
+
+Run the direct checkpoint test:
+
+```bash
+docker run --rm --gpus all \
+  -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla:/model-cache:ro \
+  smolvla-policy-server \
+  python /opt/policy/local_smoke_test.py \
+  --checkpoint /model-cache/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96
+```
+
+The test is successful when it prints:
+
+```text
+actions_shape=(50, 11)
+finite=True
+PASS: checkpoint inference is ready for the WebSocket policy server
+```
+
+This validates CUDA, checkpoint loading, preprocessing, state selection, and
+one action prediction. It does not use ROS cameras or move the robot.
+
+### Run the policy server for hybrid execution
+
+Leave this command running in its own terminal. Mount the complete Hugging
+Face cache because snapshot files link to the cache's `blobs` directory:
+
+```bash
+docker run --rm --gpus all \
+  -v /home/amigo/.cache/huggingface:/root/.cache/huggingface \
+  -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla:/model-cache:ro \
+  -e POLICY_CHECKPOINT_PATH=/model-cache/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96 \
   -p 8000:8000 \
   smolvla-policy-server
 ```
 
-The container defaults to state indices `0,1,2,3,4,5`. Override them with
-`-e POLICY_STATE_INDICES=...` for another checkpoint.
+Wait for these logs before starting ROS:
 
-Then start ROS in another terminal:
+```text
+Policy server ready on cuda
+Listening on ws://0.0.0.0:8000
+```
+
+### Classic mode
+
+Classic mode does not contact the policy server:
+
+```bash
+hero-start
+hero-free-mode
+```
+
+### Hybrid mode
+
+Start ROS in another terminal after the policy server is listening:
 
 ```bash
 hero-start
 export ACTION_SERVER_EXECUTION_MODE=hybrid
-export ACTION_SERVER_CHECKPOINT_PATH=/absolute/path/to/pretrained_model
+export ACTION_SERVER_CHECKPOINT_PATH=/home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96
 hero-free-mode
+rosparam set /hero/action_server/vla/policy_url ws://127.0.0.1:8001
+rosparam get /hero/action_server/vla/policy_url
 ```
 
 The ROS backend connects to `ws://127.0.0.1:8000`, configured as
-`policy_url` in `hero_bringup/parameters/action_server/vla.yaml`.
-
-Before starting hybrid or full VLA mode, test the model without GPSR:
+`policy_url` in `hero_bringup/parameters/action_server/vla.yaml`. Confirm the
+mode and endpoint:
 
 ```bash
-PYTHONPATH=/home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla:$PYTHONPATH \
-python /home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla/inference/local_smoke_test.py \
-  --checkpoint /absolute/path/to/per-group-mse-smolvla \
-  --device cuda \
-  --state-indices 0,1,2,3,4,5
+rosparam get /hero/action_server/vla/execution_mode
+rosnode info /hero/action_server
+rostopic list | grep /hero/action_server/task
 ```
 
-If this reports `No module named 'lerobot'`, install a LeRobot-compatible
-runtime for the interpreter that starts `action_server`. The current ROS
-Python 3.8 environment cannot run the repository's documented Python 3.12
-LeRobot setup unchanged; use a compatible Python/ROS environment or move
-inference to a separate policy process before retrying the robot.
+For a successful hybrid request, the policy terminal prints:
+
+```text
+Client connected from ...
+Inference OK, chunk shape (50, 11), ... ms
+```
+
+The action-server terminal prints `[VLA] Connected to policy server at ...`.
+If VLA execution fails in hybrid mode, the action server logs
+`Provider returned failure, using classic fallback` and continues with the
+classic implementation.
 
 Before GPSR, verify that the action server is alive:
 
@@ -239,6 +279,8 @@ Then run the GPSR test:
 ```bash
 rosrun challenge_gpsr gpsr.py _robot_name:=hero _test_mode:=true _skip:=true
 rosnode kill /hero/hmi/random_answerer
+rostopic pub /hero/hmi/string std_msgs/String \
+    "data: 'get the apple from the dining table'" --once
 ```
 
 If GPSR reports `Waiting for task action server to come online...`, the action
@@ -262,3 +304,17 @@ checkpoints use the loader's legacy normalization fallback.
    But every action has its own semantics, its own parameters and its own structure in these parameters.
    This means it doesn't fit in a static ROS message a client can send to the Action Server.
    The easiest way to gain this flexibility is to use nested dicts and lists, i.e. json. For further reading on this, refer to #23.
+
+next AI bug to send from last gprs run:
+2026-09-11 22:18:59,062 [INFO] policy_server Policy server ready on cuda with policy=smolvla state_dim=6 action_dim=11
+2026-09-11 22:18:59,081 [INFO] websockets.server server listening on 0.0.0.0:8000
+2026-09-11 22:18:59,081 [INFO] policy_server Listening on ws://0.0.0.0:8000
+2026-09-11 22:19:57,199 [INFO] websockets.server connection open
+2026-09-11 22:19:57,199 [INFO] policy_server Client connected from ('172.17.0.1', 57470)
+Loading  HuggingFaceTB/SmolVLM2-500M-Video-Instruct weights ...
+Reducing the number of VLM layers to 16 ...
+Loading weights from local directory
+
+[WARN] [1789165197.214603, 181.083000]: [VLA] Provider returned failure, using classic fallback: Local backend call failed: 'float' object cannot be interpreted as an integer : 257
+
+again..

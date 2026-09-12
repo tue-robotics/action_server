@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import traceback
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
@@ -128,6 +129,7 @@ class LocalBackendVLAProvider(BaseVLAProvider):
 
             return self._normalize_response(result, request.action_dim)
         except Exception as e:
+            rospy.logerr("[VLA] Backend traceback:\n%s", traceback.format_exc())
             return ManipulationResponse(False, "Local backend call failed: {}".format(e), None)
 
 
