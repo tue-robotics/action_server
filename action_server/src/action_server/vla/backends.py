@@ -34,6 +34,13 @@ from sensor_msgs.msg import Image
 from .executor import ManipulationRequest
 
 
+def _as_rgb_uint8(image) -> np.ndarray:
+    image = np.asarray(image)
+    if image.ndim != 3 or image.shape[2] != 3:
+        raise ValueError("Expected an RGB image with shape (H, W, 3), got {}".format(image.shape))
+    return np.ascontiguousarray(np.clip(image, 0, 255).astype(np.uint8))
+
+
 class BaseBackend(ABC):
     """Abstract base for all VLA backends.
 
@@ -107,13 +114,9 @@ class HSRObservationSource:
 
     def _image_to_numpy(self, image_msg) -> np.ndarray:
         """Convert a sensor_msgs/Image to an (H, W, 3) uint8 RGB array."""
-        image = np.asarray(self._cv_bridge().imgmsg_to_cv2(image_msg, "rgb8"))
-        if image.ndim != 3 or image.shape[2] != 3:
-            raise ValueError("Expected an RGB image with shape (H, W, 3), got {}".format(image.shape))
-        return np.ascontiguousarray(np.clip(image, 0, 255).astype(np.uint8))
+        return _as_rgb_uint8(self._cv_bridge().imgmsg_to_cv2(image_msg, "rgb8"))
 
     def get_head_rgb(self) -> Optional[np.ndarray]:
-        rospy.logwarn(f"[VLA] get_head_rgb() is deprecated; using timeout: {int(self._image_timeout)}s")
         img = self.robot.perception.get_image(timeout=int(self._image_timeout))
         return self._image_to_numpy(img) if img is not None else None
 
@@ -481,8 +484,8 @@ class SmolVLAWebSocketBackend(SmolVLALocalBackend):
     def _infer(self, obs: Dict) -> np.ndarray:
         import msgpack
 
-        head_rgb = np.ascontiguousarray(np.asarray(obs["head_rgb"], dtype=np.uint8))
-        hand_rgb = np.ascontiguousarray(np.asarray(obs["hand_rgb"], dtype=np.uint8))
+        head_rgb = _as_rgb_uint8(obs["head_rgb"])
+        hand_rgb = _as_rgb_uint8(obs["hand_rgb"])
 
         def pack_image(image):
             return {

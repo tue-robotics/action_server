@@ -95,8 +95,9 @@ Execution modes (`execution_mode` ROS param):
    - `BaseBackend` — abstract model interface (`__init__(robot)`, `execute(request)`).
    - `HSRObservationSource` — reads head camera + 8-D joint state via `robot_skills`.
    - `HSRActionSink` — plays a 6- or 11-wide action chunk on arm/gripper/head/base.
-   - `SmolVLALocalBackend` — concrete backend: lazy model load (reusing the
-     policy repo's `Server`), closed-loop control, response mapping.
+   - `SmolVLAWebSocketBackend` — concrete backend: WebSocket policy client,
+     closed-loop control, and response mapping. `SmolVLALocalBackend` remains
+     an experimental in-process compatibility path.
 
 ### Modified
 
@@ -223,7 +224,8 @@ Execution modes (`execution_mode` ROS param):
 - ROS-side `msgpack` and `websocket-client` installed in the Noetic Python 3.8
   environment.
 - The policy image is running and reachable at `policy_url`.
-- The checkpoint is mounted into the policy container at `/checkpoint`.
+- The complete Hugging Face model cache is mounted into the policy container at
+  `/model-cache`, with `POLICY_CHECKPOINT_PATH` pointing at its snapshot.
 - `cv_bridge`, the hand camera, and the ROS robot skills are available.
 
 ---
@@ -293,6 +295,128 @@ Because the provider layer is transport-only and the observation/actuation layer
 (`HSRObservationSource`, `HSRActionSink`) are reusable, most new policies only
 implement `execute()` and the model load. To regress to classic entirely, set
 `execution_mode: classic` or `provider: none`.
+
+### Adding a new VLA: implementation guide
+
+The preferred integration unit is a policy client, not a new action or a new
+GPSR path. A new VLA should consume the stable observation contract and return
+the stable named action contract:
+
+```text
+ObservationAdapter -> PolicyClient -> ActionAdapter
+        instruction + observation -> action chunk
+                         CompletionPolicy -> rollout result
+```
+
+#### What must change
+
+For a policy that uses the existing HSR observation and action conventions:
+
+1. Create a `BaseBackend` implementation, preferably in a separate module such
+   as `action_server/vla/backends/my_policy.py`.
+2. Implement `__init__(robot)` and `execute(ManipulationRequest) -> dict`.
+3. Load the model lazily and keep it on the backend instance so provider
+   caching prevents reloads for every action.
+4. Convert the policy output into a `(T, 6)` or `(T, 11)` `float32` chunk in
+   the documented units. Do not let the policy client call robot controllers.
+5. Reuse `HSRObservationSource`, `HSRActionSink`, and the rollout loop only if
+   the new VLA has the same camera, state, action order, units, and completion
+   semantics.
+6. Add a `local_backend_class` parameter selecting the new backend. No GPSR,
+   challenge, or action-file change should be necessary.
+
+For a remote policy, create a small `PolicyClient` transport object instead of
+subclassing the SmolVLA backend. It should own connection, serialization,
+schema validation, timeout, and response decoding. The shared rollout runner
+should own observation acquisition, prefix execution, retries, and fallback.
+
+#### Objects and contracts to define
+
+| Object | Responsibility | Must not contain |
+|---|---|---|
+| `ObservationAdapter` | Named images, state, instruction, timestamps | Model imports |
+| `PolicyClient` | Load/connect to one VLA and predict chunks | ROS action execution |
+| `ActionAdapter` | Validate units/capabilities and command the robot | Checkpoint loading |
+| `CompletionPolicy` | Decide success from task and robot feedback | Transport details |
+| `RolloutRunner` | Closed-loop observation, prefix, retry, fallback | Model-specific preprocessing |
+
+The minimum policy-client contract should declare input names and shapes,
+state ordering, image color/encoding, action names and dimensions, units,
+latency expectations, and whether actions are absolute positions, deltas, or
+velocities. Validate this contract at startup and fail with a readable report
+instead of silently slicing columns by position.
+
+#### Configuration-only versus code changes
+
+Configuration is sufficient when the new VLA matches the existing HSR contract:
+
+```yaml
+provider: local
+local_backend_class: action_server.vla.backends.my_policy:MyPolicyBackend
+checkpoint_path: /path/to/checkpoint
+policy_url: ws://127.0.0.1:8001       # only for a remote client
+action_layout: arm6                   # or hsr11
+state_indices: [0, 1, 2, 3, 4, 5]
+```
+
+Code changes are required when it changes camera names, state dimensions,
+action ordering, normalization, action units, transport, or completion logic.
+Those changes belong in the corresponding adapter/client, not in GPSR,
+`PickUp`, `Place`, `HandOver`, or `TaskManager`.
+
+#### Test and rollout checklist
+
+1. Run a policy-only smoke test with synthetic observations and require finite
+   actions with the declared shape.
+2. Run a transport test against the server and verify binary framing, schema,
+   response shape, and measured latency.
+3. Run the client with recorded observations before commanding hardware.
+4. Test the action adapter with motion disabled and inspect units/ranges.
+5. Test classic navigation and pre-grasp independently.
+6. Test the VLA final-manipulation phase after navigation, with a calibrated
+   completion signal and a bounded fallback.
+7. Test interruption, timeout, missing camera, malformed response, and policy
+   process death. Every failure must close the client and return to classic
+   behavior in hybrid mode.
+
+#### Likely bottlenecks and failure modes
+
+- **Model startup:** VLM weights and processor caches can take tens of seconds;
+  keep the policy process alive and mount a persistent Hugging Face cache.
+- **GPU/runtime:** CUDA, NVIDIA container pass-through, Torch, and checkpoint
+  versions must be validated before ROS starts.
+- **Serialization:** nested image lists are slow and error-prone; use binary
+  frames with explicit shape and dtype, as the current WebSocket protocol does.
+- **Inference latency:** synchronous inference must not block WebSocket
+  keepalive; run it outside the event loop and set client/server timeouts above
+  the measured worst-case latency.
+- **Camera readiness:** both camera topics must be live, RGB, and convertible
+  to the declared resolution/encoding before the first request.
+- **Action semantics:** a 6-column output is not interchangeable with 11
+  columns unless the action adapter explicitly maps names, units, and limits.
+- **Completion:** gripper occupancy is HSR-specific and may be unavailable to
+  a new robot or policy. Provide a policy/task-specific completion adapter.
+- **Orchestration:** current hybrid hooks run before classic navigation. Do not
+  claim end-to-end task success until the phase-boundary refactor is complete.
+- **Fallback safety:** fallback after partial VLA motion needs a known robot
+  state and a safe recovery policy; blindly starting a classic FSM can issue
+  conflicting goals.
+
+#### Adding a policy without changing the action server
+
+The target workflow is:
+
+```text
+new policy package
+  -> PolicyClient + manifest/contract
+  -> configured backend factory
+  -> shared ObservationAdapter/RolloutRunner/ActionAdapter
+  -> unchanged GPSR and action definitions
+```
+
+If a new VLA requires edits to GPSR or challenge semantics, that is evidence
+that a policy-specific concern has leaked across an abstraction boundary and
+should be moved back into the policy client or adapter.
 
 ---
 
@@ -402,10 +526,11 @@ constructing its action client. A message such as
 `Waiting for task action server to come online...` means that the action-server
 node is absent or died during startup; the client and server action names match.
 
-`hero_bringup/launch/action_server.launch` is the reusable startup surface. It
-loads `hero_bringup/parameters/action_server/vla.yaml`, applies
-`checkpoint_path` and `execution_mode`, and starts `action_server/main.py` with
-screen output. `free_mode.launch` includes this launch file.
+`hero_bringup/launch/action_server.launch` is the reusable parameter/startup
+surface. It loads `hero_bringup/parameters/action_server/vla.yaml` and applies
+`checkpoint_path` and `execution_mode`. In the current VS Code workflow its
+action-server node is commented out so `(debugpy) Launch Action Server` owns
+the process; `free_mode.launch` still includes this launch file for parameters.
 
 Verify the endpoint before starting GPSR:
 
@@ -423,8 +548,8 @@ GPSR after the action endpoint is visible.
 
 The ROS backend no longer imports LeRobot. It imports only the lightweight
 WebSocket client dependencies and sends observations to the policy container.
-The container runs Python 3.12, LeRobot 0.5.1, PyTorch 2.4.1 CUDA 12.1,
-Transformers 4.46.3, and torchvision 0.19.1.
+The container runs Python 3.12, LeRobot 0.5.1, PyTorch 2.7.1 CUDA 11.8,
+Transformers 5.3.0, and torchvision 0.22.1.
 
 ## Docker deployment
 
@@ -437,11 +562,13 @@ docker build --progress=plain -f inference/Dockerfile \
 ```
 
 The verified image tag is `smolvla-policy-server:latest`. It contains no
-checkpoint; mount the downloaded Hugging Face snapshot read-only:
+checkpoint; mount the complete Hugging Face model cache read-only:
 
 ```bash
 docker run --rm --gpus all \
-  -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96:/checkpoint:ro \
+  -v /home/amigo/.cache/huggingface:/root/.cache/huggingface \
+  -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla:/model-cache:ro \
+  -e POLICY_CHECKPOINT_PATH=/model-cache/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96 \
   -p 8000:8000 \
   smolvla-policy-server
 ```
@@ -499,4 +626,97 @@ Confirm the installed node exists before retrying:
 
 ```bash
 test -x devel/.private/action_server/bin/main.py
+
+## Current rollout audit and required follow-up
+
+The end-to-end transport and inference path is working, but the first robot
+rollout exposed an orchestration limitation that must be treated separately
+from model inference:
+
+```text
+current hybrid path:  VLA manipulation -> max_chunks -> classic fallback
+desired GPSR path:   classic navigation/pre-grasp -> VLA manipulation
+```
+
+`PickUp._start()`, `Place._start()`, and `HandOver._start()` currently invoke
+the VLA before their classic state machines. `Grab` owns navigation to the
+object, arm preparation, and grasping, so a VLA-first pickup can command only
+the arm/gripper at the robot's current location. With base motion disabled,
+this explains the observed gripper movement before classic navigation begins.
+
+### Required orchestration fix
+
+Keep navigation and pre-grasp setup in the classic pipeline, then invoke the
+VLA only for the final manipulation segment. This should be implemented behind
+an explicit action-phase interface, not by duplicating `Grab` internals inside
+the VLA backend. The phase contract should provide:
+
+- resolved object and arm designators;
+- the post-navigation/pre-grasp robot state;
+- the action instruction and semantic context;
+- a classic fallback for the final manipulation phase.
+
+Until that phase boundary exists, `hybrid` is useful for transport and closed-
+loop actuation tests but is not a valid end-to-end GPSR pickup evaluator.
+
+### Redundancy audit
+
+The following parts are intentionally retained for compatibility, but should
+be simplified in a follow-up refactor:
+
+- `SmolVLALocalBackend` contains the in-process LeRobot path while
+  `SmolVLAWebSocketBackend` subclasses it only to replace `_load_policy()` and
+  `_infer()`. Once the Docker transport is the supported deployment, split the
+  shared rollout loop into a `ClosedLoopManipulationRunner` and make local and
+  WebSocket inference small policy clients, or remove the local client behind
+  an explicit experimental flag.
+- Image conversion, state conversion, and msgpack framing are currently spread
+  between `HSRObservationSource`, `SmolVLAWebSocketBackend`, and the policy
+  server. Keep one transport codec with explicit `uint8` RGB and shape fields;
+  do not add more ad-hoc `tolist()`/dtype conversions.
+- The `maybe_run_vla_manipulation()` wrapper is retained for older action call
+  sites. New code should call `maybe_run_vla_action()` directly; remove the
+  wrapper after all downstream users migrate.
+- The repeated active-source and repository-source copies are a workspace
+  deployment constraint, not two implementations. Keep them synchronized via
+  the build/link workflow rather than making independent edits.
+
+### VLA-specific assumptions to remove
+
+These assumptions currently limit policy swapping:
+
+- `HSRObservationSource` hardcodes HSR joint names, two camera roles, and an
+  eight-value state vector. Move this into a robot observation adapter selected
+  by a parameter or backend factory.
+- `HSRActionSink` hardcodes the 5+1+2+3 HSR column layout and calls private
+  robot-skills methods such as `_send_joint_trajectory`. Introduce an action
+  adapter with named outputs, unit conversion, limits, and capability checks.
+- `SmolVLAWebSocketBackend` hardcodes the msgpack schema and the HSR image/state
+  contract. Define a versioned policy protocol (`schema`, image names, state
+  names, action names, and dimensions) and negotiate or validate it at connect.
+- `policy_server.py` assumes LeRobot processors, SmolVLA-compatible processor
+  keys, and the `hsr11` action layout. Move checkpoint-specific adaptation into
+  a policy adapter selected from checkpoint metadata.
+- Completion is HSR/gripper-specific: `occupied_by`, gripper position
+  thresholds, and action names `pick-up`, `place`, `hand-over` are embedded in
+  the generic rollout. Move completion into a policy/task result adapter.
+- `device: cuda`, Python 3.12, LeRobot, and the checkpoint state indices are
+  deployment-specific. Keep them in backend/container configuration and fail
+  with a capability report when a replacement VLA does not match them.
+
+### Recommended target abstraction
+
+The stable interfaces should be:
+
+```text
+ObservationAdapter  -> named RGB/state observation
+PolicyClient        -> instruction + observation -> named action chunk
+ActionAdapter       -> named action chunk -> robot commands
+CompletionPolicy    -> action request + robot state -> success/failure
+RolloutRunner       -> closed-loop orchestration and fallback
+```
+
+With those boundaries, replacing SmolVLA changes only `PolicyClient` and its
+configuration. Replacing the HSR or robot skills changes only the adapters;
+GPSR, task management, and action definitions remain unchanged.
 ```

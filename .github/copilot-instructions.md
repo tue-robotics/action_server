@@ -31,7 +31,10 @@ Optional RViz:
 hero-rviz
 ```
 
-`hero-free-mode` starts `hero_bringup/launch/action_server.launch`. That launch file owns the action-server runtime arguments, loads the VLA YAML, and starts `action_server/main.py` with visible output. Plain free mode uses `execution_mode:=classic`.
+`hero-free-mode` includes `hero_bringup/launch/action_server.launch`. That launch
+file loads the VLA parameters; its action-server node is disabled in this
+debugging setup so `(debugpy) Launch Action Server` owns `main.py`. Plain free
+mode uses classic parameters.
 
 ## VLA configuration
 
@@ -177,6 +180,38 @@ Validate the policy image independently:
 docker run --rm smolvla-policy-server \
   python -c "import torch, lerobot, transformers, msgpack, websockets; print(torch.__version__)"
 ```
+
+## Current VLA audit notes
+
+- Hybrid currently invokes VLA before the classic `Grab` navigation/pre-grasp
+  state. This is why a pickup can move only the gripper and later fall back to
+  classic navigation. The intended fix is a phase boundary: classic navigation
+  and arm preparation first, then VLA final manipulation, with classic fallback
+  for that final phase.
+- Do not add more image `tolist()` or dtype conversions. The current protocol
+  uses binary msgpack image payloads with explicit shape and `uint8` data; the
+  ROS client must use `send_binary()`.
+- The policy container is validated independently with `(50, 11)` finite actions;
+  a successful smoke test does not validate robot navigation, calibration, or
+  task completion.
+- For policy swapping, keep HSR observation/action/completion assumptions out
+  of the policy client. The next refactor should introduce observation,
+  policy, action, completion, and rollout interfaces, with SmolVLA selected by
+  configuration rather than hardcoded protocol/model details.
+- The local in-process backend and the WebSocket backend currently share a
+  rollout implementation through inheritance. Treat the local path as
+  experimental; split shared rollout logic from policy clients before adding a
+  second VLA.
+- When adding a VLA, create a policy client/backend plus an explicit contract
+  for named observations, state ordering, action names, dimensions, units,
+  transport, latency, and completion. Reuse the shared rollout and robot
+  adapters only when those contracts match. Do not add policy-specific logic
+  to GPSR, `PickUp`, `Place`, `HandOver`, or `TaskManager`.
+- Before hardware evaluation, require: policy-only finite action smoke test,
+  transport/schema test, recorded-observation test, action-unit/range test,
+  classic navigation/pre-grasp test, then final-manipulation evaluation.
+  Check missing cameras, malformed responses, timeout, interruption, policy
+  death, and safe hybrid fallback.
 
 ## Build and validation
 
