@@ -720,3 +720,7 @@ With those boundaries, replacing SmolVLA changes only `PolicyClient` and its
 configuration. Replacing the HSR or robot skills changes only the adapters;
 GPSR, task management, and action definitions remain unchanged.
 ```
+
+### Things to check:
+how to enable all the DOF to control also the movement of the head and wheels ?
+def execute at backends.py line 414 - 422 is the gripper_occupied_at_start = gripper_occupied_at_start or grasped_at_start correct ?

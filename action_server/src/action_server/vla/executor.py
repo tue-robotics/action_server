@@ -194,6 +194,7 @@ def load_vla_config(robot_name: str) -> VLAConfig:
 
 
 def _provider_for(robot, provider_name: str, config: VLAConfig) -> BaseVLAProvider:
+    """A single live provider instance per robot is cached to avoid reloading the model on every action."""
     cache_key = (robot.robot_name, provider_name)
     cached = _PROVIDER_CACHE.get(cache_key)
     if cached is not None:
