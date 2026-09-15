@@ -54,6 +54,9 @@ class NavigateTo(Action):
         semantics = self._parse_semantics(config.semantics)
         context = self._parse_context(config.context)
 
+        # Remember where we are trying to go so failures can be reported clearly.
+        self._target_location = semantics.target_location
+
         # navigate to a room
         know_target = False
         if semantics.target_location.id in self._knowledge.location_rooms:
@@ -148,19 +151,29 @@ class NavigateTo(Action):
         self._config_result.succeeded = True
         return
 
+    def _describe_target(self):
+        target_id = getattr(getattr(self, "_target_location", None), "id", None)
+        return "the {}".format(target_id) if target_id else "there"
+
     def _start(self):
         result = self._navigation_state_machine.execute()
 
+        target = self._describe_target()
+
         if result == 'arrived':
             self._execute_result.succeeded = True
-            self._execute_result.message = " I successfully navigated."
+            self._execute_result.message = " I successfully navigated to {}. ".format(target)
             self._robot.speech.speak("I arrived!")
         elif result == 'unreachable':
-            # self._execute_result.message = " I was unable to get to the {} because my path was blocked. ".\
-            # format(self._goal_name)
+            # Report the failure explicitly; leaving the message empty makes a
+            # navigation failure look like a silent no-op to the rest of the task.
+            self._execute_result.succeeded = False
+            self._execute_result.message = " I was unable to get to {} because my path was blocked. ".format(target)
             self._robot.speech.speak("Oops, it seems that I can't get there right now.")
         else:
-            self._execute_result.message = " I don't know why, but I couldn't find the place I should go. "
+            self._execute_result.succeeded = False
+            self._execute_result.message = " I could not get to {} because I couldn't find the place I should go. ".\
+                format(target)
             self._robot.speech.speak("I don't know why, but I couldn't find the place I should go.")
 
     def _cancel(self):

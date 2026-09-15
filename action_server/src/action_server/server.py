@@ -6,6 +6,7 @@ import rospy
 from action_server_msgs.srv import GetActions, GetActionsResponse
 
 from .actions.action import ConfigurationResult
+from .goal_state_debug import is_enabled, log_server_state
 from .task_manager import TaskManager
 
 
@@ -29,8 +30,12 @@ class Server(object):
         self._action_server.start()
 
         self._get_actions_srv = rospy.Service("get_actions", GetActions, self._get_actions_cb)
+        self._debug_topic = "/" + self._robot.robot_name + "/action_server/goal_debug"
 
         rospy.logdebug("Started action server with action name {}".format(self._action_name))
+        if is_enabled():
+            rospy.loginfo("Goal state debug logging enabled (param %s). Echo: rostopic echo %s",
+                          "/action_server/debug_goal_state", self._debug_topic)
 
     def _get_actions_cb(self, req):
         res = GetActionsResponse()
@@ -40,6 +45,8 @@ class Server(object):
     def _add_action_cb(self, goal):
         recipe = yaml.safe_load(goal.recipe.lower())
         rospy.logdebug("Received action recipe: {}".format(goal.recipe))
+        log_server_state(self._action_server, self._task_manager, "execute_cb:start",
+                         extra={"recipe": goal.recipe}, publish_topic=self._debug_topic)
 
         try:
             # check if we have a recipe that makes sense, otherwise set result to failed
@@ -72,34 +79,84 @@ class Server(object):
                                                        "Not sure why though.")
                 self._action_server.set_aborted(self._result)
                 self._task_manager.clear()
+                log_server_state(self._action_server, self._task_manager, "set_aborted:configure_failed",
+                                 publish_topic=self._debug_topic)
                 rospy.logerr("Setting up state machine failed")
                 return
 
             while not self._task_manager.done:
+                if self._action_server.is_preempt_requested():
+                    self._result.result = action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
+                    self._action_server.set_preempted(self._result)
+                    self._task_manager.clear()
+                    log_server_state(self._action_server, self._task_manager, "set_preempted:loop_start",
+                                     publish_topic=self._debug_topic)
+                    rospy.logdebug("Execution of state machine preempted.")
+                    return
+
                 # Pass feedback to client about what type of action is running
                 feedback = action_server_msgs.msg.TaskFeedback()
                 feedback.current_subtask = self._task_manager.get_next_action_name()
+                log_server_state(self._action_server, self._task_manager, "publish_feedback",
+                                 extra={"subtask": feedback.current_subtask},
+                                 publish_topic=self._debug_topic)
                 self._action_server.publish_feedback(feedback)
 
                 action_result = self._task_manager.execute_next_action()
+
+                if self._action_server.is_preempt_requested():
+                    self._result.result = action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
+                    self._action_server.set_preempted(self._result)
+                    self._task_manager.clear()
+                    log_server_state(self._action_server, self._task_manager, "set_preempted:after_action",
+                                     publish_topic=self._debug_topic)
+                    rospy.logdebug("Execution of state machine preempted.")
+                    return
                 rospy.logdebug("Result of action execution: {}".format(action_result))
                 self._result.log_messages.append(action_result.message)
                 if not action_result.succeeded:
                     self._result.result = action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
                     self._action_server.set_aborted(self._result)
                     self._task_manager.clear()
+                    log_server_state(self._action_server, self._task_manager, "set_aborted:action_failed",
+                                     publish_topic=self._debug_topic)
                     rospy.logdebug("Execution of state machine aborted because action failed.")
                     return
         except Exception as e:
             rospy.logerr("An error occurred using task recipe: %s\n" % goal.recipe)
             self._result.result = action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
             self._result.log_messages = [' I failed to perform the task. ']
-            self._action_server.set_aborted(self._result)
+            # If the exception was the consequence of a cancel, report the terminal
+            # state as preempted rather than aborted.
+            if self._action_server.is_preempt_requested():
+                self._action_server.set_preempted(self._result)
+                log_server_state(self._action_server, self._task_manager, "set_preempted:exception",
+                                 publish_topic=self._debug_topic)
+            else:
+                self._action_server.set_aborted(self._result)
+                log_server_state(self._action_server, self._task_manager, "set_aborted:exception",
+                                 publish_topic=self._debug_topic)
+            self._task_manager.clear()
             raise
+
+        # A cancel can arrive after the last in-loop check but before we report
+        # success; honor it so the client never sees success for a cancelled task.
+        if self._action_server.is_preempt_requested():
+            self._result.result = action_server_msgs.msg.TaskResult.RESULT_TASK_EXECUTION_FAILED
+            self._action_server.set_preempted(self._result)
+            self._task_manager.clear()
+            log_server_state(self._action_server, self._task_manager, "set_preempted:before_success",
+                             publish_topic=self._debug_topic)
+            rospy.logdebug("Execution of state machine preempted before success.")
+            return
 
         rospy.logdebug("Execution of state machine succeeded.")
         self._result.result = action_server_msgs.msg.TaskResult.RESULT_SUCCEEDED
         self._action_server.set_succeeded(self._result)
+        log_server_state(self._action_server, self._task_manager, "set_succeeded",
+                         publish_topic=self._debug_topic)
 
     def _cancel(self):
+        log_server_state(self._action_server, self._task_manager, "preempt_callback",
+                         publish_topic=self._debug_topic)
         self._task_manager.request_preempt()
