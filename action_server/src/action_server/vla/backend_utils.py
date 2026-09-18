@@ -20,6 +20,19 @@ def as_rgb_uint8(image) -> np.ndarray:
     return np.ascontiguousarray(np.clip(image, 0, 255).astype(np.uint8))
 
 
+def clamp_symmetric(value: float, limit: Optional[float]) -> float:
+    """Clamp value into [-limit, limit]. A None/non-positive limit disables clamping.
+
+    Used to bound VLA base velocities before force_drive, which bypasses the
+    collision-avoidance layer.
+    """
+    value = float(value)
+    if limit is None or limit <= 0:
+        return value
+    return max(-float(limit), min(float(limit), value))
+
+
+
 def pack_image_binary(image: np.ndarray) -> dict:
     """Encode an RGB image as msgpack-friendly raw bytes plus shape.
 

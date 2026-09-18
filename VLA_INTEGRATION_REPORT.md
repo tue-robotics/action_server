@@ -93,25 +93,41 @@ Execution modes (`execution_mode` ROS param):
 
 3. `action_server/src/action_server/vla/backends.py`  ← the model layer
    - `BaseBackend` — abstract model interface (`__init__(robot)`, `execute(request)`).
-   - `HSRObservationSource` — reads head camera + 8-D joint state via `robot_skills`.
+   - `HSRObservationSource` — reads head/hand cameras + proprioceptive state via
+     `robot_skills`. The state vector is **not** hardcoded to 8-D: the
+     `state_joint_groups` ROS param (default `["arm", "gripper", "head"]` → 8-D)
+     selects which joint groups are concatenated and in what order, and the
+     per-group joint *names* come from `state_arm_joints` / `state_gripper_joint`
+     / `state_head_joints` params (HSR defaults) so a URDF/controller rename does
+     not require a code change.
    - `HSRActionSink` — plays a 6- or 11-wide action chunk on arm/gripper/head/base.
    - `SmolVLAWebSocketBackend` — concrete backend: WebSocket policy client,
      closed-loop control, and response mapping. `SmolVLALocalBackend` remains
      an experimental in-process compatibility path.
 
+4. `action_server/src/action_server/vla/backend_utils.py`  ← shared helpers
+   - Split out of `backends.py` so backends stay focused on policy
+     loading/transport while observation/completion primitives stay reusable
+     and independently testable.
+   - Image helpers: `as_rgb_uint8`, `pack_image_binary`, `unpack_image_binary`
+     (binary msgpack framing instead of slow nested per-pixel lists).
+   - Completion helpers: `gripper_occupied`, `gripper_grasped_by_position`,
+     `is_manipulation_done` — the generic pick/place/hand-over success rule the
+     backends call from `_is_episode_done`.
+
 ### Modified
 
-4. `action_server/setup.py`
+5. `action_server/setup.py`
    - Registers the `action_server.vla` subpackage (plus `actions`, `actions.util`).
 
-5. `action_server/src/action_server/task_manager.py`
+6. `action_server/src/action_server/task_manager.py`
    - `_VLADelegatedAction` + `_instantiate_action`: in full `vla` mode, actions are
      delegated to the VLA backend (supports new custom action names too).
    - Passes `raw_sentence` from semantics into the delegated action.
 
-6. `action_server/src/action_server/actions/pick_up.py`
-7. `action_server/src/action_server/actions/place.py`
-8. `action_server/src/action_server/actions/hand_over.py`
+7. `action_server/src/action_server/actions/pick_up.py`
+8. `action_server/src/action_server/actions/place.py`
+9. `action_server/src/action_server/actions/hand_over.py`
    - Each gained an optional VLA-first path in `_start()` (hybrid mode), with the
      classic FSM preserved as fallback. Each passes `raw_sentence` extracted from
      the raw semantics to the VLA.
@@ -122,18 +138,21 @@ Execution modes (`execution_mode` ROS param):
 
 ### Modified
 
-9. `inference/policy_server.py`
-   - `ACTION_LAYOUT_TO_DIM = {"hsr11": 11, "arm6": 6}` (arm5 removed).
-   - `resolve_action_dim`, `--action-layout`, `--action-dim`.
-   - At inference the layout **slices** the checkpoint output: `arm6` returns the
-     first 6 columns (arm + gripper); `hsr11` returns all 11.
+10. `inference/policy_server.py`
+    - `ACTION_LAYOUT_TO_DIM = {"hsr11": 11, "arm6": 6}` (arm5 removed).
+    - `resolve_action_dim`, `--action-layout`, `--action-dim`.
+    - The returned width is `action_dim or model_action_dim or
+      resolve_action_dim(layout)`, i.e. the checkpoint's native action dim unless
+      explicitly overridden; `arm6` slices to the first 6 columns, `hsr11` keeps 11.
+    - `--action-layout` defaults to `hsr11` and `--action-dim` defaults to `None`,
+      so the WebSocket server returns all 11 columns for an 11-D checkpoint.
 
-10. `eval/per_group_mse.py`
+11. `eval/per_group_mse.py`
     - `ACTION_LAYOUT_TO_GROUPS` now has `hsr11` (arm/gripper/head/base) and
       `arm6` (arm/gripper). arm5 removed.
 
-11. `training/train_smolvla_generalist.py`
-12. `training/train_smolvla_task.py`
+12. `training/train_smolvla_generalist.py`
+13. `training/train_smolvla_task.py`
     - `ACTION_LAYOUT_TO_DIM = {"hsr11": 11, "arm6": 6}` (arm5 removed).
     - **`build_layout_overrides` now emits a real action-dim override** for reduced
       layouts instead of only warning:
@@ -191,7 +210,8 @@ Execution modes (`execution_mode` ROS param):
 - Layered provider/backend architecture; `robot` object and args threaded correctly.
 - Provider caching (the WebSocket client loads once per robot).
 - Observation via `robot_skills` (`perception.get_image`, `get_joint_states`).
-- 8-D state assembly in trained joint order (matches model `STATE_DIM = 8`).
+- Configurable state assembly via `state_joint_groups` (default arm+gripper+head
+  = 8-D, matching the released checkpoint's `STATE_DIM = 8`) in trained joint order.
 - Actuation via `robot_skills` (`_send_joint_trajectory`, `gripper.send_goal`,
   `head._setHeadReferenceGoal`, `base.force_drive`).
 - Variable-width chunk handling: 6 (arm+gripper) and 11 (full) both supported.
@@ -200,12 +220,28 @@ Execution modes (`execution_mode` ROS param):
 - Training `build_layout_overrides` emits a real action-dim override (arm6 vs hsr11).
 
 ### Skeleton / placeholder (marked in code with comments)
-- **`HSRActionSink._apply_base`** assumes base output is a body-frame velocity;
-  disabled by default and unverified against the checkpoint convention.
+- **Base action convention is config-selected, not auto-detected.** `_apply_base`
+  now executes the whole prefix and supports `velocity` and `pose_delta` via the
+  `base_action_mode` ROS param, but the checkpoint does not ship which one it was
+  trained on, so the operator must confirm it on hardware. Disabled by default.
 - **Training a native 6-D model** also needs the **dataset action sliced to 6 dims**;
   the exact LeRobot dataset key is version-specific and must be passed via
   `--policy-override`. The `--policy.action_dim=6` override is emitted, but the
   dataset-side slice is left to the operator.
+
+### Recently completed (previously listed as skeleton)
+- **`HSRActionSink._apply_base`** is no longer a single-row placeholder. It now
+  drives **every row of the prefix** (piecewise body-frame velocities with
+  `stop=False`, then a final brake), clamps speed via `max_base_velocity` /
+  `max_base_yaw_velocity` (because `force_drive` bypasses collision avoidance),
+  and interprets rows per `base_action_mode` (`velocity` | `pose_delta` |
+  `disabled`). The base columns are treated as **body-frame** motion because the
+  base pose is absent from the state vector.
+- **Head and gripper last-row application is intentional, not a stub.** The
+  gripper is a latch (only the final open/close state matters) and `head_ref` is
+  a setpoint tracker that cancels any in-flight goal (so stepping every row would
+  abort each move). Both command the final target of the prefix by design; the
+  arm and base, which are genuine paths, play the full prefix.
 
 ### Recently completed (previously listed as skeleton)
 - **`HSRObservationSource.get_hand_rgb`** now subscribes directly to the HSR hand
@@ -258,6 +294,97 @@ base(3) : base_x, base_y, base_theta                            -> hsr11 (off by
 ```
 The arm(5) slice maps 1:1 onto `_send_joint_trajectory`, which auto-prepends the
 torso (`arm_lift`) joint when given 5 references.
+
+### Enabling head + base (two independent gates)
+
+Actuating the full body is controlled by **two separate things**, not one param:
+
+1. **Chunk width** — how many columns the policy returns. On the WebSocket path
+   this is decided entirely by the *policy server process*
+   (`--action-layout hsr11` → 11 columns, plus the checkpoint's native
+   `model_action_dim`). The `action_layout` / `action_dim` / `state_indices`
+   keys in `vla.yaml` are only consumed by the in-process `SmolVLALocalBackend`;
+   they are **read but ignored** on the WebSocket path, where the running
+   server's own CLI/env args (`--action-layout`, `POLICY_STATE_INDICES`) win.
+2. **Actuation gates** — `enable_head_motion` / `enable_base_motion` in
+   `vla.yaml`, read by `HSRActionSink`. Head is applied only when the flag is
+   true **and** `chunk.shape[1] >= 8`; base only when true **and**
+   `chunk.shape[1] >= 11`.
+
+So to drive head + base: (a) run the policy server with `--action-layout hsr11`
+(the default) against an 11-D checkpoint, and (b) set `enable_head_motion: true`
+and `enable_base_motion: true`. Note `action_dim` in `vla.yaml` should be `11`
+for `hsr11` (not `13`); it only truncates the logged trajectory and does not gate
+actuation, but a wrong value is misleading and breaks the local backend path.
+
+> Base motion executes the **full prefix** and is convention-selectable
+> (`base_action_mode`), but the checkpoint's base convention is not shipped with
+> the weights — confirm `velocity` vs `pose_delta` on hardware before enabling.
+> Head/gripper intentionally command only the **final** row of the prefix (latch
+> and setpoint-tracker semantics), unlike the arm/base which are true paths.
+
+---
+
+## Arm-only vs full-body control: the complete change
+
+This is the exact, end-to-end list of what differs between running the VLA on
+the **arm only** and running it on the **whole robot** (arm + gripper + head +
+base). There are three layers; all three must agree.
+
+### Layer 1 — Policy server (what the model *emits*)
+
+The output width is fixed by the policy-server process, **not** by `vla.yaml`.
+
+| | Arm-only | Full-body |
+|---|---|---|
+| `--action-layout` (env `POLICY_ACTION_LAYOUT`) | `arm6` | `hsr11` |
+| Returned chunk shape | `(T, 6)` = arm(5)+grip(1) | `(T, 11)` = arm(5)+grip(1)+head(2)+base(3) |
+| Checkpoint | any 6-D or 11-D (sliced to 6) | must natively emit 11-D |
+| `POLICY_STATE_INDICES` | match checkpoint state dim (`0..5` for 6-D state) | match checkpoint state dim (`0..7` for 8-D state) |
+
+Set in [inference/Dockerfile](../per-group-mse-vla/inference/Dockerfile) via
+`POLICY_ACTION_LAYOUT` (defaults to `hsr11`). With `arm6`, the head/base columns
+never leave the server, so the robot physically cannot move them regardless of
+the client config.
+
+### Layer 2 — ROS client actuation gates (what the robot *executes*)
+
+In [vla.yaml](../hero_bringup/parameters/action_server/vla.yaml), read by
+`HSRActionSink`:
+
+| Param | Arm-only | Full-body |
+|---|---|---|
+| `enable_head_motion` | `false` | `true` |
+| `enable_base_motion` | `false` | `true` |
+| `base_action_mode` | (n/a) | `velocity` or `pose_delta` (verify on hardware) |
+| `max_base_velocity` / `max_base_yaw_velocity` | (n/a) | safety clamps for `force_drive` |
+| `head_vel` | (n/a) | head reference speed [rad/s] |
+
+Head is actuated only when `enable_head_motion` **and** the chunk is ≥ 8 wide;
+base only when `enable_base_motion` **and** the chunk is ≥ 11 wide. So a 6-wide
+`arm6` chunk is automatically arm-only even if both flags are left on.
+
+### Layer 3 — Code path (`HSRActionSink.play_chunk`)
+
+| Column(s) | Method | Robot call | Coverage |
+|---|---|---|---|
+| arm (0–4) | `_play_arm` | `_send_joint_trajectory` | full prefix (trajectory) |
+| gripper (5) | `_apply_gripper` | `gripper.send_goal` | last row (latch) |
+| head (6–7) | `_apply_head` | `head._setHeadReferenceGoal(1,…)` | last row (setpoint) |
+| base (8–10) | `_apply_base` | `base.force_drive` per row | full prefix (path) |
+
+### Minimal recipe to go from arm-only to full-body
+
+1. Serve an **11-D `hsr11` checkpoint** with `POLICY_ACTION_LAYOUT=hsr11` and a
+   `POLICY_STATE_INDICES` whose length equals that checkpoint's state dim.
+2. In `vla.yaml` set `enable_head_motion: true`, `enable_base_motion: true`,
+   `action_layout: hsr11`, `action_dim: 11`.
+3. Confirm `base_action_mode` (`velocity` vs `pose_delta`) against the training
+   convention, keep the base velocity clamps conservative, and dry-run with the
+   robot on blocks before driving on the floor.
+
+To go back to arm-only, either serve `arm6` (hard guarantee) or set both
+`enable_*_motion` flags to `false` (client-side guarantee).
 
 ---
 
@@ -722,5 +849,62 @@ GPSR, task management, and action definitions remain unchanged.
 ```
 
 ### Things to check:
-how to enable all the DOF to control also the movement of the head and wheels ?
-def execute at backends.py line 414 - 422 is the gripper_occupied_at_start = gripper_occupied_at_start or grasped_at_start correct ?
+
+This section tracks open questions and their current answers/status.
+
+#### 1. How do I enable all DoF (also head and wheels/base)?
+
+Fully answered in **"Arm-only vs full-body control: the complete change"** and
+**"Enabling head + base (two independent gates)"** above. Concrete checklist:
+
+1. **Policy server** must emit the full 11 columns: serve an 11-D `hsr11`
+   checkpoint with `POLICY_ACTION_LAYOUT=hsr11` (default) and a
+   `POLICY_STATE_INDICES` whose length matches the checkpoint's state dim. On the
+   WebSocket path the `action_layout`/`action_dim`/`state_indices` in `vla.yaml`
+   are **ignored** — the server args decide the width.
+2. **Client gates** in `vla.yaml`: set `enable_head_motion: true` and
+   `enable_base_motion: true`. Head fires only when the chunk is ≥ 8 wide, base
+   only when ≥ 11 wide, so a 6-wide `arm6` chunk stays arm-only regardless.
+3. **Base convention**: set `base_action_mode` (`velocity` vs `pose_delta`) and
+   keep `max_base_velocity` / `max_base_yaw_velocity` conservative.
+4. Verify in Gazebo first (sim maps the VLA base `Twist` on `/hero/base/references`
+   to the HSR `command_velocity`, so it behaves like hardware).
+
+Status: **implemented and documented; needs the base-convention verification below.**
+
+#### 2. Is `gripper_occupied_at_start = gripper_occupied_at_start or grasped_at_start` correct? (`SmolVLALocalBackend.execute`)
+
+**Yes — this is correct and intentional.** It fuses the two independent grasp
+signals with OR, and it is symmetric with the `occupied_now` computation in
+`_is_episode_done` (`occupied_now = occupied_now or grasped_by_position`):
+
+- `gripper_occupied()` reads the classic `gripper.occupied_by` flag, which is
+  **inert (always `False`) on a pure VLA run** because no classic FSM sets it.
+- `grasped_at_start` is the **opt-in physical reading** from
+  `grasp_position_threshold`; it is `None` (skipped) when the feature is disabled.
+
+So `occupied_at_start` means "was the gripper holding something at the start,"
+per whichever signal is available. `is_manipulation_done` then needs it for the
+transition test (`pick-up`: empty→grasped; `place`/`hand-over`: grasped→empty).
+
+**One caveat, not a bug:** the OR is only as good as the calibration. If
+`grasp_position_threshold`/`grasp_position_direction` are set so an *empty*
+gripper reads as "grasped," then `occupied_at_start` is a false positive and
+`pick-up` can never satisfy `not occupied_at_start`. Calibrate the threshold so
+an empty gripper reads "not grasped" (see the `__init__` note). With the feature
+disabled (default), both terms reduce to the inert classic flag, so completion
+relies on `max_chunks`.
+
+#### 3. Still to be made (open)
+
+- **Verify the base action convention on hardware/sim** (`velocity` vs
+  `pose_delta`): use the magnitude check on the checkpoint norm-stats plus a
+  Gazebo dry-run (wrong mode moves the base ~10× too fast or too slow). Set
+  `base_action_mode` accordingly before enabling base motion on the floor.
+- **Calibrate `grasp_position_threshold`/`grasp_position_direction`** on the real
+  gripper so VLA-driven grasp/release is detected without a classic FSM.
+- **Orchestration phase boundary** (see "Current rollout audit"): run classic
+  navigation/pre-grasp first, then the VLA for the final manipulation segment.
+  Until then, `hybrid` is a transport/actuation test, not an end-to-end evaluator.
+- **Head/base output validation**: confirm `head_pan`/`head_tilt` targets and the
+  base direction sign convention match the training data on the real robot.

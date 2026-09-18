@@ -33,6 +33,7 @@ from sensor_msgs.msg import Image
 
 from .backend_utils import (
     as_rgb_uint8,
+    clamp_symmetric,
     gripper_grasped_by_position,
     gripper_occupied,
     is_manipulation_done,
@@ -247,6 +248,19 @@ class HSRActionSink:
             base + "/gripper_close_threshold", 0.5
         )
         self._base_step_duration = rospy.get_param(base + "/base_step_duration", 0.1)
+        self._head_vel = rospy.get_param(base + "/head_vel", 1.0)
+        # How to interpret the base(3) columns. The checkpoint does not ship its
+        # base convention, so it is selected here (verify on hardware before use):
+        #   "velocity"   : row = (vx, vy, vth) body-frame velocity [m/s, m/s, rad/s]
+        #   "pose_delta" : row = (dx, dy, dtheta) body-frame step displacement
+        #                  [m, m, rad], divided by base_step_duration to get a velocity
+        #   "disabled"   : ignore base columns even if enable_base_motion is set
+        self._base_action_mode = rospy.get_param(base + "/base_action_mode", "velocity")
+        # force_drive bypasses collision avoidance, so bound the commanded speed.
+        self._max_base_velocity = rospy.get_param(base + "/max_base_velocity", 0.2)
+        self._max_base_yaw_velocity = rospy.get_param(
+            base + "/max_base_yaw_velocity", 0.4
+        )
         # Default to arm-only manipulation: the VLA drives the arm+gripper, not the whole robot.
         self._enable_base = rospy.get_param(base + "/enable_base_motion", False)
         self._enable_head = rospy.get_param(base + "/enable_head_motion", False)
@@ -265,10 +279,17 @@ class HSRActionSink:
 
         arm_ok = self._play_arm(chunk[:, : self.ARM_DIM], step_timeout)
         if chunk.shape[1] > self.GRIP_IDX:
+            # Gripper is a latch, not a trajectory: only the final commanded
+            # open/close state of the prefix is meaningful, so the last row is
+            # the right value to send (sending every row would chatter the jaw).
             self._apply_gripper(chunk[-1, self.GRIP_IDX])
         if self._enable_head and chunk.shape[1] >= self.HEAD_SLICE.stop:
+            # head_ref is a setpoint tracker that cancels any in-flight goal, so
+            # sending every row would abort each move mid-way; command the final
+            # head target of the prefix and let the tracker interpolate to it.
             self._apply_head(chunk[-1, self.HEAD_SLICE])
         if self._enable_base and chunk.shape[1] >= self.BASE_SLICE.stop:
+            # Base IS a path: drive every row of the prefix, not only the last.
             self._apply_base(chunk[:, self.BASE_SLICE])
         return arm_ok
 
@@ -290,17 +311,39 @@ class HSRActionSink:
 
     def _apply_head(self, head_values: np.ndarray):
         pan, tilt = float(head_values[0]), float(head_values[1])
-        # goal_type=1 commands the head joints directly (pan/tilt) via HeadReference.
-        self.robot.head._setHeadReferenceGoal(1, 1.0, 0.8, 0, pan=pan, tilt=tilt)
+        # goal_type=1 commands the head joints directly as absolute pan/tilt [rad].
+        self.robot.head._setHeadReferenceGoal(
+            1, self._head_vel, self._head_vel * 0.8, 0, pan=pan, tilt=tilt
+        )
 
     def _apply_base(self, base_chunk: np.ndarray):
-        # PLACEHOLDER: base_x/base_y/base_theta interpretation depends on the
-        # checkpoint (velocity commands vs pose deltas). This assumes the last
-        # row is a body-frame velocity and drives it briefly via force_drive.
-        # To finalize: confirm the training convention and, if needed, integrate
-        # the whole chunk instead of only the final row.
-        vx, vy, vth = (float(v) for v in base_chunk[-1])
-        self.robot.base.force_drive(vx, vy, vth, self._base_step_duration)
+        """Drive the base through the whole prefix, one row at a time.
+
+        The base(3) columns are body-frame: the base pose is absent from the
+        state vector, so the policy emits relative motion, not an absolute odom
+        pose. Each row is played for base_step_duration via force_drive (which
+        bypasses collision avoidance, hence the velocity clamps). base_action_mode
+        selects whether a row is a velocity or a per-step displacement.
+
+        NOTE: the exact convention is checkpoint-specific and must be confirmed on
+        hardware. With base_action_mode="velocity" (default) the row is used as a
+        body-frame velocity directly; "pose_delta" divides it by the step time.
+        """
+        if self._base_action_mode == "disabled":
+            return
+
+        dt = float(self._base_step_duration)
+        for row in base_chunk:
+            bx, by, bth = (float(v) for v in row)
+            if self._base_action_mode == "pose_delta":
+                bx, by, bth = bx / dt, by / dt, bth / dt
+            vx = clamp_symmetric(bx, self._max_base_velocity)
+            vy = clamp_symmetric(by, self._max_base_velocity)
+            vth = clamp_symmetric(bth, self._max_base_yaw_velocity)
+            # stop=False keeps velocity continuous across rows (piecewise profile).
+            self.robot.base.force_drive(vx, vy, vth, dt, stop=False)
+        # Always brake at the end of the prefix so the base never free-runs.
+        self.robot.base.force_drive(0.0, 0.0, 0.0, dt, stop=True)
 
 
 class SmolVLALocalBackend(BaseBackend):
