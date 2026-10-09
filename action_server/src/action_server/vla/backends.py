@@ -328,18 +328,83 @@ class HSRActionSink:
         NOTE: the exact convention is checkpoint-specific and must be confirmed on
         hardware. With base_action_mode="velocity" (default) the row is used as a
         body-frame velocity directly; "pose_delta" divides it by the step time.
+
+        Diagnostic logging: this method prints the per-chunk base statistics in
+        BOTH interpretations (velocity and pose_delta -> implied velocity), so
+        the operator can see which one is physically plausible on the robot /
+        sim and set `base_action_mode` accordingly.
+
+        Rule of thumb (dt=0.1s, HSR holonomic base safe speeds ~0.2-0.4 m/s):
+          - If raw |max| ~ 0.01-0.05 (small)  -> likely pose_delta
+            (as velocity it would be too slow; as delta/dt it maps to 0.1-0.5 m/s)
+          - If raw |max| ~ 0.1-0.5  (medium)  -> likely velocity
+            (as delta/dt it would command 1-5 m/s, well above HSR limits)
         """
         if self._base_action_mode == "disabled":
             return
 
         dt = float(self._base_step_duration)
-        for row in base_chunk:
+
+        # ----- diagnostic snapshot (one line per chunk) ------------------
+        try:
+            raw = np.asarray(base_chunk, dtype=np.float32)
+            abs_raw = np.abs(raw)
+            raw_max = abs_raw.max(axis=0)         # per-column max |value|
+            raw_mean = abs_raw.mean(axis=0)        # per-column mean |value|
+            # If interpreted as pose_delta, dividing by dt gives velocity:
+            implied_vel_if_delta = raw_max / max(dt, 1e-6)
+            rospy.loginfo(
+                "[VLA-base-check] mode=%s dt=%.3fs T=%d  "
+                "raw|max|=(x=%.4f y=%.4f th=%.4f)  "
+                "raw|mean|=(x=%.4f y=%.4f th=%.4f)  "
+                "if VELOCITY -> peak speed=(%.3f m/s, %.3f m/s, %.3f rad/s)  "
+                "if POSE_DELTA -> implied peak speed=(%.3f m/s, %.3f m/s, %.3f rad/s)  "
+                "[safe clamp vxy<=%.2f m/s vth<=%.2f rad/s]",
+                self._base_action_mode, dt, raw.shape[0],
+                raw_max[0], raw_max[1], raw_max[2],
+                raw_mean[0], raw_mean[1], raw_mean[2],
+                raw_max[0], raw_max[1], raw_max[2],
+                implied_vel_if_delta[0], implied_vel_if_delta[1], implied_vel_if_delta[2],
+                self._max_base_velocity, self._max_base_yaw_velocity,
+            )
+            # Heuristic hint: the HSR holonomic base safe envelope is well
+            # below 1 m/s. If both interpretations give the same sign-of-plausibility
+            # we cannot distinguish; otherwise print a hint for the operator.
+            as_vel_plausible = raw_max[0] <= 1.0 and raw_max[1] <= 1.0 and raw_max[2] <= 2.0
+            as_delta_plausible = (
+                implied_vel_if_delta[0] <= 1.0
+                and implied_vel_if_delta[1] <= 1.0
+                and implied_vel_if_delta[2] <= 2.0
+            )
+            if as_vel_plausible and not as_delta_plausible:
+                rospy.loginfo("[VLA-base-check] HINT: magnitudes consistent with VELOCITY (delta/dt would be too fast)")
+            elif as_delta_plausible and not as_vel_plausible:
+                rospy.loginfo("[VLA-base-check] HINT: magnitudes consistent with POSE_DELTA (raw as velocity would be too fast)")
+            elif as_vel_plausible and as_delta_plausible:
+                rospy.loginfo("[VLA-base-check] HINT: both interpretations plausible; watch sim motion vs expected speed")
+            else:
+                rospy.logwarn("[VLA-base-check] HINT: neither interpretation plausible under current clamps - will be clipped heavily")
+        except Exception as log_err:
+            rospy.logwarn("[VLA-base-check] diagnostic logging failed: %s", log_err)
+        # ------------------------------------------------------------------
+
+        for i, row in enumerate(base_chunk):
             bx, by, bth = (float(v) for v in row)
+            raw_bx, raw_by, raw_bth = bx, by, bth
             if self._base_action_mode == "pose_delta":
                 bx, by, bth = bx / dt, by / dt, bth / dt
             vx = clamp_symmetric(bx, self._max_base_velocity)
             vy = clamp_symmetric(by, self._max_base_velocity)
             vth = clamp_symmetric(bth, self._max_base_yaw_velocity)
+            clipped = (
+                vx != bx or vy != by or vth != bth
+            )
+            rospy.logdebug(
+                "[VLA-base-step] i=%d raw=(%.4f,%.4f,%.4f) %s-> cmd=(%.3f,%.3f,%.3f)%s",
+                i, raw_bx, raw_by, raw_bth,
+                "/dt " if self._base_action_mode == "pose_delta" else "",
+                vx, vy, vth, "  CLIPPED" if clipped else "",
+            )
             # stop=False keeps velocity continuous across rows (piecewise profile).
             self.robot.base.force_drive(vx, vy, vth, dt, stop=False)
         # Always brake at the end of the prefix so the base never free-runs.

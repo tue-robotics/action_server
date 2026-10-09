@@ -729,6 +729,14 @@ rostopic list | grep /hero/action_server/task
 rosparam get /hero/action_server/vla/execution_mode
 ```
 
+### ToTest with GPSR:
+if action server is disabled from the launch files enable it (you can launch in debug from vscode)
+```bash
+rosnode kill /hero/hmi/random_answerer
+rosrun challenge_gpsr gpsr.py _robot_name:=hero _test_mode:=true _skip:=true
+rostopic pub /hero/hmi/string std_msgs/String "data: 'get the apple from the dinning table'"
+
+```
 The final image build was validated after removing unused `pynput/evdev`,
 avoiding LeRobot's dependency re-resolution of a second Torch version, and
 pinning the compatible Transformers/torchvision versions. Failed intermediate
