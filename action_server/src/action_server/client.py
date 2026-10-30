@@ -1,3 +1,6 @@
+import traceback
+from concurrent.futures import ThreadPoolExecutor
+
 import action_server_msgs.msg
 import action_server_msgs.srv
 import actionlib
@@ -83,6 +86,8 @@ class Client(object):
 
         self.get_actions_proxy = rospy.ServiceProxy('get_actions', action_server_msgs.srv.GetActions)
 
+        self._done_cb_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="action_server_done_cb")
+
     def get_actions(self):
         """
         Query the available actions from the action server.
@@ -111,7 +116,18 @@ class Client(object):
         # Define the wrapped done callback
         def _wrapped_done_cb(_, result):
             taskoutcome = task_outcome_from_result(result=result)
-            return done_cb(taskoutcome)
+            # actionlib >= 1.14.0 only marks the goal DONE after this callback returns (ros/actionlib#193). A goal sent
+            # from done_cb would then be marked DONE as well and its own done_cb would never be called. So call done_cb
+            # from a separate thread, once the SimpleActionClient has marked this goal DONE.
+            self._done_cb_executor.submit(_deferred_done_cb, taskoutcome)
+
+        def _deferred_done_cb(taskoutcome):
+            if not self._action_client.wait_for_result():
+                return  # Shutting down
+            try:
+                done_cb(taskoutcome)
+            except Exception:
+                rospy.logerr("Exception in done_cb:\n{}".format(traceback.format_exc()))
 
         # The wrapped done callback is only used if the provided done callback is callable. Otherwise it's useless
         _done_cb = _wrapped_done_cb if callable(done_cb) else None
