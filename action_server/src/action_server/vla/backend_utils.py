@@ -7,6 +7,7 @@ reusable and independently testable.
 
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 import numpy as np
@@ -81,6 +82,21 @@ def unpack_image_binary(value) -> np.ndarray:
     shape = tuple(int(dimension) for dimension in value["shape"])
     image = np.frombuffer(value["data"], dtype=np.uint8)
     return image.reshape(shape)
+
+
+def query_debug_message(iteration: int, instruction: str, state, chunk, prefix_steps: int) -> str:
+    """JSON record of one policy query: the observed state and the full chunk the policy returned.
+
+    Published for rosbag recordings, so what the policy asked for can be
+    compared with what the controllers did, moment to moment.
+    """
+    return json.dumps({
+        "iteration": int(iteration),
+        "instruction": str(instruction),
+        "state": np.asarray(state, dtype=np.float64).tolist(),
+        "chunk": np.asarray(chunk, dtype=np.float64).tolist(),
+        "prefix_steps": int(prefix_steps),
+    })
 
 
 def gripper_occupied(sink) -> bool:

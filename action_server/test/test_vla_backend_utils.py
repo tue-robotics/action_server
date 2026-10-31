@@ -1,3 +1,4 @@
+import json
 import unittest
 
 import numpy as np
@@ -7,6 +8,7 @@ from action_server.vla.backend_utils import (
     gripper_action,
     gripper_holding_object,
     is_manipulation_done,
+    query_debug_message,
 )
 
 
@@ -75,6 +77,18 @@ class TestIsManipulationDone(unittest.TestCase):
     def test_place(self):
         self.assertTrue(is_manipulation_done("place", False, True))
         self.assertFalse(is_manipulation_done("place", True, True))
+
+
+class TestQueryDebugMessage(unittest.TestCase):
+    def test_keeps_the_full_chunk(self):
+        # The comparison recordings show exactly what the policy returned, so nothing may be rounded or dropped
+        chunk = np.arange(50 * 11, dtype=np.float32).reshape(50, 11) / 7.0
+        message = json.loads(query_debug_message(3, "pick up the apple", np.float32([0.2, -0.3]), chunk, 10))
+        self.assertEqual(message["iteration"], 3)
+        self.assertEqual(message["instruction"], "pick up the apple")
+        self.assertEqual(message["prefix_steps"], 10)
+        np.testing.assert_allclose(message["state"], [0.2, -0.3], rtol=1e-6)
+        np.testing.assert_array_equal(np.float32(message["chunk"]), chunk)
 
 
 if __name__ == '__main__':

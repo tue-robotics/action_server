@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest import mock
 
@@ -124,6 +125,49 @@ class TestHSRActionSink(unittest.TestCase):
         self.assertTrue(sink.play_chunk(chunk(2)[:, :6]))
         sink._base_pub.publish.assert_not_called()
         robot.head._setHeadReferenceGoal.assert_not_called()
+
+
+def make_backend(params):
+    robot = mock.MagicMock()
+    robot.robot_name = "hero"
+    prefix = "/hero/action_server/vla/"
+    topics = []
+    with mock.patch.object(backends.rospy, "get_param", lambda name, default=None: params.get(
+            name[len(prefix):], default)), \
+            mock.patch.object(backends.rospy, "Publisher") as publisher, \
+            mock.patch.object(backends.rospy, "Subscriber"):
+        publisher.side_effect = lambda topic, *args, **kwargs: topics.append(topic) or mock.MagicMock(topic=topic)
+        backend = backends.SmolVLALocalBackend(robot)
+    backend._obs = mock.MagicMock()
+    backend._obs.get_observation.return_value = {"state": list(STATE.values()), "instruction": "pick up the apple"}
+    backend._sink = mock.MagicMock(gripper_command=None)
+    backend._sink.play_chunk.return_value = True
+    backend._infer = mock.MagicMock(return_value=chunk(50))
+    backend._move_to_start_pose = mock.MagicMock()
+    backend._gripper_occupied = mock.MagicMock(return_value=False)
+    return backend, topics
+
+
+def pick_up_request():
+    return backends.ManipulationRequest(robot_name="hero", action_name="pick-up", semantics={"object": {"type": "apple"}},
+                                        context={}, output_mode="joints", action_dim=11)
+
+
+class TestRolloutDebugTopic(unittest.TestCase):
+    def test_every_query_is_published_with_the_full_chunk(self):
+        backend, topics = make_backend({"publish_debug": True, "max_chunks": 2})
+        backend._rollout(pick_up_request())
+
+        self.assertIn("/hero/action_server/vla/debug/query", topics)
+        messages = [json.loads(c[0][0].data) for c in backend._debug_pub.publish.call_args_list]
+        self.assertEqual([m["iteration"] for m in messages], [0, 1])
+        self.assertEqual(messages[0]["instruction"], "pick up the apple")
+        self.assertEqual(np.shape(messages[0]["chunk"]), (50, 11))
+        self.assertEqual(messages[0]["prefix_steps"], 10)
+
+    def test_no_debug_topic_by_default(self):
+        _, topics = make_backend({"max_chunks": 2})
+        self.assertNotIn("/hero/action_server/vla/debug/query", topics)
 
 
 if __name__ == '__main__':

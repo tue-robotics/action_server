@@ -31,6 +31,7 @@ import numpy as np
 import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image, JointState
+from std_msgs.msg import String
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from .backend_utils import (
@@ -42,6 +43,7 @@ from .backend_utils import (
     gripper_occupied,
     is_manipulation_done,
     pack_image_binary,
+    query_debug_message,
 )
 from .executor import ManipulationRequest
 
@@ -515,6 +517,10 @@ class SmolVLALocalBackend(BaseBackend):
         self._grasp_settle_time = float(rospy.get_param(base + "/grasp_settle_time", 1.0))
         # Consecutive chunks the completion signal must hold, against a transient reading.
         self._done_confirm_chunks = int(rospy.get_param(base + "/done_confirm_chunks", 2))
+        # Opt-in: publish every policy query (state + full chunk) as JSON, for rosbag comparisons.
+        self._debug_pub = None
+        if rospy.get_param(base + "/publish_debug", False):
+            self._debug_pub = rospy.Publisher(base + "/debug/query", String, queue_size=10)
 
     # -- items 1-2: model loading + inference ------------------------------
 
@@ -658,6 +664,9 @@ class SmolVLALocalBackend(BaseBackend):
                 else chunk
             )
             _log_chunk(iteration, obs["state"], prefix, self._sink.gripper_command)
+            if self._debug_pub is not None:
+                self._debug_pub.publish(String(data=query_debug_message(
+                    iteration, instruction, obs["state"], chunk, len(prefix))))
             played = self._sink.play_chunk(prefix)
             executed.extend(row.tolist() for row in prefix)
 
