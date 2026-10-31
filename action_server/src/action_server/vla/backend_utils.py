@@ -32,6 +32,40 @@ def clamp_symmetric(value: float, limit: Optional[float]) -> float:
     return max(-float(limit), min(float(limit), value))
 
 
+def apply_relative(current, delta, lower=None, upper=None, max_delta=None) -> np.ndarray:
+    """Turn a relative joint action into an absolute joint target.
+
+    The HSR-SmolVLA arm and head columns are deltas with respect to the
+    measured joint state (AIRoA MoMa 'action.relative'), so the target is
+    current + delta. max_delta bounds each delta, lower/upper the target.
+    """
+    delta = np.asarray(delta, dtype=np.float64)
+    if max_delta is not None:
+        max_delta = np.asarray(max_delta, dtype=np.float64)
+        delta = np.clip(delta, -max_delta, max_delta)
+    target = np.asarray(current, dtype=np.float64) + delta
+    if lower is not None or upper is not None:
+        target = np.clip(target, lower, upper)
+    return target
+
+
+def gripper_action(
+    value: float, grasping: bool, close_threshold: float, open_threshold: float
+) -> Optional[float]:
+    """Map the absolute gripper column (hand_motor_joint, ~-0.8 closed, ~1.24 open) to a command.
+
+    Follows the 'hybrid' gripper mode of the reference AIRoA client: below
+    close_threshold grasp with effort, otherwise follow the column as a
+    position. An effort grasp is only released once the column reaches
+    open_threshold, because while holding an object the column stays near the
+    object's width. Returns None to grasp (or keep grasping) with effort, else
+    the hand_motor_joint position target.
+    """
+    if value < close_threshold or (grasping and value < open_threshold):
+        return None
+    return float(np.clip(value, -0.1, 1.23))
+
+
 
 def pack_image_binary(image: np.ndarray) -> dict:
     """Encode an RGB image as msgpack-friendly raw bytes plus shape.
@@ -58,19 +92,28 @@ def gripper_occupied(sink) -> bool:
     return sink._get_arm().gripper.occupied_by is not None
 
 
-def gripper_grasped_by_position(
-    position: Optional[float], threshold: Optional[float], direction: str
+def gripper_holding_object(
+    commanded_state: Optional[str],
+    seconds_since_command: Optional[float],
+    position: Optional[float],
+    empty_closed_threshold: Optional[float],
+    settle_time: float,
 ) -> Optional[bool]:
     """Physical stand-in for `occupied_by`: is the gripper holding something?
+
+    An open gripper also reads above the empty-closed position, so position
+    alone is ambiguous: the gripper must have been commanded closed and given
+    settle_time to close. It then holds an object when the fingers stopped
+    above empty_closed_threshold instead of closing completely.
 
     Returns None when the threshold is unset (feature disabled) or the joint
     reading is unavailable, so callers can distinguish "unknown" from "empty".
     """
-    if threshold is None or position is None:
+    if empty_closed_threshold is None or position is None:
         return None
-    if direction == "below":
-        return position < threshold
-    return position > threshold
+    if commanded_state != "close" or seconds_since_command is None or seconds_since_command < settle_time:
+        return False
+    return position > empty_closed_threshold
 
 
 def is_manipulation_done(action_name: str, occupied_now: bool, occupied_at_start: bool) -> bool:

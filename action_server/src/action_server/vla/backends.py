@@ -29,12 +29,16 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import rospy
-from sensor_msgs.msg import Image
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg import Image, JointState
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from .backend_utils import (
+    apply_relative,
     as_rgb_uint8,
     clamp_symmetric,
-    gripper_grasped_by_position,
+    gripper_action,
+    gripper_holding_object,
     gripper_occupied,
     is_manipulation_done,
     pack_image_binary,
@@ -60,6 +64,27 @@ class BaseBackend(ABC):
     def execute(self, request: ManipulationRequest) -> Dict:
         """Run one manipulation episode and return an outcome dict."""
         raise NotImplementedError
+
+
+class JointStateCache:
+    """Latest joint positions from one persistent /<robot>/joint_states subscriber.
+
+    robot.get_joint_states() creates a new subscriber and waits for a message on
+    every call, which is too slow to stream commands at the policy rate.
+    """
+
+    def __init__(self, topic: str):
+        self._positions = None
+        self._subscriber = rospy.Subscriber(topic, JointState, self._callback, queue_size=1)
+
+    def _callback(self, msg: JointState):
+        self._positions = dict(zip(msg.name, msg.position))
+
+    def get(self, timeout: float = 1.0) -> Optional[Dict[str, float]]:
+        deadline = rospy.Time.now() + rospy.Duration.from_sec(timeout)
+        while self._positions is None and rospy.Time.now() < deadline and not rospy.is_shutdown():
+            rospy.sleep(0.01)
+        return self._positions
 
 
 class HSRObservationSource:
@@ -223,40 +248,67 @@ class HSRObservationSource:
 
 
 class HSRActionSink:
-    """Plays a variable-width action chunk on a Toyota HSR through robot_skills.
+    """Streams an action chunk of the HSR-SmolVLA policy onto a Toyota HSR, one row per policy step.
 
-    Supports 6/11-column chunks; columns are consumed by position:
-        arm(5)  : arm_lift, arm_flex, arm_roll, wrist_flex, wrist_roll   -> arm6
-        grip(1) : gripper open/close scalar                              -> arm6
-        head(2) : head_pan, head_tilt                                    -> hsr11
-        base(3) : base_x, base_y, base_theta                            -> hsr11
-    The arm slice maps 1:1 onto _send_joint_trajectory, which prepends the
-    torso (arm_lift) joint when given 5 references. Gripper/head/base are only
-    applied when the chunk is wide enough, so the narrower layout is safe.
+    The checkpoint's 'action' is the AIRoA 'action.relative' layout (its
+    normalisation statistics are identical):
+        arm(5)  : arm_lift, arm_flex, arm_roll, wrist_flex, wrist_roll   delta w.r.t. the measured joints [m, rad]
+        grip(1) : hand_motor_joint                                       absolute, ~-0.8 closed .. ~1.24 open [rad]
+        head(2) : head_pan, head_tilt                                    delta w.r.t. the measured joints [rad]
+        base(3) : base_x, base_y, base_theta                             body-frame velocity [m/s, m/s, rad/s]
+    Every row is played for 1/policy_fps seconds (10 Hz, like the reference
+    AIRoA client airoa-org/airoa-evaluation-ICRA). The arm target is the
+    measured state plus the delta, streamed to the arm trajectory controller,
+    the base velocity is published directly, the gripper follows the reference
+    client's 'hybrid' mode and the head is commanded once per chunk.
+    Gripper/head/base are only applied when the chunk is wide enough, so a
+    6-wide arm6 chunk is safe.
     """
 
     ARM_DIM = 5
     GRIP_IDX = 5
     HEAD_SLICE = slice(6, 8)
     BASE_SLICE = slice(8, 11)
+    # HSR arm joint limits (hsrb4s.urdf) in the order of the arm columns
+    ARM_LOWER = [0.0, -2.62, -2.09, -1.92, -1.92]
+    ARM_UPPER = [0.69, 0.0, 3.84, 1.22, 3.67]
 
     def __init__(self, robot):
         self.robot = robot
         base = "/{}/action_server/vla".format(robot.robot_name)
-        self._max_joint_vel = rospy.get_param(base + "/max_joint_vel", 0.7)
-        self._gripper_close_threshold = rospy.get_param(
-            base + "/gripper_close_threshold", 0.5
+        self._fps = float(rospy.get_param(base + "/policy_fps", 10.0))
+        self._arm_joints = rospy.get_param(
+            base + "/state_arm_joints", HSRObservationSource.DEFAULT_ARM_JOINTS
         )
-        self._base_step_duration = rospy.get_param(base + "/base_step_duration", 0.1)
+        self._gripper_joint = rospy.get_param(
+            base + "/state_gripper_joint", HSRObservationSource.DEFAULT_GRIPPER_JOINT
+        )
+        self._head_joints = rospy.get_param(
+            base + "/state_head_joints", HSRObservationSource.DEFAULT_HEAD_JOINTS
+        )
+        # The arm deltas are the lead of the teleoperation command over the measured
+        # state, so the arm speed is roughly delta / arm_lead_time. The default bound
+        # is the URDF velocity limit times the default lead time.
+        self._arm_lead_time = float(rospy.get_param(base + "/arm_lead_time", 0.2))
+        self._max_arm_delta = rospy.get_param(
+            base + "/max_arm_delta", [0.04, 0.24, 0.4, 0.3, 0.3]
+        )
+        # Below the close threshold the gripper grasps with effort (0.26 * 0.07 m
+        # moment arm = the reference client's 0.018 Nm), above it the column is
+        # followed as a position. A grasp is released at the open threshold.
+        self._gripper_close_threshold = float(
+            rospy.get_param(base + "/gripper_close_threshold", 0.5)
+        )
+        self._gripper_open_threshold = float(rospy.get_param(base + "/gripper_open_threshold", 0.9))
+        self._gripper_max_torque = float(rospy.get_param(base + "/gripper_max_torque", 0.26))
         self._head_vel = rospy.get_param(base + "/head_vel", 1.0)
-        # How to interpret the base(3) columns. The checkpoint does not ship its
-        # base convention, so it is selected here (verify on hardware before use):
+        # How to interpret the base(3) columns:
         #   "velocity"   : row = (vx, vy, vth) body-frame velocity [m/s, m/s, rad/s]
-        #   "pose_delta" : row = (dx, dy, dtheta) body-frame step displacement
-        #                  [m, m, rad], divided by base_step_duration to get a velocity
+        #   "pose_delta" : row = (dx, dy, dtheta) per-step displacement, times policy_fps
         #   "disabled"   : ignore base columns even if enable_base_motion is set
         self._base_action_mode = rospy.get_param(base + "/base_action_mode", "velocity")
-        # force_drive bypasses collision avoidance, so bound the commanded speed.
+        # The velocity is published straight to the base controller, bypassing
+        # collision avoidance, so bound the commanded speed.
         self._max_base_velocity = rospy.get_param(base + "/max_base_velocity", 0.2)
         self._max_base_yaw_velocity = rospy.get_param(
             base + "/max_base_yaw_velocity", 0.4
@@ -264,151 +316,145 @@ class HSRActionSink:
         # Default to arm-only manipulation: the VLA drives the arm+gripper, not the whole robot.
         self._enable_base = rospy.get_param(base + "/enable_base_motion", False)
         self._enable_head = rospy.get_param(base + "/enable_head_motion", False)
+
+        self._joint_states = JointStateCache(
+            rospy.get_param(base + "/joint_states_topic", "/{}/joint_states".format(robot.robot_name))
+        )
+        self._arm_pub = rospy.Publisher(
+            rospy.get_param(
+                base + "/arm_command_topic",
+                "/{}/arm_trajectory_controller/command".format(robot.robot_name),
+            ),
+            JointTrajectory,
+            queue_size=1,
+        )
+        self._base_pub = rospy.Publisher(
+            rospy.get_param(base + "/base_command_topic", "/{}/base/references".format(robot.robot_name)),
+            Twist,
+            queue_size=1,
+        )
+        self._gripper_pub = rospy.Publisher(
+            rospy.get_param(
+                base + "/gripper_command_topic",
+                "/{}/gripper_controller/command".format(robot.robot_name),
+            ),
+            JointTrajectory,
+            queue_size=1,
+        )
         self._arm = None  # resolved lazily
+        # Last gripper command: 'open', 'close' (effort grasp), 'position' or None
+        self.gripper_command = None
+        self._gripper_command_stamp = None
 
     def _get_arm(self):
         if self._arm is None:
             self._arm = self.robot.get_arm()
         return self._arm
 
-    def play_chunk(self, chunk: np.ndarray, step_timeout: float) -> bool:
-        """Execute an (T, 11) chunk. Returns True if the arm trajectory succeeded."""
+    def joint_positions(self) -> Optional[Dict[str, float]]:
+        return self._joint_states.get()
+
+    def play_chunk(self, chunk: np.ndarray) -> bool:
+        """Play a (T, 6) or (T, 11) chunk at the policy rate. Returns False if it could not be played."""
         if chunk.ndim != 2 or chunk.shape[1] < self.ARM_DIM:
             rospy.logwarn("[VLA] Unexpected chunk shape %s", chunk.shape)
             return False
 
-        arm_ok = self._play_arm(chunk[:, : self.ARM_DIM], step_timeout)
-        if chunk.shape[1] > self.GRIP_IDX:
-            # Gripper is a latch, not a trajectory: only the final commanded
-            # open/close state of the prefix is meaningful, so the last row is
-            # the right value to send (sending every row would chatter the jaw).
-            self._apply_gripper(chunk[-1, self.GRIP_IDX])
-        if self._enable_head and chunk.shape[1] >= self.HEAD_SLICE.stop:
-            # head_ref is a setpoint tracker that cancels any in-flight goal, so
-            # sending every row would abort each move mid-way; command the final
-            # head target of the prefix and let the tracker interpolate to it.
-            self._apply_head(chunk[-1, self.HEAD_SLICE])
-        if self._enable_base and chunk.shape[1] >= self.BASE_SLICE.stop:
-            # Base IS a path: drive every row of the prefix, not only the last.
-            self._apply_base(chunk[:, self.BASE_SLICE])
-        return arm_ok
-
-    def _play_arm(self, arm_chunk: np.ndarray, step_timeout: float) -> bool:
-        arm = self._get_arm()
-        trajectory = [row.tolist() for row in arm_chunk]
-        # _send_joint_trajectory lives on the underlying Arm; PublicArm exposes it as _arm.
-        underlying = getattr(arm, "_arm", arm)
-        return underlying._send_joint_trajectory(
-            trajectory, max_joint_vel=self._max_joint_vel, timeout=step_timeout
+        drive_base = (
+            self._enable_base
+            and self._base_action_mode != "disabled"
+            and chunk.shape[1] >= self.BASE_SLICE.stop
         )
+        rate = rospy.Rate(self._fps)
+        positions = None
+        try:
+            for row in chunk:
+                if rospy.is_shutdown():
+                    return False
+                positions = self._joint_states.get()
+                if positions is None:
+                    rospy.logwarn("[VLA] No joint states received, cannot play the chunk")
+                    return False
+                self._send_arm(positions, row[: self.ARM_DIM])
+                if chunk.shape[1] > self.GRIP_IDX:
+                    self._apply_gripper(row[self.GRIP_IDX])
+                if drive_base:
+                    self._send_base(row[self.BASE_SLICE])
+                rate.sleep()
+        finally:
+            # Always brake at the end of the prefix so the base never free-runs.
+            if drive_base:
+                self.stop_base()
+        if self._enable_head and chunk.shape[1] >= self.HEAD_SLICE.stop:
+            # head_ref cancels any in-flight goal, so the head is commanded once per chunk.
+            self._apply_head(positions, chunk[-1, self.HEAD_SLICE])
+        return True
+
+    def _send_arm(self, positions: Dict[str, float], delta: np.ndarray):
+        current = [positions[name] for name in self._arm_joints]
+        target = apply_relative(current, delta, self.ARM_LOWER, self.ARM_UPPER, self._max_arm_delta)
+        point = JointTrajectoryPoint(
+            positions=target.tolist(), time_from_start=rospy.Duration.from_sec(self._arm_lead_time)
+        )
+        # A zero header stamp starts the trajectory on receipt, replacing the previous one.
+        self._arm_pub.publish(JointTrajectory(joint_names=list(self._arm_joints), points=[point]))
 
     def _apply_gripper(self, gripper_value: float):
-        arm = self._get_arm()
-        state = (
-            "close" if float(gripper_value) >= self._gripper_close_threshold else "open"
+        target = gripper_action(
+            float(gripper_value),
+            self.gripper_command == "close",
+            self._gripper_close_threshold,
+            self._gripper_open_threshold,
         )
-        arm.gripper.send_goal(state, timeout=2.0)
-
-    def _apply_head(self, head_values: np.ndarray):
-        pan, tilt = float(head_values[0]), float(head_values[1])
-        # goal_type=1 commands the head joints directly as absolute pan/tilt [rad].
-        self.robot.head._setHeadReferenceGoal(
-            1, self._head_vel, self._head_vel * 0.8, 0, pan=pan, tilt=tilt
-        )
-
-    def _apply_base(self, base_chunk: np.ndarray):
-        """Drive the base through the whole prefix, one row at a time.
-
-        The base(3) columns are body-frame: the base pose is absent from the
-        state vector, so the policy emits relative motion, not an absolute odom
-        pose. Each row is played for base_step_duration via force_drive (which
-        bypasses collision avoidance, hence the velocity clamps). base_action_mode
-        selects whether a row is a velocity or a per-step displacement.
-
-        NOTE: the exact convention is checkpoint-specific and must be confirmed on
-        hardware. With base_action_mode="velocity" (default) the row is used as a
-        body-frame velocity directly; "pose_delta" divides it by the step time.
-
-        Diagnostic logging: this method prints the per-chunk base statistics in
-        BOTH interpretations (velocity and pose_delta -> implied velocity), so
-        the operator can see which one is physically plausible on the robot /
-        sim and set `base_action_mode` accordingly.
-
-        Rule of thumb (dt=0.1s, HSR holonomic base safe speeds ~0.2-0.4 m/s):
-          - If raw |max| ~ 0.01-0.05 (small)  -> likely pose_delta
-            (as velocity it would be too slow; as delta/dt it maps to 0.1-0.5 m/s)
-          - If raw |max| ~ 0.1-0.5  (medium)  -> likely velocity
-            (as delta/dt it would command 1-5 m/s, well above HSR limits)
-        """
-        if self._base_action_mode == "disabled":
+        if target is None:
+            if self.gripper_command != "close":
+                # timeout=0.0: do not block the stream while the jaw closes.
+                self._get_arm().gripper.send_goal(
+                    "close", timeout=0.0, max_torque=self._gripper_max_torque
+                )
+                self.set_gripper_command("close")
             return
+        point = JointTrajectoryPoint(positions=[target], time_from_start=rospy.Duration.from_sec(1.0))
+        self._gripper_pub.publish(JointTrajectory(joint_names=[self._gripper_joint], points=[point]))
+        if self.gripper_command != "position":
+            self.set_gripper_command("position")
 
-        dt = float(self._base_step_duration)
+    def set_gripper_command(self, state: Optional[str]):
+        self.gripper_command = state
+        self._gripper_command_stamp = rospy.Time.now() if state is not None else None
 
-        # ----- diagnostic snapshot (one line per chunk) ------------------
-        try:
-            raw = np.asarray(base_chunk, dtype=np.float32)
-            abs_raw = np.abs(raw)
-            raw_max = abs_raw.max(axis=0)         # per-column max |value|
-            raw_mean = abs_raw.mean(axis=0)        # per-column mean |value|
-            # If interpreted as pose_delta, dividing by dt gives velocity:
-            implied_vel_if_delta = raw_max / max(dt, 1e-6)
-            rospy.loginfo(
-                "[VLA-base-check] mode=%s dt=%.3fs T=%d  "
-                "raw|max|=(x=%.4f y=%.4f th=%.4f)  "
-                "raw|mean|=(x=%.4f y=%.4f th=%.4f)  "
-                "if VELOCITY -> peak speed=(%.3f m/s, %.3f m/s, %.3f rad/s)  "
-                "if POSE_DELTA -> implied peak speed=(%.3f m/s, %.3f m/s, %.3f rad/s)  "
-                "[safe clamp vxy<=%.2f m/s vth<=%.2f rad/s]",
-                self._base_action_mode, dt, raw.shape[0],
-                raw_max[0], raw_max[1], raw_max[2],
-                raw_mean[0], raw_mean[1], raw_mean[2],
-                raw_max[0], raw_max[1], raw_max[2],
-                implied_vel_if_delta[0], implied_vel_if_delta[1], implied_vel_if_delta[2],
-                self._max_base_velocity, self._max_base_yaw_velocity,
-            )
-            # Heuristic hint: the HSR holonomic base safe envelope is well
-            # below 1 m/s. If both interpretations give the same sign-of-plausibility
-            # we cannot distinguish; otherwise print a hint for the operator.
-            as_vel_plausible = raw_max[0] <= 1.0 and raw_max[1] <= 1.0 and raw_max[2] <= 2.0
-            as_delta_plausible = (
-                implied_vel_if_delta[0] <= 1.0
-                and implied_vel_if_delta[1] <= 1.0
-                and implied_vel_if_delta[2] <= 2.0
-            )
-            if as_vel_plausible and not as_delta_plausible:
-                rospy.loginfo("[VLA-base-check] HINT: magnitudes consistent with VELOCITY (delta/dt would be too fast)")
-            elif as_delta_plausible and not as_vel_plausible:
-                rospy.loginfo("[VLA-base-check] HINT: magnitudes consistent with POSE_DELTA (raw as velocity would be too fast)")
-            elif as_vel_plausible and as_delta_plausible:
-                rospy.loginfo("[VLA-base-check] HINT: both interpretations plausible; watch sim motion vs expected speed")
-            else:
-                rospy.logwarn("[VLA-base-check] HINT: neither interpretation plausible under current clamps - will be clipped heavily")
-        except Exception as log_err:
-            rospy.logwarn("[VLA-base-check] diagnostic logging failed: %s", log_err)
-        # ------------------------------------------------------------------
+    def seconds_since_gripper_command(self) -> Optional[float]:
+        if self._gripper_command_stamp is None:
+            return None
+        return (rospy.Time.now() - self._gripper_command_stamp).to_sec()
 
-        for i, row in enumerate(base_chunk):
-            bx, by, bth = (float(v) for v in row)
-            raw_bx, raw_by, raw_bth = bx, by, bth
-            if self._base_action_mode == "pose_delta":
-                bx, by, bth = bx / dt, by / dt, bth / dt
-            vx = clamp_symmetric(bx, self._max_base_velocity)
-            vy = clamp_symmetric(by, self._max_base_velocity)
-            vth = clamp_symmetric(bth, self._max_base_yaw_velocity)
-            clipped = (
-                vx != bx or vy != by or vth != bth
-            )
-            rospy.logdebug(
-                "[VLA-base-step] i=%d raw=(%.4f,%.4f,%.4f) %s-> cmd=(%.3f,%.3f,%.3f)%s",
-                i, raw_bx, raw_by, raw_bth,
-                "/dt " if self._base_action_mode == "pose_delta" else "",
-                vx, vy, vth, "  CLIPPED" if clipped else "",
-            )
-            # stop=False keeps velocity continuous across rows (piecewise profile).
-            self.robot.base.force_drive(vx, vy, vth, dt, stop=False)
-        # Always brake at the end of the prefix so the base never free-runs.
-        self.robot.base.force_drive(0.0, 0.0, 0.0, dt, stop=True)
+    def _apply_head(self, positions: Dict[str, float], delta: np.ndarray):
+        pan, tilt = apply_relative([positions[name] for name in self._head_joints], delta)
+        set_head_joints(self.robot, pan, tilt, self._head_vel)
+
+    def _send_base(self, base_row: np.ndarray):
+        bx, by, bth = (float(v) for v in base_row)
+        if self._base_action_mode == "pose_delta":
+            bx, by, bth = bx * self._fps, by * self._fps, bth * self._fps
+        twist = Twist()
+        twist.linear.x = clamp_symmetric(bx, self._max_base_velocity)
+        twist.linear.y = clamp_symmetric(by, self._max_base_velocity)
+        twist.angular.z = clamp_symmetric(bth, self._max_base_yaw_velocity)
+        self._base_pub.publish(twist)
+
+    def stop_base(self):
+        self._base_pub.publish(Twist())
+
+
+def set_head_joints(robot, pan: float, tilt: float, vel: float = 1.0, timeout: float = 0.0):
+    """Command head_pan_joint/head_tilt_joint [rad] through head_ref.
+
+    head_ref's PAN_TILT goal (goal_type 1) multiplies the tilt by the joint axis
+    direction, which is -1 for HERO's head_tilt_joint, so the joint tilt is negated.
+    """
+    robot.head._setHeadReferenceGoal(
+        1, vel, vel * 0.8, 0, pan=float(pan), tilt=-float(tilt), timeout=timeout
+    )
 
 
 class SmolVLALocalBackend(BaseBackend):
@@ -441,21 +487,34 @@ class SmolVLALocalBackend(BaseBackend):
         self._device = rospy.get_param(base + "/device", "cuda")
         self._action_layout = rospy.get_param(base + "/action_layout", "hsr11")
         self._state_indices = rospy.get_param(base + "/state_indices", [])
-        self._max_chunks = rospy.get_param(base + "/max_chunks", 20)
+        self._max_chunks = rospy.get_param(base + "/max_chunks", 60)
         self._chunk_prefix_steps = rospy.get_param(base + "/chunk_prefix_steps", 10)
-        self._step_timeout = rospy.get_param(base + "/step_timeout", 10.0)
+        # The training episodes start with the arm in the HSR neutral pose and the
+        # head tilted down at the table. HERO's reset and carrying poses have
+        # arm_roll -1.57, ~7 standard deviations outside the training state
+        # distribution. Joint values [m, rad]; an empty list skips that part.
+        self._start_arm_pose = rospy.get_param(base + "/start_arm_pose", [0.2, 0.0, 0.0, -1.57, 0.0])
+        self._start_head_pose = rospy.get_param(base + "/start_head_pose", [0.0, -0.6])
+        # Lift [m] after a detected grasp, so the object clears the table before the robot moves.
+        self._post_grasp_lift = float(rospy.get_param(base + "/post_grasp_lift", 0.1))
+        # Nothing fills raw_sentence yet; the policy was trained on short commands
+        # like "pick up the mug", so those are built from the semantics instead.
+        self._instruction_templates = rospy.get_param(
+            base + "/instruction_templates", {"pick-up": "pick up the {object}"}
+        )
 
         # gripper.occupied_by is only ever set by the classic Grab/Place FSMs
         # (robot_smach_states), never by this VLA path, so it cannot be used on
-        # its own to detect a VLA-driven grasp/release. This position threshold
-        # is a stand-in physical signal and MUST be calibrated on the actual
-        # gripper (sim or hardware) before being relied on; disabled by default.
+        # its own to detect a VLA-driven grasp/release. The physical stand-in is
+        # a gripper commanded closed whose fingers stopped above the empty-closed
+        # position; that threshold MUST be calibrated on the actual gripper (sim
+        # or hardware) before being relied on; disabled by default.
         self._grasp_position_threshold = rospy.get_param(
             base + "/grasp_position_threshold", None
         )
-        self._grasp_position_direction = rospy.get_param(
-            base + "/grasp_position_direction", "above"
-        )
+        self._grasp_settle_time = float(rospy.get_param(base + "/grasp_settle_time", 1.0))
+        # Consecutive chunks the completion signal must hold, against a transient reading.
+        self._done_confirm_chunks = int(rospy.get_param(base + "/done_confirm_chunks", 2))
 
     # -- items 1-2: model loading + inference ------------------------------
 
@@ -487,17 +546,32 @@ class SmolVLALocalBackend(BaseBackend):
         """Return an (T, action_dim) action chunk in robot units."""
         return self._server.infer(obs)
 
+    def _release_policy(self):
+        """Release per-episode policy resources; the in-process model stays loaded."""
+
+    # -- item 2: prompting -------------------------------------------------
+
+    def _instruction(self, request: ManipulationRequest) -> str:
+        if request.raw_sentence:
+            return request.raw_sentence
+        template = self._instruction_templates.get(request.action_name)
+        target = _object_name(request.semantics.get("object"), request.context.get("object"))
+        if template and target:
+            return template.format(object=target)
+        return request.action_name
+
     # -- item 7: episode termination --------------------------------------
 
     def _gripper_occupied(self) -> bool:
-        return gripper_occupied(self._sink)
-
-    def _gripper_grasped_by_position(self) -> Optional[bool]:
-        return gripper_grasped_by_position(
+        """Classic occupied_by flag, or a VLA-driven grasp measured on the gripper joint."""
+        holding = gripper_holding_object(
+            self._sink.gripper_command,
+            self._sink.seconds_since_gripper_command(),
             self._obs.get_gripper_position(),
             self._grasp_position_threshold,
-            self._grasp_position_direction,
+            self._grasp_settle_time,
         )
+        return gripper_occupied(self._sink) or bool(holding)
 
     def _is_episode_done(
         self, request: ManipulationRequest, executed_steps: int, gripper_occupied_at_start: bool
@@ -508,28 +582,65 @@ class SmolVLALocalBackend(BaseBackend):
         - occupied_by transition: only fires if a classic FSM set it, so it is
           inert (always False -> False) on a pure VLA run.
         - grasp_position_threshold: an opt-in physical reading of the gripper
-          joint, calibrated per-robot via ROS params (see __init__).
+          joint while it is commanded closed, calibrated per-robot via ROS params.
         Other actions have no known success signal and always run to max_chunks.
         """
-        occupied_now = self._gripper_occupied()
-        grasped_by_position = self._gripper_grasped_by_position()
-        if grasped_by_position is not None:
-            occupied_now = occupied_now or grasped_by_position
-        return is_manipulation_done(request.action_name, occupied_now, gripper_occupied_at_start)
+        return is_manipulation_done(
+            request.action_name, self._gripper_occupied(), gripper_occupied_at_start
+        )
 
     # -- items 5-6-8: control loop, actuation, response mapping -----------
 
+    def _send_arm_pose(self, pose: List[float]):
+        # _send_joint_trajectory lives on the underlying Arm; PublicArm exposes it as _arm.
+        arm = self._sink._get_arm()
+        getattr(arm, "_arm", arm)._send_joint_trajectory([list(pose)], timeout=10.0)
+
+    def _current_arm_pose(self) -> List[float]:
+        positions = self._sink.joint_positions()
+        return [positions[name] for name in self._obs._arm_joints]
+
+    def _move_to_start_pose(self):
+        """Bring the robot into the pose the policy's training episodes start from."""
+        arm = self._sink._get_arm()
+        # Cancel any local planner goal and stop the base before the policy drives it.
+        self.robot.base.force_drive(0.0, 0.0, 0.0, 0.0)
+        arm.gripper.send_goal("open", timeout=5.0)
+        self._sink.set_gripper_command("open")
+        if self._start_arm_pose:
+            # Lift first: rolling the arm at the bottom of its range can hit the table edge.
+            lifted = self._current_arm_pose()
+            lifted[0] = max(lifted[0], self._start_arm_pose[0])
+            self._send_arm_pose(lifted)
+            self._send_arm_pose(self._start_arm_pose)
+        if self._start_head_pose:
+            set_head_joints(self.robot, *self._start_head_pose, timeout=5.0)
+
+    def _lift_grasped_object(self):
+        if self._post_grasp_lift > 0:
+            pose = self._current_arm_pose()
+            pose[0] = min(pose[0] + self._post_grasp_lift, HSRActionSink.ARM_UPPER[0])
+            self._send_arm_pose(pose)
+
     def execute(self, request: ManipulationRequest) -> Dict:
         self._load_policy()
+        try:
+            return self._rollout(request)
+        finally:
+            self._sink.stop_base()
+            # The start pose leaves a head goal that never expires; release the head.
+            self.robot.head.cancel_goal()
+            self._release_policy()
 
-        instruction = request.raw_sentence or request.action_name
+    def _rollout(self, request: ManipulationRequest) -> Dict:
+        self._move_to_start_pose()
+        instruction = self._instruction(request)
+        rospy.loginfo("[VLA] Instruction: '%s'", instruction)
         executed: List[List[float]] = []
         gripper_occupied_at_start = self._gripper_occupied()
-        grasped_at_start = self._gripper_grasped_by_position()
-        if grasped_at_start is not None:
-            gripper_occupied_at_start = gripper_occupied_at_start or grasped_at_start
+        done_count = 0
 
-        for _iteration in range(self._max_chunks):
+        for iteration in range(self._max_chunks):
             obs = self._obs.get_observation(instruction, require_hand=True)
             if obs is None:
                 return {
@@ -546,22 +657,29 @@ class SmolVLALocalBackend(BaseBackend):
                 if self._chunk_prefix_steps > 0
                 else chunk
             )
-            arm_ok = self._sink.play_chunk(prefix, step_timeout=self._step_timeout)
+            _log_chunk(iteration, obs["state"], prefix, self._sink.gripper_command)
+            played = self._sink.play_chunk(prefix)
             executed.extend(row.tolist() for row in prefix)
 
-            if not arm_ok:
+            if not played:
                 return {
                     "succeeded": False,
                     "actions": executed,
-                    "message": "Arm trajectory execution failed during VLA rollout",
+                    "message": "Could not play the action chunk during the VLA rollout",
                 }
 
             if self._is_episode_done(request, len(executed), gripper_occupied_at_start):
-                return {
-                    "succeeded": True,
-                    "actions": executed,
-                    "message": "VLA completed '{}'".format(request.action_name),
-                }
+                done_count += 1
+                if done_count >= self._done_confirm_chunks:
+                    if request.action_name == "pick-up":
+                        self._lift_grasped_object()
+                    return {
+                        "succeeded": True,
+                        "actions": executed,
+                        "message": "VLA completed '{}'".format(request.action_name),
+                    }
+            else:
+                done_count = 0
 
         # Ran out of iterations without a success signal.
         return {
@@ -569,6 +687,33 @@ class SmolVLALocalBackend(BaseBackend):
             "actions": executed,
             "message": "VLA reached max_chunks without a completion signal",
         }
+
+
+def _object_name(semantics_object, context_object) -> str:
+    """Name of the manipulated object from the action semantics, or the found object for a reference."""
+    for description in (semantics_object, context_object):
+        if isinstance(description, str):
+            return description
+        if isinstance(description, dict):
+            name = description.get("type") or description.get("id") or description.get("category")
+            if name and name != "reference":
+                return str(name).replace("_", " ")
+    return ""
+
+
+def _log_chunk(iteration: int, state, prefix: np.ndarray, gripper_command: Optional[str]):
+    """One diagnostic line per chunk: what the policy asks for, per joint group."""
+    arm = np.abs(prefix[:, : HSRActionSink.ARM_DIM]).max(axis=0)
+    message = "[VLA] chunk %d state=%s arm|delta|max=%s" % (
+        iteration, np.round(np.asarray(state, dtype=np.float64), 3).tolist(), np.round(arm, 3).tolist()
+    )
+    if prefix.shape[1] > HSRActionSink.GRIP_IDX:
+        gripper = prefix[:, HSRActionSink.GRIP_IDX]
+        message += " gripper=[%.2f..%.2f] (commanded %s)" % (gripper.min(), gripper.max(), gripper_command)
+    if prefix.shape[1] >= HSRActionSink.BASE_SLICE.stop:
+        base = np.abs(prefix[:, HSRActionSink.BASE_SLICE]).max(axis=0)
+        message += " base|v|max=%s" % np.round(base, 3).tolist()
+    rospy.loginfo(message)
 
 
 class SmolVLAWebSocketBackend(SmolVLALocalBackend):
@@ -642,6 +787,11 @@ class SmolVLAWebSocketBackend(SmolVLALocalBackend):
                 "Policy server returned invalid action shape {}".format(actions.shape)
             )
         return actions
+
+    def _release_policy(self):
+        # One connection per episode: between actions nobody answers the server's
+        # keepalive pings, so a cached socket is dead by the next action.
+        self._close_policy_socket()
 
     def _close_policy_socket(self):
         if self._policy_socket is not None:

@@ -353,3 +353,98 @@ execution, plus the result state of each trajectory goal.
 6. Fix client websocket keepalive.
 7. Re-run in Gazebo with `velocity`, record rosbag + full logs, and compare to the
    two runs here.
+
+---
+
+## 7. Follow-up (2026-10-30): root causes and fixes
+
+The checkpoint's I/O contract was checked against four sources: its normalisation
+statistics, the AIRoA MoMa paper (arXiv 2509.25032), the official AIRoA client
+(`airoa-org/airoa-evaluation-ICRA`, `deploy/hsr_policy_client/scripts/hsr_policy.py`
+and its launch file) and live policy outputs in the simulator.
+
+### 7.1 What the policy actually outputs
+
+The checkpoint's `action` statistics are identical to the dataset's `action.relative`.
+
+| Columns | Meaning | Old client did |
+|---|---|---|
+| arm 0-4 | delta w.r.t. the **measured** joints (teleop command minus state) | sent as absolute targets: arm driven to ~[0,0,0,0,0] every chunk |
+| gripper 5 | **absolute** `hand_motor_joint` (~-0.8 closed, ~1.24 open) | closed when >= 0.5, i.e. inverted, blocking 2 s; toggled every chunk |
+| head 6-7 | delta w.r.t. the measured joints (~0) | sent as absolute pan/tilt ~(0, 0): head at the horizon |
+| base 8-10 | body-frame velocity [m/s, rad/s] | correct, but held 0.1 s per row in 1.1 s bursts after the arm |
+
+Rows are 10 Hz: the official client plays 10 rows per inference at `update_freq` 10.
+The old client timed rows by `max_joint_vel`, blocked on every group and ran the
+groups one after another (25 s first cycle, 3-4 s later cycles).
+
+### 7.2 Fixes
+
+| Problem | Fix | Where |
+|---|---|---|
+| Arm/head deltas played as absolute | per row: target = latest `/joint_states` + delta, clipped, streamed to `arm_trajectory_controller/command` (0.2 s lead) | `backends.py` `HSRActionSink` |
+| Wrong row rate, blocking, sequential groups | one synchronised 10 Hz loop over arm, gripper and base; 10 rows per query; base braked at the end | `HSRActionSink.play_chunk`, `vla.yaml` |
+| Gripper inverted | official "hybrid" mode: < 0.5 grasp with effort (0.018 Nm, like the official client), else position command; a grasp is released only at >= 0.9 | `backend_utils.gripper_action` |
+| Start state far outside the training data (HERO reset/carrying `arm_roll` -1.57 = -7 sigma) | start pose: lift to 0.2 first, then `[0.2, 0, 0, -1.57, 0]`; head at joint tilt -0.6; gripper open | `SmolVLALocalBackend._move_to_start_pose` |
+| `head_ref` negates the tilt of HERO's head (tilt -0.7 sent the camera to the ceiling) | `set_head_joints()` negates the tilt; head columns ignored by default | `backends.py`, `vla.yaml` |
+| Prompt was the literal string `pick-up` (nothing fills `raw_sentence`) | `"pick up the {object}"` from the semantics | `_instruction()` |
+| VLA ran at the find pose, 0.9-1.4 m from the object | classic `NavigateToGrasp` before the VLA when it is enabled for pick-up | `pick_up.py` |
+| No completion signal; a position threshold alone also fires on an open gripper | holding = effort grasp settled for 1 s and fingers stopped above 0.1 (empty close in sim: -0.07); confirmed on 2 chunks; then lift 0.1 m | `gripper_holding_object`, `vla.yaml` |
+| After a VLA pick nothing knew the arm was holding the object | mark `occupied_by`, remove the ED pose, drive back, carrying pose (as `Grab` does) | `PickUp._hold_vla_grasped_object` |
+| Cached socket killed by the server keepalive between actions | one WebSocket connection per episode | `SmolVLAWebSocketBackend._release_policy` |
+| Server fed a 6-D state; the model was trained on the 8-D state its statistics describe | server state dim from `--state-indices`, default `0..7` | `policy_server.py`, `Dockerfile` |
+| place/hand-over hooks run before the navigation to their target | VLA enabled for `pick-up` only | `vla.yaml`, `executor.py` default |
+| `robot.get_joint_states()` subscribes anew on every call | persistent `JointStateCache` | `backends.py` |
+
+Tests: `action_server/test/test_vla_backend_utils.py` and `test_vla_action_sink.py` (25 pass).
+
+### 7.3 Results in Gazebo
+
+- Live outputs confirm the table in 7.1 (arm columns |max| <= 0.08, gripper ~1.0 while
+  open, base velocities).
+- With the fixes the arm, gripper and base follow the policy: in a controlled run with
+  the robot at the grasp pose the fingers reached to within 10-12 cm of the apple at its
+  height, the hand pre-shaped to ~0.7 while approaching and grasped when the column
+  dropped below 0.
+- No pick succeeded in 3 rollouts: the grasps closed a few centimetres beside the apple
+  and twice knocked an apple off the table. The completion check correctly reported no
+  grasp. This is the remaining gap: the checkpoint was trained on real AIRoA images
+  (3.5/4 on the real HSR, in distribution) and Gazebo is far from that.
+- A first `gripper_close_threshold` of 0.7 closed during the pre-shaping; the official
+  0.5 waits for the real grasp.
+
+### 7.4 Simulator problems found (not VLA code)
+
+- ED localisation diverged twice (0.9 m / 110 deg, then 2.2 m), so navigation reported
+  `unreachable` or drove to the wrong grasp pose. Re-initialising `/hero/initialpose` to
+  the Gazebo pose fixed it only until the next drive.
+- The base wheels spin at saturated effort (+-28 Nm) with no velocity commands, already
+  right after a fresh simulator start; wheel odometry reported 0.1 m/s while the robot
+  crept ~4 mm/s. This feeds the localisation drift and part of the "erratic shifting".
+- An empty grasp stalls at `hand_motor_joint` -0.07 instead of ~-0.8 on the real HSR, so
+  after a miss the policy believes it holds something and rarely retries.
+
+### 7.5 Running it
+
+1. The VS Code "(debugpy) Launch Action Server" loads no parameters. Reload them before
+   restarting the action server:
+   `rosparam load hero_bringup/parameters/action_server/vla.yaml /hero/action_server/vla`
+   (and keep `execution_mode` hybrid). The backend reads them once per process.
+2. Serve the 8-D state without rebuilding the image:
+   ```bash
+   docker run --rm --gpus all \
+     -v /home/amigo/.cache/huggingface:/root/.cache/huggingface \
+     -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla:/model-cache:ro \
+     -v /home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla/inference/policy_server.py:/opt/policy/policy_server.py:ro \
+     -e POLICY_CHECKPOINT_PATH=/model-cache/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96 \
+     -e POLICY_STATE_INDICES=0,1,2,3,4,5,6,7 \
+     -p 8000:8000 smolvla-policy-server
+   ```
+3. Tunables: `arm_lead_time` sets the arm speed (~delta / lead time; the official client
+   is effectively ~0.1 s), `enable_base_motion` (off by default), `max_chunks`.
+
+### 7.6 Superseded statements
+
+In `VLA_INTEGRATION_REPORT.md`: arm columns are deltas, not absolute positions; the
+state is 8-D (arm + gripper + head), not 6-D; rows are 10 Hz; the gripper closes below
+0.5, not above; `place`/`hand-over` should not use the VLA hooks yet.

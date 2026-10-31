@@ -161,9 +161,11 @@ def load_vla_config(robot_name: str) -> VLAConfig:
         [base + "/provider", "/action_server/vla/provider"],
         "none",
     )
+    # Only pick-up runs after the classic approach; the place/hand-over hooks run
+    # before the classic navigation to their target location.
     enabled_actions = _get_param_with_fallback(
         [base + "/enabled_actions", "/action_server/vla/enabled_actions"],
-        ["pick-up", "place", "hand-over"],
+        ["pick-up"],
     )
     output_mode = _get_param_with_fallback(
         [base + "/output_mode", "/action_server/vla/output_mode"],
@@ -215,6 +217,11 @@ def _is_vla_enabled_for_action(config: VLAConfig, action_name: str) -> bool:
     if "*" in config.enabled_actions:
         return True
     return action_name in config.enabled_actions
+
+
+def is_vla_enabled_for_action(robot_name: str, action_name: str) -> bool:
+    """Whether maybe_run_vla_action will try the VLA for this action."""
+    return _is_vla_enabled_for_action(load_vla_config(robot_name), action_name)
 
 
 def maybe_run_vla_action(

@@ -1,9 +1,10 @@
 import rospy
 from robot_skills.arm.arms import GripperTypes
 from robot_smach_states.manipulation import Grab
+from robot_smach_states.navigation.navigate_to_grasp import NavigateToGrasp
 from robot_smach_states.util.designators import UnoccupiedArmDesignator
 
-from action_server.vla import maybe_run_vla_manipulation
+from action_server.vla import is_vla_enabled_for_action, maybe_run_vla_manipulation
 
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
@@ -113,6 +114,11 @@ class PickUp(Action):
         self._config_result.succeeded = True
 
     def _start(self):
+        if is_vla_enabled_for_action(self._robot.robot_name, "pick-up"):
+            # The VLA only replaces the grasp: approach the object the way Grab does first,
+            # the find action leaves the robot out of reach.
+            NavigateToGrasp(self._robot, self._config_result.context['arm-designator'],
+                            self.context.object.designator).execute()
         vla_outcome = maybe_run_vla_manipulation(
             robot=self._robot,
             action_name="pick-up",
@@ -123,6 +129,8 @@ class PickUp(Action):
         if vla_outcome.used:
             self._execute_result.succeeded = vla_outcome.succeeded
             self._execute_result.message = " {} ".format(vla_outcome.message)
+            if vla_outcome.succeeded:
+                self._hold_vla_grasped_object()
             return
 
         fsm_result = self._fsm.execute()
@@ -140,6 +148,21 @@ class PickUp(Action):
             else:
                 self._execute_result.message += " I could not pick up the {}. ". \
                     format(self._config_result.context['object']['designator'].resolve().etype)
+
+    def _hold_vla_grasped_object(self):
+        """
+        Do what the classic Grab does after its grasp (the VLA backend already lifted the object), so the following
+        actions (place, hand-over) know which arm holds the object and the robot drives with the arm tucked in.
+        """
+        arm = self._config_result.context['arm-designator'].resolve()
+        entity = self.context.object.designator.resolve()
+        arm.gripper.occupied_by = entity
+        if entity is not None:
+            # Remove pose from ED as we are holding the object in the gripper
+            self._robot.ed.update_entity(uuid=entity.uuid, remove_pose=True)
+        self._robot.base.force_drive(-0.125, 0, 0, 2.0)
+        arm.send_joint_goal('carrying_pose', timeout=0.0)
+        arm.wait_for_motion_done(cancel=True)
 
     def _cancel(self):
         if self._fsm.is_running:
