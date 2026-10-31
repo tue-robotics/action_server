@@ -384,7 +384,7 @@ groups one after another (25 s first cycle, 3-4 s later cycles).
 |---|---|---|
 | Arm/head deltas played as absolute | per row: target = latest `/joint_states` + delta, clipped, streamed to `arm_trajectory_controller/command` (0.2 s lead) | `backends.py` `HSRActionSink` |
 | Wrong row rate, blocking, sequential groups | one synchronised 10 Hz loop over arm, gripper and base; 10 rows per query; base braked at the end | `HSRActionSink.play_chunk`, `vla.yaml` |
-| Gripper inverted | official "hybrid" mode: < 0.5 grasp with effort (0.018 Nm, like the official client), else position command; a grasp is released only at >= 0.9 | `backend_utils.gripper_action` |
+| Gripper inverted | official "hybrid" mode: < 0.5 grasp with effort (0.018 Nm, like the official client), else position command; a grasp on an object is released only at >= 0.9, fingers closed on nothing (below `grasp_position_threshold`) reopen at >= 0.5 like the official client | `backend_utils.gripper_action`, `HSRActionSink._apply_gripper` |
 | Start state far outside the training data (HERO reset/carrying `arm_roll` -1.57 = -7 sigma) | start pose: lift to 0.2 first, then `[0.2, 0, 0, -1.57, 0]`; head at joint tilt -0.6; gripper open | `SmolVLALocalBackend._move_to_start_pose` |
 | `head_ref` negates the tilt of HERO's head (tilt -0.7 sent the camera to the ceiling) | `set_head_joints()` negates the tilt; head columns ignored by default | `backends.py`, `vla.yaml` |
 | Prompt was the literal string `pick-up` (nothing fills `raw_sentence`) | `"pick up the {object}"` from the semantics | `_instruction()` |
@@ -395,8 +395,13 @@ groups one after another (25 s first cycle, 3-4 s later cycles).
 | Server fed a 6-D state; the model was trained on the 8-D state its statistics describe | server state dim from `--state-indices`, default `0..7` | `policy_server.py`, `Dockerfile` |
 | place/hand-over hooks run before the navigation to their target | VLA enabled for `pick-up` only | `vla.yaml`, `executor.py` default |
 | `robot.get_joint_states()` subscribes anew on every call | persistent `JointStateCache` | `backends.py` |
+| Sim hand misses: wrist pitched down and short of the apple (sim `wrist_flex` PID has no integral term; per unit delta the sim moves `arm_roll` 0.40x and `wrist_flex` 0.55x of the training data) | `arm_delta_gain` [1, 1, 2.5, 2, 1] scales the deltas before `max_arm_delta`; `arm_hold_threshold` 0.005 rad on `wrist_flex` re-sends the previous target instead of following the sag; both neutral by default | `backend_utils.shape_arm_delta`, `vla.yaml` |
+| A failed VLA pick-up left the arm low over the table for the classic fallback | after a failed pick-up in which the policy moved: open the gripper, lift `post_grasp_lift`, start pose | `SmolVLALocalBackend._retract` |
+| The VLA also ran when the approach failed; `Place` composed its pose with the stale map pose of a VLA-grasped object | VLA only after `NavigateToGrasp` arrived with a resolved arm; identity in-hand pose before `occupied_by` | `pick_up.py` |
+| A wrong `POLICY_STATE_INDICES` was trimmed to fit silently | indices checked against the normalisation statistics before they are trimmed; the server fails at startup | `policy_server.py` |
 
-Tests: `action_server/test/test_vla_backend_utils.py` and `test_vla_action_sink.py` (25 pass).
+Tests: `action_server/test/test_vla_*.py`, including a golden test against a transcription of the official
+client (`test_vla_airoa_golden.py`), and `per-group-mse-vla/inference/test_policy_server.py`.
 
 ### 7.3 Results in Gazebo
 
@@ -422,7 +427,8 @@ Tests: `action_server/test/test_vla_backend_utils.py` and `test_vla_action_sink.
   right after a fresh simulator start; wheel odometry reported 0.1 m/s while the robot
   crept ~4 mm/s. This feeds the localisation drift and part of the "erratic shifting".
 - An empty grasp stalls at `hand_motor_joint` -0.07 instead of ~-0.8 on the real HSR, so
-  after a miss the policy believes it holds something and rarely retries.
+  after a miss the policy believes it holds something and rarely retries. The client now
+  at least releases such a grasp as soon as the column rises above 0.5.
 
 ### 7.5 Running it
 

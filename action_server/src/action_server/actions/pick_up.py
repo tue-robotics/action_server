@@ -1,4 +1,5 @@
 import rospy
+from pykdl_ros import FrameStamped
 from robot_skills.arm.arms import GripperTypes
 from robot_smach_states.manipulation import Grab
 from robot_smach_states.navigation.navigate_to_grasp import NavigateToGrasp
@@ -114,19 +115,16 @@ class PickUp(Action):
         self._config_result.succeeded = True
 
     def _start(self):
-        if is_vla_enabled_for_action(self._robot.robot_name, "pick-up"):
-            # The VLA only replaces the grasp: approach the object the way Grab does first,
-            # the find action leaves the robot out of reach.
-            NavigateToGrasp(self._robot, self._config_result.context['arm-designator'],
-                            self.context.object.designator).execute()
-        vla_outcome = maybe_run_vla_manipulation(
-            robot=self._robot,
-            action_name="pick-up",
-            semantics=getattr(self, "_raw_semantics", {}),
-            context=getattr(self, "_raw_context", {}),
-            raw_sentence=getattr(self, "_raw_semantics", {}).get("raw_sentence", ""),
-        )
-        if vla_outcome.used:
+        vla_outcome = None
+        if is_vla_enabled_for_action(self._robot.robot_name, "pick-up") and self._approach_for_vla():
+            vla_outcome = maybe_run_vla_manipulation(
+                robot=self._robot,
+                action_name="pick-up",
+                semantics=getattr(self, "_raw_semantics", {}),
+                context=getattr(self, "_raw_context", {}),
+                raw_sentence=getattr(self, "_raw_semantics", {}).get("raw_sentence", ""),
+            )
+        if vla_outcome is not None and vla_outcome.used:
             self._execute_result.succeeded = vla_outcome.succeeded
             self._execute_result.message = " {} ".format(vla_outcome.message)
             if vla_outcome.succeeded:
@@ -149,6 +147,21 @@ class PickUp(Action):
                 self._execute_result.message += " I could not pick up the {}. ". \
                     format(self._config_result.context['object']['designator'].resolve().etype)
 
+    def _approach_for_vla(self):
+        """
+        The VLA only replaces the grasp: approach the object the way Grab does first, the find action leaves the
+        robot out of reach. Returns False if the classic pick-up should run instead.
+        """
+        arm_designator = self._config_result.context['arm-designator']
+        if arm_designator.resolve() is None:
+            rospy.logwarn("[VLA] No arm to grasp with, using the classic pick-up")
+            return False
+        outcome = NavigateToGrasp(self._robot, arm_designator, self.context.object.designator).execute()
+        if outcome != 'arrived':
+            rospy.logwarn("[VLA] Approaching the object ended with '%s', using the classic pick-up", outcome)
+            return False
+        return True
+
     def _hold_vla_grasped_object(self):
         """
         Do what the classic Grab does after its grasp (the VLA backend already lifted the object), so the following
@@ -156,6 +169,10 @@ class PickUp(Action):
         """
         arm = self._config_result.context['arm-designator'].resolve()
         entity = self.context.object.designator.resolve()
+        if entity is not None:
+            # Place composes the place pose with the pose of the object in the hand; the VLA does not know the grasp
+            # offset, so the object is assumed at the gripper (Grab stores the measured offset instead).
+            entity.pose = FrameStamped.identity(rospy.Time.now(), "map")
         arm.gripper.occupied_by = entity
         if entity is not None:
             # Remove pose from ED as we are holding the object in the gripper

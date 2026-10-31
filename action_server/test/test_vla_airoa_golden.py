@@ -49,9 +49,12 @@ DEPLOYED = dict(
     chunk_prefix_steps=10,
     arm_lead_time=0.2,
     max_arm_delta=[0.04, 0.24, 0.4, 0.3, 0.3],
+    arm_delta_gain=[1.0, 1.0, 2.5, 2.0, 1.0],
+    arm_hold_threshold=[0.0, 0.0, 0.0, 0.005, 0.0],
     gripper_close_threshold=0.5,
     gripper_open_threshold=0.9,
     gripper_max_torque=0.26,
+    grasp_position_threshold=0.1,
     enable_head_motion=False,
     enable_base_motion=False,
     base_action_mode="velocity",
@@ -218,7 +221,9 @@ class TestAiroaGolden(unittest.TestCase):
             with self.subTest(tick=k):
                 # arm_lead_time: the sim arm lags the teleoperation lead of the data
                 self.assertAlmostEqual(sink["arm"][1], 0.2)
-                target = np.array(ref["arm"][0], dtype=np.float64)
+                # arm_delta_gain: the sim moves arm_roll and wrist_flex less per unit delta than the real HSR
+                gain = np.array(DEPLOYED["arm_delta_gain"])
+                target = np.array(ref["arm"][0], dtype=np.float64) + (gain - 1.0) * rows[k, :5]
                 if k == DELTA_CAPPED:  # max_arm_delta: URDF velocity limit times arm_lead_time
                     target[1] = STATES[k][1] - 0.24
                 elif k == BELOW_LIFT_LIMIT:  # URDF position limits
@@ -230,7 +235,7 @@ class TestAiroaGolden(unittest.TestCase):
                 self.assertNotIn("head", sink)
                 self.assertNotIn("base", sink)
                 if GRIPPER[k] == 0.6:
-                    # gripper_open_threshold: the grasp is held while the column stays at the object's width
+                    # gripper_open_threshold: a grasp on an object is held while the column stays at its width
                     self.assertIsNone(sink.get("gripper"))
                     self.assertEqual(ref["gripper"][0], "position")
                 else:

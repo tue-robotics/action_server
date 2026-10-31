@@ -22,11 +22,14 @@
   <exec_depend>grammar_parser</exec_depend>
   <exec_depend>pykdl_ros</exec_depend>
   <exec_depend>python3-nose</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <exec_depend>robocup_knowledge</exec_depend>
   <exec_depend>robot_skills</exec_depend>
   <exec_depend>robot_smach_states</exec_depend>
 
   <test_depend>ed_msgs</test_depend>
+  <test_depend>python_orocos_kdl</test_depend>
+  <test_depend>python3-rospkg</test_depend>
 
   <doc_depend>python3-sphinx</doc_depend>
   <doc_depend>python-sphinx-autoapi-pip</doc_depend>

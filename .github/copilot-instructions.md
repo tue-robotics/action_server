@@ -168,7 +168,7 @@ PYTHONPATH=/home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vl
 python /home/amigo/ros/noetic/repos/github.com/tue-robotics/per-group-mse-vla/inference/local_smoke_test.py \
   --checkpoint /absolute/path/to/per-group-mse-smolvla \
   --device cuda \
-  --state-indices 0,1,2,3,4,5
+  --state-indices 0,1,2,3,4,5,6,7
 ```
 
 The current ROS node uses Python 3.8. If the policy container is unavailable,

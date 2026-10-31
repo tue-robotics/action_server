@@ -50,6 +50,23 @@ def apply_relative(current, delta, lower=None, upper=None, max_delta=None) -> np
     return target
 
 
+def shape_arm_delta(delta, current, gain=1.0, hold_threshold=0.0, previous_target=None) -> np.ndarray:
+    """Correct the policy's arm deltas for the simulated arm, before they are bounded and applied.
+
+    gain scales the deltas of joints that track the teleoperation lead too
+    slowly. A joint whose delta is below hold_threshold re-sends
+    previous_target instead: the deltas are relative to the measured joints, so
+    a joint whose controller cannot hold it (a sagging wrist) would otherwise
+    follow its own sag. The defaults return the delta unchanged.
+    """
+    delta = np.asarray(delta, dtype=np.float64)
+    shaped = delta * gain
+    if previous_target is not None:
+        held = np.asarray(previous_target, dtype=np.float64) - np.asarray(current, dtype=np.float64)
+        shaped = np.where(np.abs(delta) < hold_threshold, held, shaped)
+    return shaped
+
+
 def gripper_action(
     value: float, grasping: bool, close_threshold: float, open_threshold: float
 ) -> Optional[float]:
