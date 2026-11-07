@@ -1,16 +1,15 @@
-"""Shared helpers used by VLA backends (in-process and WebSocket).
+"""Pure helpers of the VLA backend: image packing, joint limits, the action contract, debug records.
 
-Kept separate from backends.py so backend implementations stay focused on
-policy loading/transport, while observation/completion primitives are
-reusable and independently testable.
+Kept separate from backends.py so they can be tested without ROS.
 """
 
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
+from urdf_parser_py.urdf import URDF
 
 
 def as_rgb_uint8(image) -> np.ndarray:
@@ -24,8 +23,7 @@ def as_rgb_uint8(image) -> np.ndarray:
 def clamp_symmetric(value: float, limit: Optional[float]) -> float:
     """Clamp value into [-limit, limit]. A None/non-positive limit disables clamping.
 
-    Used to bound VLA base velocities before force_drive, which bypasses the
-    collision-avoidance layer.
+    Used to bound the VLA base velocities, which bypass the collision-avoidance layer.
     """
     value = float(value)
     if limit is None or limit <= 0:
@@ -50,39 +48,32 @@ def apply_relative(current, delta, lower=None, upper=None, max_delta=None) -> np
     return target
 
 
-def shape_arm_delta(delta, current, gain=1.0, hold_threshold=0.0, previous_target=None) -> np.ndarray:
-    """Correct the policy's arm deltas for the simulated arm, before they are bounded and applied.
+def joint_limits(urdf_xml: str, joint_names: List[str]) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Position and velocity limits (lower, upper, velocity) of joint_names in a URDF, in that order.
 
-    gain scales the deltas of joints that track the teleoperation lead too
-    slowly. A joint whose delta is below hold_threshold re-sends
-    previous_target instead: the deltas are relative to the measured joints, so
-    a joint whose controller cannot hold it (a sagging wrist) would otherwise
-    follow its own sag. The defaults return the delta unchanged.
+    Returns None if the URDF is empty or one of the joints has no limit.
     """
-    delta = np.asarray(delta, dtype=np.float64)
-    shaped = delta * gain
-    if previous_target is not None:
-        held = np.asarray(previous_target, dtype=np.float64) - np.asarray(current, dtype=np.float64)
-        shaped = np.where(np.abs(delta) < hold_threshold, held, shaped)
-    return shaped
+    if not urdf_xml:
+        return None
+    joints = {joint.name: joint for joint in URDF.from_xml_string(urdf_xml).joints}
+    limits = [getattr(joints.get(name), "limit", None) for name in joint_names]
+    if any(limit is None or None in (limit.lower, limit.upper, limit.velocity) for limit in limits):
+        return None
+    return tuple(np.array([getattr(limit, field) for limit in limits], dtype=np.float64)
+                 for field in ("lower", "upper", "velocity"))
 
 
-def gripper_action(
-    value: float, grasping: bool, close_threshold: float, open_threshold: float
-) -> Optional[float]:
+def gripper_action(value: float, close_threshold: float) -> Optional[float]:
     """Map the absolute gripper column (hand_motor_joint, ~-0.8 closed, ~1.24 open) to a command.
 
-    Follows the 'hybrid' gripper mode of the reference AIRoA client: below
+    The 'hybrid' gripper mode of the reference AIRoA client: below
     close_threshold grasp with effort, otherwise follow the column as a
-    position. An effort grasp is only released once the column reaches
-    open_threshold, because while holding an object the column stays near the
-    object's width. Returns None to grasp (or keep grasping) with effort, else
-    the hand_motor_joint position target.
+    position. Returns None to grasp with effort, else the hand_motor_joint
+    position target.
     """
-    if value < close_threshold or (grasping and value < open_threshold):
+    if value < close_threshold:
         return None
     return float(np.clip(value, -0.1, 1.23))
-
 
 
 def pack_image_binary(image: np.ndarray) -> dict:
@@ -115,48 +106,3 @@ def query_debug_message(iteration: int, instruction: str, state, chunk, prefix_s
         "prefix_steps": int(prefix_steps),
     })
 
-
-def gripper_occupied(sink) -> bool:
-    """True if the classic Grab/Place FSM has recorded the gripper as holding an item.
-
-    Only reflects classic bookkeeping; always False on a pure VLA run where no
-    classic FSM has touched `occupied_by`.
-    """
-    return sink._get_arm().gripper.occupied_by is not None
-
-
-def gripper_holding_object(
-    commanded_state: Optional[str],
-    seconds_since_command: Optional[float],
-    position: Optional[float],
-    empty_closed_threshold: Optional[float],
-    settle_time: float,
-) -> Optional[bool]:
-    """Physical stand-in for `occupied_by`: is the gripper holding something?
-
-    An open gripper also reads above the empty-closed position, so position
-    alone is ambiguous: the gripper must have been commanded closed and given
-    settle_time to close. It then holds an object when the fingers stopped
-    above empty_closed_threshold instead of closing completely.
-
-    Returns None when the threshold is unset (feature disabled) or the joint
-    reading is unavailable, so callers can distinguish "unknown" from "empty".
-    """
-    if empty_closed_threshold is None or position is None:
-        return None
-    if commanded_state != "close" or seconds_since_command is None or seconds_since_command < settle_time:
-        return False
-    return position > empty_closed_threshold
-
-
-def is_manipulation_done(action_name: str, occupied_now: bool, occupied_at_start: bool) -> bool:
-    """Generic pick/place/hand-over completion rule from a binary gripper signal.
-
-    pick-up succeeds on empty->grasped, place/hand-over succeed on
-    grasped->empty. Other actions have no known completion signal here.
-    """
-    if action_name == "pick-up":
-        return occupied_now and not occupied_at_start
-    if action_name in ("place", "hand-over"):
-        return occupied_at_start and not occupied_now
-    return False

@@ -31,14 +31,17 @@ def make_pick_up():
     action._fsm.execute.return_value = "failed"
     action._raw_semantics = {}
     action._raw_context = {}
+    action._approach = None
+    action._cancelled = False
     return action, arm, entity
 
 
+@mock.patch.object(pick_up, "cancel_vla")
 @mock.patch.object(pick_up, "maybe_run_vla_manipulation")
 @mock.patch.object(pick_up, "NavigateToGrasp")
 @mock.patch.object(pick_up, "is_vla_enabled_for_action", return_value=True)
 class TestPickUpVLA(unittest.TestCase):
-    def test_vla_grasps_after_arriving_at_the_object(self, _enabled, navigate, run_vla):
+    def test_vla_grasps_after_arriving_at_the_object(self, _enabled, navigate, run_vla, _cancel_vla):
         navigate.return_value.execute.return_value = "arrived"
         run_vla.return_value = VLAOutcome(used=True, succeeded=True, message="VLA completed 'pick-up'")
         action, arm, entity = make_pick_up()
@@ -51,14 +54,14 @@ class TestPickUpVLA(unittest.TestCase):
         self.assertEqual(entity.pose.frame, kdl.Frame.Identity())
         self.assertEqual(entity.pose.header.frame_id, "map")
 
-    def test_unreachable_object_uses_the_classic_pick_up(self, _enabled, navigate, run_vla):
+    def test_unreachable_object_uses_the_classic_pick_up(self, _enabled, navigate, run_vla, _cancel_vla):
         navigate.return_value.execute.return_value = "unreachable"
         action, _, _ = make_pick_up()
         action._start()
         run_vla.assert_not_called()
         action._fsm.execute.assert_called_once()
 
-    def test_missing_arm_uses_the_classic_pick_up(self, _enabled, navigate, run_vla):
+    def test_missing_arm_uses_the_classic_pick_up(self, _enabled, navigate, run_vla, _cancel_vla):
         action, _, _ = make_pick_up()
         action._config_result.context["arm-designator"].resolve.return_value = None
         action._start()
@@ -66,7 +69,7 @@ class TestPickUpVLA(unittest.TestCase):
         run_vla.assert_not_called()
         action._fsm.execute.assert_called_once()
 
-    def test_failed_vla_falls_back_to_the_classic_pick_up(self, _enabled, navigate, run_vla):
+    def test_failed_vla_falls_back_to_the_classic_pick_up(self, _enabled, navigate, run_vla, _cancel_vla):
         navigate.return_value.execute.return_value = "arrived"
         run_vla.return_value = VLAOutcome(used=False, succeeded=False, message="max_chunks")
         action, arm, _ = make_pick_up()
@@ -74,13 +77,50 @@ class TestPickUpVLA(unittest.TestCase):
         action._fsm.execute.assert_called_once()
         self.assertIsNone(arm.gripper.occupied_by)
 
-    def test_disabled_vla_does_not_approach(self, enabled, navigate, run_vla):
+    def test_disabled_vla_does_not_approach(self, enabled, navigate, run_vla, _cancel_vla):
         enabled.return_value = False
         action, _, _ = make_pick_up()
         action._start()
         navigate.assert_not_called()
         run_vla.assert_not_called()
         action._fsm.execute.assert_called_once()
+
+    def test_cancel_during_the_approach_skips_the_classic_pick_up(self, _enabled, navigate, run_vla, cancel_vla):
+        action, _, _ = make_pick_up()
+
+        def preempted():
+            action._cancel()
+            return "preempted"
+        navigate.return_value.execute.side_effect = preempted
+        action._start()
+
+        navigate.return_value.request_preempt.assert_called_once_with()
+        cancel_vla.assert_called_once_with("hero")
+        run_vla.assert_not_called()
+        action._fsm.execute.assert_not_called()
+        self.assertFalse(action._execute_result.succeeded)
+
+    def test_cancel_during_the_vla_skips_the_classic_pick_up(self, _enabled, navigate, run_vla, _cancel_vla):
+        navigate.return_value.execute.return_value = "arrived"
+        action, _, _ = make_pick_up()
+
+        def cancelled_rollout(**_kwargs):
+            action._cancel()
+            return VLAOutcome(used=False, succeeded=False, message="VLA rollout cancelled")
+        run_vla.side_effect = cancelled_rollout
+        action._start()
+
+        action._fsm.execute.assert_not_called()
+        self.assertFalse(action._execute_result.succeeded)
+
+    def test_cancel_preempts_the_classic_pick_up_only_while_it_runs(self, _enabled, _navigate, _run_vla, _cancel_vla):
+        action, _, _ = make_pick_up()
+        action._fsm.is_running.return_value = False
+        action._cancel()
+        action._fsm.request_preempt.assert_not_called()
+        action._fsm.is_running.return_value = True
+        action._cancel()
+        action._fsm.request_preempt.assert_called_once_with()
 
 
 if __name__ == '__main__':

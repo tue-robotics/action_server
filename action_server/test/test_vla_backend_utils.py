@@ -3,13 +3,17 @@ import unittest
 
 import numpy as np
 
-from action_server.vla.backend_utils import (
-    apply_relative,
-    gripper_action,
-    gripper_holding_object,
-    is_manipulation_done,
-    query_debug_message,
-)
+from action_server.vla.backend_utils import apply_relative, gripper_action, joint_limits, query_debug_message
+
+URDF = """<robot name="arm">
+  <link name="base"/><link name="lift"/><link name="flex"/>
+  <joint name="arm_lift_joint" type="prismatic">
+    <parent link="base"/><child link="lift"/><limit lower="0.0" upper="0.69" velocity="0.2" effort="100"/>
+  </joint>
+  <joint name="arm_flex_joint" type="revolute">
+    <parent link="lift"/><child link="flex"/><limit lower="-2.62" upper="0.0" velocity="1.2" effort="100"/>
+  </joint>
+</robot>"""
 
 
 class TestApplyRelative(unittest.TestCase):
@@ -27,56 +31,33 @@ class TestApplyRelative(unittest.TestCase):
         np.testing.assert_allclose(target, [0.05, -0.3])
 
 
+class TestJointLimits(unittest.TestCase):
+    def test_limits_are_read_from_the_urdf_in_the_requested_order(self):
+        lower, upper, velocity = joint_limits(URDF, ["arm_flex_joint", "arm_lift_joint"])
+        np.testing.assert_allclose(lower, [-2.62, 0.0])
+        np.testing.assert_allclose(upper, [0.0, 0.69])
+        np.testing.assert_allclose(velocity, [1.2, 0.2])
+
+    def test_missing_joint_or_description_gives_no_limits(self):
+        self.assertIsNone(joint_limits(URDF, ["arm_lift_joint", "arm_roll_joint"]))
+        self.assertIsNone(joint_limits("", ["arm_lift_joint"]))
+
+
 class TestGripperAction(unittest.TestCase):
-    # Reference AIRoA client 'hybrid' mode: below the close threshold grasp with effort,
-    # above it follow the column as a hand_motor_joint position (~-0.8 closed .. ~1.24 open)
+    # The 'hybrid' gripper mode of the reference AIRoA client (hsr_policy.py:661-679): below the close threshold
+    # grasp with effort, otherwise follow the column as a hand_motor_joint position (~-0.8 closed .. ~1.24 open)
 
     def test_open_value_is_a_position_target(self):
-        self.assertAlmostEqual(gripper_action(1.1, False, 0.5, 0.9), 1.1)
+        self.assertAlmostEqual(gripper_action(1.1, 0.5), 1.1)
 
     def test_position_is_clipped_like_the_reference_client(self):
-        self.assertAlmostEqual(gripper_action(1.3, False, 0.5, 0.9), 1.23)
+        self.assertAlmostEqual(gripper_action(1.3, 0.5), 1.23)
 
     def test_closing_value_grasps_with_effort(self):
-        self.assertIsNone(gripper_action(0.3, False, 0.5, 0.9))
+        self.assertIsNone(gripper_action(0.3, 0.5))
 
-    def test_grasp_is_kept_until_clearly_opening(self):
-        # A held object keeps the fingers, and so the predicted column, near its width
-        self.assertIsNone(gripper_action(0.6, True, 0.5, 0.9))
-        self.assertAlmostEqual(gripper_action(1.0, True, 0.5, 0.9), 1.0)
-
-
-class TestGripperHoldingObject(unittest.TestCase):
-    def test_disabled_without_threshold(self):
-        self.assertIsNone(gripper_holding_object("close", 5.0, 0.3, None, 1.0))
-
-    def test_open_gripper_is_not_holding(self):
-        # An open gripper also reads above the empty-closed position, so the commanded state must be 'close'
-        self.assertFalse(gripper_holding_object("open", 5.0, 1.0, -0.5, 1.0))
-        self.assertFalse(gripper_holding_object(None, None, 1.0, -0.5, 1.0))
-
-    def test_closing_gripper_needs_time_to_settle(self):
-        self.assertFalse(gripper_holding_object("close", 0.2, 0.3, -0.5, 1.0))
-
-    def test_fingers_stopped_by_object(self):
-        self.assertTrue(gripper_holding_object("close", 1.5, 0.55, 0.1, 1.0))
-
-    def test_fingers_closed_on_nothing(self):
-        # In the HERO simulation an empty grasp stalls at about -0.07
-        self.assertFalse(gripper_holding_object("close", 1.5, -0.07, 0.1, 1.0))
-
-    def test_position_mode_is_not_a_grasp(self):
-        self.assertFalse(gripper_holding_object("position", 1.5, 0.55, 0.1, 1.0))
-
-
-class TestIsManipulationDone(unittest.TestCase):
-    def test_pick_up(self):
-        self.assertTrue(is_manipulation_done("pick-up", True, False))
-        self.assertFalse(is_manipulation_done("pick-up", False, False))
-
-    def test_place(self):
-        self.assertTrue(is_manipulation_done("place", False, True))
-        self.assertFalse(is_manipulation_done("place", True, True))
+    def test_the_threshold_itself_is_a_position(self):
+        self.assertAlmostEqual(gripper_action(0.5, 0.5), 0.5)
 
 
 class TestQueryDebugMessage(unittest.TestCase):

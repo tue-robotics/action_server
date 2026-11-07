@@ -54,6 +54,9 @@ class BaseVLAProvider(object):
     def execute_manipulation(self, request: ManipulationRequest) -> ManipulationResponse:
         raise NotImplementedError("Implement execute_manipulation in provider")
 
+    def cancel(self):
+        """Stop a running execute_manipulation() as soon as possible; called from another thread."""
+
 
 class NullVLAProvider(BaseVLAProvider):
     """Default provider that intentionally does nothing.
@@ -131,6 +134,10 @@ class LocalBackendVLAProvider(BaseVLAProvider):
         except Exception as e:
             rospy.logerr("[VLA] Backend traceback:\n%s", traceback.format_exc())
             return ManipulationResponse(False, "Local backend call failed: {}".format(e), None)
+
+    def cancel(self):
+        if self._backend is not None and hasattr(self._backend, "cancel"):
+            self._backend.cancel()
 
 
 _PROVIDER_REGISTRY = {
@@ -220,25 +227,28 @@ def _is_vla_enabled_for_action(config: VLAConfig, action_name: str) -> bool:
 
 
 def is_vla_enabled_for_action(robot_name: str, action_name: str) -> bool:
-    """Whether maybe_run_vla_action will try the VLA for this action."""
+    """Whether maybe_run_vla_manipulation will try the VLA for this action."""
     return _is_vla_enabled_for_action(load_vla_config(robot_name), action_name)
 
 
-def maybe_run_vla_action(
+def maybe_run_vla_manipulation(
     robot, action_name: str, semantics: Dict, context: Dict, raw_sentence: str = ""
 ) -> VLAOutcome:
-    """Try VLA execution for one action.
+    """Try VLA execution for one manipulation action.
 
-    Returns VLAOutcome(used=False, ...) when classic code should continue.
+    Returns VLAOutcome(used=False, ...) when classic code should continue: the VLA is not enabled for the
+    action, or it failed in hybrid mode. In vla mode, or with strict_mode, a VLA failure is the outcome.
     """
     config = load_vla_config(robot.robot_name)
     if not _is_vla_enabled_for_action(config, action_name):
         return VLAOutcome(used=False, succeeded=False, message="")
+    # vla: the classic code still finds and approaches, but never takes over the manipulation
+    strict = config.strict_mode or config.execution_mode == "vla"
 
     if config.output_mode != "joints":
         msg = "[VLA] Unsupported output_mode '{}', expected 'joints'".format(config.output_mode)
         rospy.logwarn(msg)
-        if config.strict_mode:
+        if strict:
             return VLAOutcome(used=True, succeeded=False, message=msg)
         return VLAOutcome(used=False, succeeded=False, message="")
 
@@ -258,7 +268,7 @@ def maybe_run_vla_action(
         msg = response.message or "VLA manipulation executed successfully."
         return VLAOutcome(used=True, succeeded=True, message=msg)
 
-    if config.strict_mode:
+    if strict:
         msg = response.message or "VLA manipulation failed."
         return VLAOutcome(used=True, succeeded=False, message=msg)
 
@@ -266,17 +276,8 @@ def maybe_run_vla_action(
     return VLAOutcome(used=False, succeeded=False, message=response.message)
 
 
-def maybe_run_vla_manipulation(
-    robot, action_name: str, semantics: Dict, context: Dict, raw_sentence: str = ""
-) -> VLAOutcome:
-    """Backward-compatible wrapper for manipulation actions."""
-    return maybe_run_vla_action(
-        robot, action_name, semantics, context, raw_sentence=raw_sentence
-    )
-
-
-def should_delegate_action_to_vla(robot_name: str, action_name: str) -> bool:
-    config = load_vla_config(robot_name)
-    if config.execution_mode != "vla":
-        return False
-    return _is_vla_enabled_for_action(config, action_name)
+def cancel_vla(robot_name: str) -> None:
+    """Cancel the VLA execution of this robot, if one is running."""
+    for (name, _), provider in list(_PROVIDER_CACHE.items()):
+        if name == robot_name:
+            provider.cancel()

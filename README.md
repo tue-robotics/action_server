@@ -133,8 +133,10 @@ The Action life cycle consists of the following phases:
 
 ## VLA integration
 
-The action server can run the HSR manipulation VLA in-process while retaining
-the existing actionlib API. The public endpoint remains:
+The action server can hand the HSR pick-up grasp to a VLA policy while
+retaining the existing actionlib API. The policy runs in a separate Python 3.12
+process (a Docker container) and is queried over WebSocket. The public endpoint
+remains:
 
 ```text
 /hero/action_server/task
@@ -143,15 +145,16 @@ the existing actionlib API. The public endpoint remains:
 The VLA implementation is layered as follows:
 
 - `action_server/src/action_server/vla/executor.py` selects `classic`,
-  `hybrid`, or `vla` execution.
+  `hybrid`, or `vla` execution. `hybrid` runs the classic find and approach,
+  then the VLA grasp, with the classic `Grab` as fallback; `vla` is the same
+  without the fallback.
 - `action_server/src/action_server/vla/backends.py` provides the HSR
   observation, inference, and actuation backend.
 - `per-group-mse-vla/inference/policy_server.py` loads the checkpoint and its
   LeRobot preprocessor/postprocessor files.
 
 The shared ROS launch entry point is
-`hero_bringup/launch/action_server.launch`. It owns `execution_mode` and
-`checkpoint_path`, loads
+`hero_bringup/launch/action_server.launch`. It owns `execution_mode`, loads
 `hero_bringup/parameters/action_server/vla.yaml`, and starts `main.py`.
 `hero-free-mode` already includes this launch, so do not start a second action
 server afterward.
@@ -163,9 +166,8 @@ hero-start
 hero-free-mode
 ```
 
-The action-server launch adds the policy repository to the ROS node's
-`PYTHONPATH`. In the container architecture, ROS Python 3.8 does not import
-LeRobot; it only needs the lightweight WebSocket client packages:
+ROS Python 3.8 does not import LeRobot; it only needs the lightweight WebSocket
+client packages:
 
 ```bash
 python -m pip install -r action_server/requirements-vla.txt
@@ -211,9 +213,12 @@ docker run --rm --gpus all \
   -v /home/amigo/.cache/huggingface:/root/.cache/huggingface \
   -v /home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla:/model-cache:ro \
   -e POLICY_CHECKPOINT_PATH=/model-cache/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96 \
-  -p 8000:8000 \
+  -p 8001:8000 \
   smolvla-policy-server
 ```
+
+Host port 8000 is taken by the `tue_mobile_ui` webserver of `hero-start`, so
+the policy is published on 8001.
 
 Wait for these logs before starting ROS:
 
@@ -238,13 +243,11 @@ Start ROS in another terminal after the policy server is listening:
 ```bash
 hero-start
 export ACTION_SERVER_EXECUTION_MODE=hybrid
-export ACTION_SERVER_CHECKPOINT_PATH=/home/amigo/.cache/huggingface/hub/models--PauMontagut--per-group-mse-smolvla/snapshots/cb72ca6a3a58e724a3ca8579bea3811f1810be96
 hero-free-mode
-rosparam set /hero/action_server/vla/policy_url ws://127.0.0.1:8001
 rosparam get /hero/action_server/vla/policy_url
 ```
 
-The ROS backend connects to `ws://127.0.0.1:8000`, configured as
+The ROS backend connects to `ws://127.0.0.1:8001`, configured as
 `policy_url` in `hero_bringup/parameters/action_server/vla.yaml`. Confirm the
 mode and endpoint:
 
@@ -287,15 +290,15 @@ If GPSR reports `Waiting for task action server to come online...`, the action
 server node is absent or failed during startup. Inspect its terminal for
 `main.py` installation errors, robot initialization failures, or missing Python
 dependencies before investigating the VLA. In hybrid mode, a message such as
-`Local backend call failed: No module named 'lerobot'` means the action server
-is alive and has reached the VLA backend, but the model runtime is unavailable;
-hybrid mode will intentionally fall back to classic execution.
+`Local backend call failed: [Errno 111] Connection refused` means the action
+server is alive and has reached the VLA backend, but no policy server listens
+at `policy_url`; hybrid mode will intentionally fall back to classic execution.
 
 The released checkpoint is `PauMontagut/per-group-mse-smolvla` on Hugging Face.
-Its six state values are mapped from the HSR arm joints and gripper through
-`state_indices: [0, 1, 2, 3, 4, 5]` in the VLA YAML. Modern checkpoints define
-their own state/action dimensions and preprocessing pipelines; older
-checkpoints use the loader's legacy normalization fallback.
+Its eight state values are the five HSR arm joints, the gripper and the two
+head joints. The policy server selects them (`POLICY_STATE_INDICES=0,1,2,3,4,5,6,7`)
+and refuses indices that do not match the checkpoint's normalisation
+statistics.
 
 ## FAQ
 

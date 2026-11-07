@@ -5,8 +5,8 @@ deploy/hsr_policy_client/scripts/hsr_policy.py in its 10 Hz configuration
 (launch args update_freq:=10 adopted_action_chunks:=10 upsample:=false
 action_smoothing:=none gripper_mode:=hybrid). With reference-equivalent
 parameters the sink must command exactly what the reference commands. With
-the deployed parameters (hero_bringup vla.yaml) it may only differ where a
-deviation is documented.
+the deployed parameters (hero_bringup vla.yaml) and the HSR robot model it may
+only differ where a deviation is documented.
 """
 import unittest
 from unittest import mock
@@ -32,9 +32,7 @@ REFERENCE_EQUIVALENT = dict(
     TOPICS,
     policy_fps=10.0,
     arm_lead_time=0.05,  # 1 / update_freq / 2 (hsr_policy.py:608)
-    max_arm_delta=[1e3] * 5,  # the reference does not bound the deltas...
     gripper_close_threshold=0.5,  # hsr_policy.py:452
-    gripper_open_threshold=0.5,  # ...nor hold a grasp above the close threshold
     gripper_max_torque=0.018 / HAND_MOMENT_ARM_LENGTH,  # hsr_policy.py:665
     enable_base_motion=True,
     base_action_mode="velocity",
@@ -48,19 +46,21 @@ DEPLOYED = dict(
     policy_fps=10.0,
     chunk_prefix_steps=10,
     arm_lead_time=0.2,
-    max_arm_delta=[0.04, 0.24, 0.4, 0.3, 0.3],
-    arm_delta_gain=[1.0, 1.0, 2.5, 2.0, 1.0],
-    arm_hold_threshold=[0.0, 0.0, 0.0, 0.005, 0.0],
     gripper_close_threshold=0.5,
-    gripper_open_threshold=0.9,
     gripper_max_torque=0.26,
-    grasp_position_threshold=0.1,
     enable_head_motion=False,
     enable_base_motion=False,
-    base_action_mode="velocity",
     max_base_velocity=0.2,
     max_base_yaw_velocity=0.4,
 )
+
+# The robot model the deployed sink bounds the arm with: arm joint (lower, upper, velocity) of hsrb4s.urdf
+HSR_ARM_LIMITS = [(0.0, 0.69, 0.2), (-2.62, 0.0, 1.2), (-2.09, 3.84, 2.0), (-1.92, 1.22, 1.5), (-1.92, 3.67, 1.5)]
+HSR_ARM_URDF = '<robot name="hsrb"><link name="link0"/>{}</robot>'.format("".join(
+    '<link name="link{i}"/><joint name="{name}" type="revolute"><parent link="link{parent}"/><child link="link{i}"/>'
+    '<limit lower="{lower}" upper="{upper}" velocity="{velocity}" effort="100"/></joint>'.format(
+        i=i + 1, parent=i, name=name, lower=lower, upper=upper, velocity=velocity)
+    for i, (name, (lower, upper, velocity)) in enumerate(zip(STATE_JOINTS[:5], HSR_ARM_LIMITS))))
 
 # Joint state per tick, drifting so that a target anchored on the chunk start or a
 # cumulative sum of the deltas would not match the reference.
@@ -79,7 +79,7 @@ def make_chunk():
     rows[:, 6:8] = [0.001, -0.002]
     rows[:10, 5] = GRIPPER
     rows[:10, 8:11] = [0.1, 0.0, 0.05]
-    rows[DELTA_CAPPED, 1] = -0.30  # arm_flex delta beyond max_arm_delta 0.24
+    rows[DELTA_CAPPED, 1] = -0.30  # arm_flex delta beyond its velocity limit times the lead, 1.2 * 0.2
     rows[BELOW_LIFT_LIMIT, 0] = -0.02  # arm_lift target below its lower limit 0.0
     rows[ABOVE_FLEX_LIMIT, 1] = 0.04  # arm_flex target above its upper limit 0.0
     rows[1, 8] = 0.3  # beyond max_base_velocity
@@ -115,7 +115,7 @@ def reference_commands(rows):
     return [client.tick(rows[k], STATES[k]) for k in range(len(rows))]
 
 
-def play(params, rows):
+def play(params, rows, robot_description=""):
     """Play rows through a sink built with params. Returns (rate, per-tick commands, commands after the last tick)."""
     events = []
 
@@ -135,8 +135,12 @@ def play(params, rows):
 
     robot = mock.MagicMock()
     robot.robot_name = "hero"
-    with mock.patch.object(backends.rospy, "get_param", lambda name, default=None: params.get(
-            name[len(PREFIX):], default)), \
+    def get_param(name, default=None):
+        if name == "/hero/robot_description":
+            return robot_description
+        return params.get(name[len(PREFIX):], default)
+
+    with mock.patch.object(backends.rospy, "get_param", get_param), \
             mock.patch.object(backends.rospy, "Publisher", Publisher), \
             mock.patch.object(backends.rospy, "Subscriber"):
         sink = backends.HSRActionSink(robot)
@@ -187,10 +191,8 @@ class TestAiroaGolden(unittest.TestCase):
     def test_reference_equivalent_parameters_command_exactly_the_reference(self):
         rows = make_chunk()[:10]
         expected = reference_commands(rows)
-        # The reference does not clip to the joint limits either
-        with mock.patch.object(backends.HSRActionSink, "ARM_LOWER", [-np.inf] * 5), \
-                mock.patch.object(backends.HSRActionSink, "ARM_UPPER", [np.inf] * 5):
-            rate, ticks, after = play(REFERENCE_EQUIVALENT, rows)
+        # Without a robot model the arm is not bounded, like the reference
+        rate, ticks, after = play(REFERENCE_EQUIVALENT, rows)
 
         self.assertEqual(rate, 10.0)
         self.assertEqual(len(ticks), 10)
@@ -214,17 +216,15 @@ class TestAiroaGolden(unittest.TestCase):
     def test_deployed_parameters_deviate_only_where_documented(self):
         rows = make_chunk()[:10]
         expected = reference_commands(rows)
-        rate, ticks, after = play(DEPLOYED, rows)
+        rate, ticks, after = play(DEPLOYED, rows, HSR_ARM_URDF)
 
         self.assertEqual(rate, 10.0)
         for k, (ref, sink) in enumerate(zip(expected, ticks)):
             with self.subTest(tick=k):
                 # arm_lead_time: the sim arm lags the teleoperation lead of the data
                 self.assertAlmostEqual(sink["arm"][1], 0.2)
-                # arm_delta_gain: the sim moves arm_roll and wrist_flex less per unit delta than the real HSR
-                gain = np.array(DEPLOYED["arm_delta_gain"])
-                target = np.array(ref["arm"][0], dtype=np.float64) + (gain - 1.0) * rows[k, :5]
-                if k == DELTA_CAPPED:  # max_arm_delta: URDF velocity limit times arm_lead_time
+                target = np.array(ref["arm"][0], dtype=np.float64)
+                if k == DELTA_CAPPED:  # the URDF velocity limit times arm_lead_time
                     target[1] = STATES[k][1] - 0.24
                 elif k == BELOW_LIFT_LIMIT:  # URDF position limits
                     target[0] = 0.0
@@ -234,13 +234,8 @@ class TestAiroaGolden(unittest.TestCase):
                 # enable_head_motion / enable_base_motion are off
                 self.assertNotIn("head", sink)
                 self.assertNotIn("base", sink)
-                if GRIPPER[k] == 0.6:
-                    # gripper_open_threshold: a grasp on an object is held while the column stays at its width
-                    self.assertIsNone(sink.get("gripper"))
-                    self.assertEqual(ref["gripper"][0], "position")
-                else:
-                    # gripper_max_torque 0.26 rounds the reference's 0.018 Nm
-                    self.assertGripperEqual(ref["gripper"], sink.get("gripper"), effort_rtol=0.02)
+                # gripper_max_torque 0.26 rounds the reference's 0.018 Nm
+                self.assertGripperEqual(ref["gripper"], sink.get("gripper"), effort_rtol=0.02)
         self.assertEqual(after, {})
 
     def test_deployed_mirror_matches_vla_yaml(self):

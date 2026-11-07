@@ -5,7 +5,7 @@ from robot_smach_states.manipulation import Grab
 from robot_smach_states.navigation.navigate_to_grasp import NavigateToGrasp
 from robot_smach_states.util.designators import UnoccupiedArmDesignator
 
-from action_server.vla import is_vla_enabled_for_action, maybe_run_vla_manipulation
+from action_server.vla import cancel_vla, is_vla_enabled_for_action, maybe_run_vla_manipulation
 
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
@@ -25,6 +25,8 @@ class PickUp(Action):
         self._required_skills = ['arms']
         self._required_field_prompts = {'object': " What would you like me to pick up? ",
                                         'source-location': " Where would you like me to pick that up? "}  # TODO: handle source location from context?
+        self._approach = None
+        self._cancelled = False
 
     class Semantics:
         def __init__(self):
@@ -130,6 +132,10 @@ class PickUp(Action):
             if vla_outcome.succeeded:
                 self._hold_vla_grasped_object()
             return
+        if self._cancelled:
+            # smach does not honour a preempt requested before execute(), so the classic pick-up is not started
+            self._execute_result.message += " I stopped picking up. "
+            return
 
         fsm_result = self._fsm.execute()
 
@@ -156,7 +162,8 @@ class PickUp(Action):
         if arm_designator.resolve() is None:
             rospy.logwarn("[VLA] No arm to grasp with, using the classic pick-up")
             return False
-        outcome = NavigateToGrasp(self._robot, arm_designator, self.context.object.designator).execute()
+        self._approach = NavigateToGrasp(self._robot, arm_designator, self.context.object.designator)
+        outcome = self._approach.execute()
         if outcome != 'arrived':
             rospy.logwarn("[VLA] Approaching the object ended with '%s', using the classic pick-up", outcome)
             return False
@@ -182,7 +189,11 @@ class PickUp(Action):
         arm.wait_for_motion_done(cancel=True)
 
     def _cancel(self):
-        if self._fsm.is_running:
+        self._cancelled = True
+        if self._approach is not None:
+            self._approach.request_preempt()
+        cancel_vla(self._robot.robot_name)
+        if self._fsm.is_running():
             self._fsm.request_preempt()
 
 

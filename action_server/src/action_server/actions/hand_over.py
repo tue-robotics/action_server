@@ -1,7 +1,5 @@
 import rospy
 
-from action_server.vla import maybe_run_vla_manipulation
-
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
 
@@ -61,8 +59,6 @@ class HandOver(Action):
 
     def _configure(self, robot, config):
         self._robot = robot
-        self._raw_semantics = dict(config.semantics)
-        self._raw_context = dict(config.context)
 
         # Parse semantics and context to a convenient object
         self.semantics = self._parse_semantics(config.semantics)
@@ -140,18 +136,6 @@ class HandOver(Action):
         arm.occupied_by = None
 
     def _start(self):
-        vla_outcome = maybe_run_vla_manipulation(
-            robot=self._robot,
-            action_name="hand-over",
-            semantics=getattr(self, "_raw_semantics", {}),
-            context=getattr(self, "_raw_context", {}),
-            raw_sentence=getattr(self, "_raw_semantics", {}).get("raw_sentence", ""),
-        )
-        if vla_outcome.used:
-            self._execute_result.succeeded = vla_outcome.succeeded
-            self._execute_result.message = " {} ".format(vla_outcome.message)
-            return
-
         # Handover
         self._handover()
 

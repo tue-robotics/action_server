@@ -10,6 +10,7 @@ from action_server.vla import backends
 # Allow rospy.Time.now() without a running node
 rospy.rostime.set_rostime_initialized(True)
 
+PREFIX = "/hero/action_server/vla/"
 ARM_JOINTS = ["arm_lift_joint", "arm_flex_joint", "arm_roll_joint", "wrist_flex_joint", "wrist_roll_joint"]
 STATE = {
     "arm_lift_joint": 0.1,
@@ -21,14 +22,24 @@ STATE = {
     "head_pan_joint": 0.0,
     "head_tilt_joint": -0.7,
 }
+# Arm joint limits of hsrb4s.urdf: (lower, upper, velocity)
+HSR_ARM_LIMITS = [(0.0, 0.69, 0.2), (-2.62, 0.0, 1.2), (-2.09, 3.84, 2.0), (-1.92, 1.22, 1.5), (-1.92, 3.67, 1.5)]
+HSR_ARM_URDF = '<robot name="hsrb"><link name="link0"/>{}</robot>'.format("".join(
+    '<link name="link{i}"/><joint name="{name}" type="revolute"><parent link="link{parent}"/><child link="link{i}"/>'
+    '<limit lower="{lower}" upper="{upper}" velocity="{velocity}" effort="100"/></joint>'.format(
+        i=i + 1, parent=i, name=name, lower=lower, upper=upper, velocity=velocity)
+    for i, (name, (lower, upper, velocity)) in enumerate(zip(ARM_JOINTS, HSR_ARM_LIMITS))))
+
+
+def get_param(params):
+    """rospy.get_param over the VLA params (by their short name) and the robot params (by their full name)."""
+    return lambda name, default=None: params.get(name[len(PREFIX):] if name.startswith(PREFIX) else name, default)
 
 
 def make_sink(params):
     robot = mock.MagicMock()
     robot.robot_name = "hero"
-    prefix = "/hero/action_server/vla/"
-    with mock.patch.object(backends.rospy, "get_param", lambda name, default=None: params.get(
-            name[len(prefix):], default)), \
+    with mock.patch.object(backends.rospy, "get_param", get_param(params)), \
             mock.patch.object(backends.rospy, "Publisher") as publisher, \
             mock.patch.object(backends.rospy, "Subscriber"):
         publisher.side_effect = lambda topic, *args, **kwargs: mock.MagicMock(topic=topic)
@@ -68,13 +79,31 @@ class TestHSRActionSink(unittest.TestCase):
         rate.assert_called_once_with(10.0)
         self.assertEqual(rate.return_value.sleep.call_count, 3)
 
-    def test_arm_target_respects_joint_limits(self, _is_shutdown, _rate):
-        sink, _ = make_sink({})
+    def test_arm_target_respects_the_urdf_joint_limits(self, _is_shutdown, _rate):
+        sink, _ = make_sink({"/hero/robot_description": HSR_ARM_URDF})
+        sink._joint_states.get.return_value = dict(STATE, arm_flex_joint=-0.1)
         rows = chunk(1)
-        rows[0, 1] = 0.6  # arm_flex delta that would cross its upper limit of 0.0
+        rows[0, 1] = 0.2  # arm_flex delta that would cross its upper limit of 0.0
         sink.play_chunk(rows)
         positions = sink._arm_pub.publish.call_args[0][0].points[0].positions
-        self.assertLessEqual(positions[1], 0.0)
+        self.assertAlmostEqual(positions[1], 0.0)
+
+    def test_arm_delta_is_bounded_by_the_urdf_velocity_limit(self, _is_shutdown, _rate):
+        sink, _ = make_sink({"/hero/robot_description": HSR_ARM_URDF, "arm_lead_time": 0.2})
+        rows = chunk(1)
+        rows[0, 0] = 0.3  # arm_lift moves at most 0.2 m/s, so 0.04 m within the 0.2 s lead
+        sink.play_chunk(rows)
+        positions = sink._arm_pub.publish.call_args[0][0].points[0].positions
+        self.assertAlmostEqual(positions[0], 0.14)
+
+    def test_without_robot_description_the_arm_is_unbounded(self, _is_shutdown, _rate):
+        with mock.patch.object(backends.rospy, "logwarn") as logwarn:
+            sink, _ = make_sink({})
+        logwarn.assert_called_once()
+        rows = chunk(1)
+        rows[0, 1] = 0.6
+        sink.play_chunk(rows)
+        self.assertAlmostEqual(sink._arm_pub.publish.call_args[0][0].points[0].positions[1], 0.1, places=6)
 
     def test_gripper_open_value_is_followed_as_position(self, _is_shutdown, _rate):
         sink, robot = make_sink({})
@@ -92,14 +121,12 @@ class TestHSRActionSink(unittest.TestCase):
         robot.get_arm.return_value.gripper.send_goal.assert_called_once_with("close", timeout=0.0, max_torque=0.26)
         self.assertEqual(sink.gripper_command, "close")
 
-    def test_grasp_is_kept_while_the_column_stays_near_the_object(self, _is_shutdown, _rate):
+    def test_grasp_reopens_when_the_column_rises_above_the_threshold(self, _is_shutdown, _rate):
         sink, robot = make_sink({})
-        rows = chunk(4, gripper=0.3)
-        rows[2:, 5] = 0.6
-        sink.play_chunk(rows)
+        sink.play_chunk(gripper_rows([0.3, 0.6]))
         robot.get_arm.return_value.gripper.send_goal.assert_called_once()
-        sink._gripper_pub.publish.assert_not_called()
-        self.assertEqual(sink.gripper_command, "close")
+        self.assertAlmostEqual(sink._gripper_pub.publish.call_args[0][0].points[0].positions[0], 0.6, places=5)
+        self.assertEqual(sink.gripper_command, "position")
 
     def test_base_velocity_is_clamped_and_braked(self, _is_shutdown, _rate):
         sink, _ = make_sink({"enable_base_motion": True, "max_base_velocity": 0.2})
@@ -132,72 +159,31 @@ class TestHSRActionSink(unittest.TestCase):
         sink._base_pub.publish.assert_not_called()
         robot.head._setHeadReferenceGoal.assert_not_called()
 
-    def test_arm_delta_gain_scales_before_the_cap(self, _is_shutdown, _rate):
-        sink, _ = make_sink({"arm_delta_gain": [5.0, 1.0, 2.5, 2.0, 1.0]})
-        sink.play_chunk(chunk(1))
-        positions = sink._arm_pub.publish.call_args[0][0].points[0].positions
-        # lift 5 * 0.01 is bounded by max_arm_delta 0.04; roll 2.5 * 0.03
-        np.testing.assert_allclose(positions, [0.14, -0.52, 0.075, -1.57, -0.01], atol=1e-6)
-
-    def test_small_delta_holds_the_previous_target(self, _is_shutdown, _rate):
-        sink, _ = make_sink({"arm_hold_threshold": [0.0, 0.0, 0.0, 0.005, 0.0]})
-        # The wrist sags while the policy asks it to stay, then the policy moves it
-        sink._joint_states.get.side_effect = [dict(STATE, wrist_flex_joint=wrist) for wrist in (-1.57, -1.58, -1.59)]
-        rows = chunk(3)
-        rows[:, 3] = [0.001, 0.001, 0.02]
-        sink.play_chunk(rows)
-        wrist = [c[0][0].points[0].positions[3] for c in sink._arm_pub.publish.call_args_list]
-        np.testing.assert_allclose(wrist, [-1.569, -1.569, -1.57], atol=1e-6)
-
-    def test_reset_forgets_the_held_target(self, _is_shutdown, _rate):
-        sink, _ = make_sink({"arm_hold_threshold": 0.005})
-        rows = chunk(1)
-        rows[0, 3] = 0.001
-        sink.play_chunk(rows)
-        sink.reset()
-        sink._joint_states.get.return_value = dict(STATE, wrist_flex_joint=-1.3)
-        sink.play_chunk(rows)
-        self.assertAlmostEqual(sink._arm_pub.publish.call_args[0][0].points[0].positions[3], -1.299, places=6)
-
-    def test_empty_grasp_reopens_at_the_close_threshold(self, _is_shutdown, _rate):
-        sink, robot = make_sink({"grasp_position_threshold": 0.1})
-        sink._joint_states.get.side_effect = [dict(STATE, hand_motor_joint=hand) for hand in (1.0, -0.07, -0.07)]
-        sink.play_chunk(gripper_rows([0.3, 0.6, 0.6]))
-        robot.get_arm.return_value.gripper.send_goal.assert_called_once()
-        self.assertAlmostEqual(sink._gripper_pub.publish.call_args[0][0].points[0].positions[0], 0.6, places=5)
-        self.assertEqual(sink.gripper_command, "position")
-
-    def test_grasp_on_an_object_is_held_in_the_release_band(self, _is_shutdown, _rate):
-        sink, robot = make_sink({"grasp_position_threshold": 0.1})
-        sink._joint_states.get.side_effect = [dict(STATE, hand_motor_joint=hand) for hand in (1.0, 0.55, 0.55)]
-        sink.play_chunk(gripper_rows([0.3, 0.6, 0.6]))
-        robot.get_arm.return_value.gripper.send_goal.assert_called_once()
-        sink._gripper_pub.publish.assert_not_called()
-        self.assertEqual(sink.gripper_command, "close")
-
-    def test_arm_param_of_the_wrong_length_fails_before_moving(self, _is_shutdown, _rate):
-        with self.assertRaises(ValueError):
-            make_sink({"arm_delta_gain": [1.0, 2.0]})
+    def test_stop_ends_the_chunk_before_the_next_row(self, _is_shutdown, _rate):
+        sink, _ = make_sink({"enable_base_motion": True})
+        sink._arm_pub.publish.side_effect = lambda _msg: sink._stop.set()
+        self.assertFalse(sink.play_chunk(chunk(3)))
+        self.assertEqual(sink._arm_pub.publish.call_count, 1)
+        # The base is braked anyway
+        twist = sink._base_pub.publish.call_args[0][0]
+        self.assertEqual((twist.linear.x, twist.linear.y, twist.angular.z), (0.0, 0.0, 0.0))
 
 
 def make_backend(params):
     robot = mock.MagicMock()
     robot.robot_name = "hero"
-    prefix = "/hero/action_server/vla/"
     topics = []
-    with mock.patch.object(backends.rospy, "get_param", lambda name, default=None: params.get(
-            name[len(prefix):], default)), \
+    with mock.patch.object(backends.rospy, "get_param", get_param(params)), \
             mock.patch.object(backends.rospy, "Publisher") as publisher, \
             mock.patch.object(backends.rospy, "Subscriber"):
         publisher.side_effect = lambda topic, *args, **kwargs: topics.append(topic) or mock.MagicMock(topic=topic)
-        backend = backends.SmolVLALocalBackend(robot)
+        backend = backends.SmolVLAWebSocketBackend(robot)
     backend._obs = mock.MagicMock()
     backend._obs.get_observation.return_value = {"state": list(STATE.values()), "instruction": "pick up the apple"}
     backend._sink = mock.MagicMock(gripper_command=None)
     backend._sink.play_chunk.return_value = True
     backend._infer = mock.MagicMock(return_value=chunk(50))
     backend._move_to_start_pose = mock.MagicMock()
-    backend._gripper_occupied = mock.MagicMock(return_value=False)
     return backend, topics
 
 
@@ -223,13 +209,68 @@ class TestRolloutDebugTopic(unittest.TestCase):
         self.assertNotIn("/hero/action_server/vla/debug/query", topics)
 
 
+@mock.patch.object(backends, "ActiveGraspDetector")
+class TestGraspCompletion(unittest.TestCase):
+    def make_grasping_backend(self, params=None, held_for=2.0):
+        """Backend whose sink holds an effort grasp; lift, open and the grasp check are recorded in order."""
+        backend, _ = make_backend(dict({"max_chunks": 2}, **(params or {})))
+        backend._sink.gripper_command = "close"
+        backend._sink.seconds_since_gripper_command.return_value = held_for
+        calls = []
+        backend._lift_arm = mock.MagicMock(side_effect=lambda: calls.append("lift"))
+
+        def open_gripper():
+            calls.append("open")
+            backend._sink.gripper_command = "open"
+        backend._open_gripper = mock.MagicMock(side_effect=open_gripper)
+        return backend, calls
+
+    def test_settled_grasp_is_lifted_then_checked(self, detector):
+        backend, calls = self.make_grasping_backend()
+        detector.return_value.execute.side_effect = lambda: calls.append("check") or "true"
+        result = backend._rollout(pick_up_request())
+        self.assertTrue(result["succeeded"])
+        # The lift comes first: fingers stalled on the table edge must not pass the check
+        self.assertEqual(calls, ["lift", "check"])
+        self.assertEqual(backend._sink.play_chunk.call_count, 1)
+        # The classic check, on the arm the sink drives
+        self.assertIs(detector.call_args[0][1].resolve(), backend._sink.get_arm.return_value)
+
+    def test_unsettled_grasp_is_not_checked(self, detector):
+        backend, calls = self.make_grasping_backend(held_for=0.5)
+        self.assertFalse(backend._rollout(pick_up_request())["succeeded"])
+        detector.assert_not_called()
+        self.assertEqual(calls, [])
+
+    def test_failed_grasp_check_opens_the_gripper_and_continues(self, detector):
+        backend, calls = self.make_grasping_backend()
+        detector.return_value.execute.return_value = "cannot_determine"
+        result = backend._rollout(pick_up_request())
+        self.assertFalse(result["succeeded"])
+        self.assertEqual(backend._sink.play_chunk.call_count, 2)
+        # Opened once, then not checked again until the policy grasps again
+        self.assertEqual(calls, ["lift", "open"])
+
+    def test_grasp_minimum_position_is_passed_to_the_detector(self, detector):
+        backend, _ = self.make_grasping_backend({"grasp_minimum_position": 0.3})
+        detector.return_value.execute.return_value = "true"
+        backend._rollout(pick_up_request())
+        self.assertEqual(detector.call_args[1], {"minimum_position": 0.3})
+
+    def test_detector_default_without_the_param(self, detector):
+        backend, _ = self.make_grasping_backend()
+        detector.return_value.execute.return_value = "true"
+        backend._rollout(pick_up_request())
+        self.assertEqual(detector.call_args[1], {})
+
+
 class TestRetractAfterFailedPickUp(unittest.TestCase):
     def make_episode(self):
         """Backend whose retract steps and cleanup are recorded in order."""
         backend, _ = make_backend({"max_chunks": 1})
         calls = []
-        backend._load_policy = mock.MagicMock()
-        backend._release_policy = mock.MagicMock(side_effect=lambda: calls.append("release policy"))
+        backend._connect = mock.MagicMock()
+        backend._close_policy_socket = mock.MagicMock(side_effect=lambda: calls.append("release policy"))
         backend._open_gripper = mock.MagicMock(side_effect=lambda: calls.append("open"))
         backend._lift_arm = mock.MagicMock(side_effect=lambda: calls.append("lift"))
         backend._move_to_start_pose = mock.MagicMock(side_effect=lambda: calls.append("start pose"))
@@ -249,10 +290,12 @@ class TestRetractAfterFailedPickUp(unittest.TestCase):
         backend.execute(pick_up_request())
         self.assertEqual(calls, ["start pose", "release head", "release policy"])
 
-    def test_no_retract_after_a_grasp(self):
+    @mock.patch.object(backends, "ActiveGraspDetector")
+    def test_no_retract_after_a_grasp(self, detector):
         backend, calls = self.make_episode()
-        backend._gripper_occupied.side_effect = [False, True, True]
-        backend._done_confirm_chunks = 1
+        backend._sink.gripper_command = "close"
+        backend._sink.seconds_since_gripper_command.return_value = 2.0
+        detector.return_value.execute.return_value = "true"
         self.assertTrue(backend.execute(pick_up_request())["succeeded"])
         self.assertNotIn("open", calls)
 
@@ -276,6 +319,23 @@ class TestRetractAfterFailedPickUp(unittest.TestCase):
         result = backend.execute(pick_up_request())
         self.assertFalse(result["succeeded"])
         self.assertEqual(calls[-2:], ["release head", "release policy"])
+
+    def test_cancel_stops_the_rollout_without_retract(self):
+        backend, calls = self.make_episode()
+        backend._max_chunks = 3
+        backend._sink.play_chunk.side_effect = lambda _prefix: backend.cancel() or False
+        result = backend.execute(pick_up_request())
+        self.assertFalse(result["succeeded"])
+        self.assertEqual(result["message"], "VLA rollout cancelled")
+        self.assertEqual(backend._infer.call_count, 1)
+        # Stop means stop: the arm is not moved again
+        self.assertEqual(calls, ["start pose", "release head", "release policy"])
+
+    def test_cancel_is_reset_for_the_next_episode(self):
+        backend, _ = self.make_episode()
+        backend.cancel()
+        backend.execute(pick_up_request())
+        self.assertEqual(backend._infer.call_count, 1)
 
 
 class TestLogChunk(unittest.TestCase):
