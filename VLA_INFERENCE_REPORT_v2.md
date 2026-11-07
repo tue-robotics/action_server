@@ -78,13 +78,15 @@ apple up, because the simulated robot slowly drives itself away during every att
 | Sim evaluation | 2 GPSR runs, eyeballed | 3 controlled rollouts | recorded trial kit (bag + Gazebo ground truth + 1–4 score), staged mode, 2 batches |
 | Answer to (c) | "not working" | "works mechanically, no pick" | "works end to end; grasp quality not measurable until the sim base holds still" |
 
-Code revisions this report is based on (none of them is pushed):
+Code revisions this report is based on. Push state as of 2026-11-07: `action_server`, `hero_bringup` and
+`tue_robocup` are pushed; `per-group-mse-vla` is not (no write access). See `VLA_PR_STATUS.md` in the
+workspace root.
 
 | Repo | Branch | Commits since v1 |
 |---|---|---|
 | `action_server` | `feature/vla` | `2517279` baseline, `05e4ab4` golden test, `e87e410` debug topic, `02e5c81` sim corrections and guards |
 | `per-group-mse-vla` | `feature/vla_implementation` | `8b58877` 8-D state, `b3200ec` state-index validation, `4fde5ee` follow-up |
-| `hero_bringup` | `feature/LUT_for_configuring_yolo_filter` (unrelated branch) | **uncommitted**: `parameters/action_server/vla.yaml`, `launch/action_server.launch` |
+| `hero_bringup` | `feature/LUT_for_configuring_yolo_filter` (unrelated branch) | `9dd1c28` `vla.yaml` + `hybrid` launch default (committed 2026-11-03) |
 
 ---
 
@@ -101,7 +103,7 @@ Code revisions this report is based on (none of them is pushed):
 | Task | "pick up the apple from the dinner table": Find → PickUp |
 | Laptop | RTX 3050 4 GB. The policy uses ~1.1 GB; ED, face recognition and HMI nodes use ~1.6 GB |
 
-### 1.1 Client parameters used in the trials (`vla.yaml`, uncommitted)
+### 1.1 Client parameters used in the trials (`vla.yaml`, committed later as `hero_bringup` `9dd1c28`)
 
 ```yaml
 execution_mode: hybrid          # trials set strict_mode true (no classic fallback)
@@ -467,15 +469,31 @@ the Gazebo robot (caveat C12).
   invalid` (the mesh server URL has an empty host).
 - **Fix:** repair this before any classic-vs-VLA comparison.
 
-### P7. The Docker image is stale
+### P7. The Docker image was stale (resolved 2026-11-07)
 
-- **Symptom:** `smolvla-policy-server:latest` was built on 2026-10-30, before `8b58877`. Its baked-in
-  `policy_server.py` and its default `POLICY_STATE_INDICES=0,1,2,3,4,5` serve a **6-D state without any
-  error**.
-- **Fix:**
-  - rebuild the image;
-  - until then, always bind-mount the repo's `policy_server.py` and set `POLICY_STATE_INDICES=0..7`
-    (`start_policy_server.sh` does both).
+- **Was:** `smolvla-policy-server:latest` (`3cfb1827ed65`) was built on 2026-10-30, before `8b58877`. Its
+  baked-in `policy_server.py` and its default `POLICY_STATE_INDICES=0,1,2,3,4,5` served a **6-D state
+  without any error**.
+- **Done:** rebuilt from `per-group-mse-vla` `4fde5ee` with
+  `docker build -f inference/Dockerfile -t smolvla-policy-server:2026-11-07 .`. Now
+  `smolvla-policy-server:latest` = `:2026-11-07` = `8d5b0336a3e7`, and the old image is kept as
+  `:2026-10-30` for rollback.
+- **Checked:**
+  - the baked `policy_server.py` is identical to the repo at `4fde5ee`;
+  - the default is `POLICY_STATE_INDICES=0,1,2,3,4,5,6,7`;
+  - torch, transformers, lerobot, torchvision and numpy are at the same versions as in the old image.
+- **Still to check:** a start of the new image on the GPU (log `state_dim=8`, `inference/smoke_test.py`
+  answers, `POLICY_STATE_INDICES=0,1,2,3,4,5` refused at startup). It couldn't run on 2026-11-07: the GPU
+  was broken by a suspend/resume (C1) and needs a reboot.
+- **Left over:**
+  - The Dockerfile pins only torch, lerobot, transformers and torchvision. A rebuild nine days later
+    already moved 8 other packages (anyio, click, mypy_extensions, pandas, pyarrow, python-dateutil,
+    regex, typer) and dropped six. Pin them with a constraints file from `pip freeze` of a verified
+    image.
+  - The image contains the 3 `per-group-mse-vla` commits that are not on GitHub yet (no write access, see
+    `VLA_PR_STATUS.md` in the workspace root). A rebuild from GitHub would give the old server again.
+- The bind mount in `start_policy_server.sh` is no longer needed for correctness. It still lets a running
+  container pick up uncommitted server edits.
 
 ### P8. Port 8000 conflict
 
@@ -550,8 +568,9 @@ the Gazebo robot (caveat C12).
   - never bag raw images or the unthrottled `/gazebo/model_states`.
 
 **Policy server**
-- **C5.** The image is stale and silently serves a 6-D state (P7). Look for `state_dim=8` in the
-  startup log.
+- **C5.** Images built before 2026-11-07 (`smolvla-policy-server:2026-10-30`, and any container started
+  from it without the bind mount and `POLICY_STATE_INDICES`) silently serve a 6-D state (P7, now
+  resolved for `:latest`). Always look for `state_dim=8` in the startup log.
 - **C6.** Port 8000 is taken by the mobile UI (P8).
 - **C7.** `config.json` of the checkpoint says state dim 6. That is stale: the normalisation statistics
   and `state_proj` weights are 8-D.
@@ -599,12 +618,16 @@ the Gazebo robot (caveat C12).
   (navigation). During the VLA rollout it killed valid trials.
 
 **Repos**
-- **C23.** `hero_bringup`'s `vla.yaml` and launch change are uncommitted, on the unrelated branch
-  `feature/LUT_for_configuring_yolo_filter`. The `hybrid` default in `action_server.launch` is the
-  owner's edit; keep it.
-- **C24.** `tue_robocup` (`feat/vla-grasp`) carries uncommitted changes from the older VLAGrasp path
-  (`robot_skills` arms/base/hero/mockbot and others). They load at runtime. That path is gated by
-  `/hero/skills/vla/grasp_mode`, default `off`. Every trial's `code.diff` records them.
+- **C23.** `hero_bringup`'s `vla.yaml` and launch change live on the unrelated branch
+  `feature/LUT_for_configuring_yolo_filter` (`9dd1c28`). The `hybrid` default in `action_server.launch`
+  is the owner's edit; keep it. The shared `vla.yaml` carries the **sim-only** arm corrections
+  (`arm_delta_gain`, `arm_hold_threshold`). Move them to a sim override, or neutralize them, before any
+  real-robot run (C15).
+- **C24.** `tue_robocup` `feat/vla-grasp` has the older VLAGrasp path committed as a snapshot
+  (`f1194f226`; `robot_skills` vla_policy/vla_chunk, a `Hero` body part, a Grab hook gated by
+  `/hero/skills/vla/grasp_mode`, default `off`). The checkout also carries **uncommitted live copies**
+  of `gpsr.py` and the #1372 files on purpose; they are identical to `fix/gpsr-single-listen` and
+  `feature/swap-object-confidence-source`. Every trial's `code.diff` records them.
 - **C25.** `action_server/vla_last_report` holds the owner's notes. Keep it untracked.
 
 ---
@@ -636,9 +659,10 @@ the Gazebo robot (caveat C12).
    ("get the apple from the dinner table") in hybrid + strict.
 9. **Classic baseline** (P6), then classic vs VLA with `report.py`.
 10. **Housekeeping:**
-    - commit `vla.yaml` and the launch default on the right `hero_bringup` branch;
-    - push `feature/vla` and `feature/vla_implementation`, then PRs;
-    - rebuild the image;
+    - get write access to `tue-robotics/per-group-mse-vla` and push `feature/vla_implementation`;
+    - open the PRs (none is open yet; see `VLA_PR_STATUS.md`);
+    - after a reboot, run the GPU start-up check of the rebuilt image (P7), and pin the Dockerfile's
+      floating dependencies;
     - settle the policy port;
     - put `~/vla/compare` under version control.
 

@@ -80,7 +80,7 @@ Runtime boundary (unchanged), now with ports:
 
 ```text
 ROS Noetic, Python 3.8                     Docker smolvla-policy-server, Python 3.12
-  action_server (VS Code debugpy)  --ws:8001-->  policy_server.py (bind-mounted from the repo)
+  action_server (VS Code debugpy)  --ws:8001-->  policy_server.py (baked into the image since 2026-11-07)
   cameras + 8-D joint state                     LeRobot 0.5.1 + SmolVLA, CUDA, ~340 ms/query
   arm/gripper/base topics        <--(50,11)---   checkpoint per-group-mse-smolvla
 ```
@@ -91,15 +91,16 @@ Host port 8000 is taken by `hero-start`'s `tue_mobile_ui` webserver, so the poli
 
 ## Repos, branches and commits
 
-Nothing is pushed. The branches are ahead of their remotes: `action_server` by 8 commits (including a
-merge from master), `per-group-mse-vla` by 3.
+Push state as of 2026-11-07: `action_server`, `hero_bringup` and `tue_robocup` are pushed.
+`per-group-mse-vla` (3 commits) is not: PanosBn has no write access to the `tue-robotics` fork. No PR is
+open yet. Details are in `VLA_PR_STATUS.md` in the workspace root.
 
 | Repo | Branch | Commits / state |
 |---|---|---|
 | `action_server` | `feature/vla` | `2517279` "Stream relative actions at 10 Hz, 8-D state, grasp completion and start pose" (baseline of the earlier uncommitted work); `05e4ab4` "Golden test of the action sink against the official AIRoA HSR client"; `e87e410` "Opt-in debug topic with every policy query"; `02e5c81` "Sim arm corrections, empty-grasp release, retract and approach guards". On top of `b57d409` (merge of master, includes the "received DONE twice" fix in `client.py`) |
 | `per-group-mse-vla` | `feature/vla_implementation` | `8b58877` "Serve the 8-D state the per-group-mse-smolvla checkpoint was trained on"; `b3200ec` "Validate state_indices against the normalisation statistics"; `4fde5ee` "Drop the state length check that startup validation makes redundant" |
-| `hero_bringup` | `feature/LUT_for_configuring_yolo_filter` (unrelated) | **uncommitted**: `parameters/action_server/vla.yaml` (all new params), `launch/action_server.launch` (`execution_mode` default `hybrid`, the owner's edit) |
-| `tue_robocup` | `feat/vla-grasp` | not part of this integration. It has uncommitted changes from an older VLAGrasp path, gated by `/hero/skills/vla/grasp_mode` (default `off`) |
+| `hero_bringup` | `feature/LUT_for_configuring_yolo_filter` (unrelated) | `9dd1c28`: `parameters/action_server/vla.yaml` (all new params) and `launch/action_server.launch` (`execution_mode` default `hybrid`, the owner's edit); `6003046`: yolo_model path fix |
+| `tue_robocup` | `feat/vla-grasp` | not part of this integration: `f1194f226` is a snapshot of an older VLAGrasp path, gated by `/hero/skills/vla/grasp_mode` (default `off`). The checkout also has uncommitted live copies of the GPSR and #1372 fixes |
 | trial kit | `~/vla/compare` | **not under git**: `trial.py`, `run_trials.sh`, `score_runs.py`, `report.py`, `start_policy_server.sh`, `README.md` |
 
 ---
@@ -275,12 +276,12 @@ Kept from v1: `as_rgb_uint8`, `pack_image_binary`/`unpack_image_binary`, `grippe
     Before this, 6 indices on the 8-D checkpoint were silently accepted, and the model got the mean head
     pose.
   - `4fde5ee`: removed the now-dead length check in `_select_state`.
-- `inference/Dockerfile`: `POLICY_STATE_INDICES=0,1,2,3,4,5,6,7` (the image is **not rebuilt yet**; see
-  the caveats).
+- `inference/Dockerfile`: `POLICY_STATE_INDICES=0,1,2,3,4,5,6,7`. The image was rebuilt from `4fde5ee` on
+  2026-11-07: `smolvla-policy-server:latest` = `:2026-11-07`, and the old image is kept as `:2026-10-30`.
 - `inference/local_smoke_test.py`: 8-D.
 - `inference/test_policy_server.py` (new): 11 offline tests with a fake LeRobot factory.
 
-## Files changed: hero_bringup (uncommitted)
+## Files changed: hero_bringup (`9dd1c28`, `6003046`)
 
 `parameters/action_server/vla.yaml` is the full deployed configuration (see the parameter table). Its
 comments explain each value. `launch/action_server.launch` defaults `execution_mode` to `hybrid`
@@ -451,8 +452,10 @@ docker run --rm --gpus all \
   -p 8001:8000 smolvla-policy-server
 ```
 
-Check the server log for `state_dim=8`. The bind mount is needed until the image is rebuilt: the current
-image bakes an older `policy_server.py` and the 6-D default.
+Check the server log for `state_dim=8`. Since the 2026-11-07 rebuild, the bind mount and
+`POLICY_STATE_INDICES` are no longer needed for correctness: the image bakes the validated server and the
+8-D default. The bind mount still lets the container run uncommitted server edits. Containers started
+from the old `:2026-10-30` image still need both.
 
 ### Recorded trials, no action-server process
 
@@ -524,7 +527,10 @@ code:
 
 1. **The backend reads its params once per process** (provider cache). The VS Code debug launch loads
    none, `rosparam load vla.yaml` resets `policy_url` to 8000, and `strict_mode` isn't in the yaml.
-2. **Docker image stale**: it silently serves 6-D without the bind mount. Rebuild it.
+2. **Docker image**: rebuilt on 2026-11-07 (P7 in the inference report).
+   - Containers from the old `:2026-10-30` image still serve 6-D without the bind mount.
+   - The Dockerfile pins only torch, lerobot, transformers and torchvision, so rebuilds drift.
+   - A rebuild from GitHub lacks the 3 unpushed `per-group-mse-vla` commits.
 3. **Port 8000** is the mobile UI's.
 4. **The golden test mirrors `vla.yaml`** on purpose: change both together.
 5. **`execution_mode: vla` bypasses the approach guard** (`_VLADelegatedAction`). Add the guard there or
@@ -533,19 +539,23 @@ code:
    collision avoidance. Keep base motion off on hardware until it has been tested on blocks.
 7. **Sim-only values** (`arm_delta_gain`, `arm_hold_threshold`, `grasp_position_threshold`) must be
    re-measured on the real HSR. An empty real grasp reads about −0.8, not −0.07…0.17.
-8. **`tue_robocup` has uncommitted runtime changes** (old VLAGrasp path); `grasp_mode` must stay `off`.
+8. **`tue_robocup` `feat/vla-grasp` contains the old VLAGrasp path** (committed snapshot `f1194f226`);
+   `grasp_mode` must stay `off`.
 9. **The trial kit is outside git**, so `code.diff` per run is the only record of what ran.
 
 ---
 
 ## TODOs (integration)
 
-1. **Commit and push**:
-   - `vla.yaml` and the launch default on the right `hero_bringup` branch (the owner decides which);
-   - push `action_server` `feature/vla` and `per-group-mse-vla` `feature/vla_implementation`;
-   - open PRs.
-2. **Rebuild** `smolvla-policy-server` (bakes the 8-D default and the validated server). Settle the
-   policy port (8001 in sim) in `vla.yaml` or in the docs.
+1. **Push and PRs**:
+   - get write access, then push `per-group-mse-vla` `feature/vla_implementation`;
+   - open the PRs.
+
+   Everything else is pushed (see `VLA_PR_STATUS.md`).
+2. **Policy image**, rebuilt 2026-11-07:
+   - after a reboot, run its GPU start-up check;
+   - pin the Dockerfile's floating dependencies;
+   - settle the policy port (8001 in sim) in `vla.yaml` or in the docs.
 3. **Completion**: calibrate `grasp_position_threshold` (~0.3) and add a post-lift confirmation.
 4. **Stop and cancel**:
    - a per-tick stop flag in the rollout (zero Twist, hold the arm);
@@ -585,7 +595,7 @@ checkpoint author) are in the inference report v2 §9.
 - "Docker deployment": `POLICY_STATE_INDICES` "defaults to `0,1,2,3,4,5`" is the stale image. The repo
   default is now `0..7`, and `-p 8000:8000` conflicts with the mobile UI.
 - "Plain `hero-free-mode` defaults to classic mode": `action_server.launch` now defaults to `hybrid`
-  (uncommitted owner edit).
+  (the owner's edit, committed in `hero_bringup` `9dd1c28`).
 - "Key ROS parameters": `max_chunks` 20 → 60; `enabled_actions` default pick-up only; many new params
   (table above).
 - "Current rollout audit": "hybrid hooks run before classic navigation" is fixed for pick-up
