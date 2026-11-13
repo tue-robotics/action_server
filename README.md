@@ -131,6 +131,51 @@ The Action life cycle consists of the following phases:
     - performing the actual behavior
     - checking the result and returning appropriate information
 
+## LLM task planner
+
+`action_server.llm` turns a command in natural language into a recipe with a language model. `LLM_PROVIDER` chooses
+the service: `openai` (also any server that speaks the OpenAI API) and `azure` go through the OpenAI SDK; `foundry`
+(Claude in Microsoft Foundry) and `anthropic` go through the Messages API, because Claude models have no OpenAI-style
+endpoint there.
+
+```python
+from action_server.llm import LLMPlanner
+
+plan = LLMPlanner.from_settings().plan("could you get me a pepsi")
+plan.recipe  # {"actions": [{"action": "hand-over", "object": {"type": "coke"}, ...}]}
+plan.reply   # "I will bring you a coke, I do not have pepsi."
+```
+
+The model does not write the recipe itself. Per step it fills in one action and five roles (`object`, `person`,
+`source`, `destination`, `sentence`), and every role except the sentence is a choice from the names in
+`robocup_knowledge` for the active `ROBOT_ENV`. With structured output the model therefore cannot name something the
+robot does not know. `schema.compile_plan` translates the steps to the recipe. A plan also has a `status`: when the
+command is unclear or not something the robot can do, there is no recipe and `reply` says why.
+
+The [conversation_engine](https://github.com/tue-robotics/conversation_engine) uses the planner when its `parser`
+parameter is `llm`. When the robot asked something about a command, the planner gets the question and the answer
+with the command, `planner.plan(command, follow_ups=[(question, answer)])`, and plans the whole command again.
+
+| What | Where |
+|---|---|
+| Service, model and API key | `.env/llm.env`, see [.env/README.md](.env/README.md) |
+| Instructions for the model, per robot | `<robot>_bringup/parameters/llm/task_planner.md` |
+| Actions the planner can use | `ACTIONS` in [schema.py](action_server/src/action_server/llm/schema.py) |
+
+The `openai` and `azure` providers need the OpenAI SDK, `pip install openai` (2.2.0 is the newest release for the
+Python 3.8 of ROS Noetic). The Claude providers only need `requests`: the Anthropic SDK has no release for Python 3.8
+with the Foundry client or structured output. Check the settings without a robot:
+
+```bash
+rosrun action_server llm_smoke_test.py --ping          # one tiny request: are the key, the address and the model right?
+rosrun action_server llm_smoke_test.py                 # plans a few commands
+rosrun action_server llm_smoke_test.py --configure "bring me a coke"   # also: does the action server accept the recipe?
+rosrun action_server llm_smoke_test.py --show-prompt   # what the model receives; makes no request
+```
+
+`--configure` gives each recipe to the task manager with the mock robot, so it needs a roscore but no simulator. It
+prints the actions the action server makes of the recipe, for example `Find > PickUp > NavigateTo > HandOver`.
+
 ## FAQ
 
  - **Why json?**
