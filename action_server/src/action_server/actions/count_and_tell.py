@@ -1,7 +1,7 @@
 import rospy
 
-import robot_smach_states as states
 import robot_smach_states.util.designators as ds
+from robot_smach_states.count_objects_on_location import InspectAndCount
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
 
@@ -42,10 +42,10 @@ class CountAndTell(Action):
         self._count_designator = ds.VariableDesignator(-1)
         self._where_to_count_designator = ds.EntityByIdDesignator(robot, uuid=semantics.location.id)
         self._what_to_count_designator = ds.Designator(semantics.object.type)
-        self._count_state_machine = states.InspectAndCount(robot,
-                                                           self._where_to_count_designator,
-                                                           self._what_to_count_designator,
-                                                           self._count_designator)
+        self._count_state_machine = InspectAndCount(robot,
+                                                    self._where_to_count_designator,
+                                                    self._what_to_count_designator,
+                                                    self._count_designator)
 
         # Here we set up a message that is formatted further later, in self._start
         self._execute_result.message = "I counted {{c}} {t}s on the {l}".format(t=semantics.object.type,

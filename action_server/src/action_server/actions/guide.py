@@ -1,7 +1,7 @@
 import rospy
 
-import robot_smach_states as states
 import robot_smach_states.util.designators as ds
+from robot_smach_states.navigation import NavigateToSymbolic
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
 
@@ -83,11 +83,11 @@ class Guide(Action):
         if self._semantics.target_location.type == "room":
             area = "in"
 
-        self._guide_state_machine = states.NavigateToSymbolic(robot=self._robot,
-                                                              entity_designator_area_name_map={
-                                                                  target_location_designator: area
-                                                              },
-                                                              entity_lookat_designator=target_location_designator)
+        self._guide_state_machine = NavigateToSymbolic(robot=self._robot,
+                                                       entity_designator_area_name_map={
+                                                           target_location_designator: area
+                                                       },
+                                                       entity_lookat_designator=target_location_designator)
 
         self._config_result.succeeded = True
 
