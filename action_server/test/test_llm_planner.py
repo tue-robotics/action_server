@@ -8,6 +8,7 @@ from action_server.action_factory import ActionFactory
 from action_server.llm import BackendError, ClaudeBackend, LLMPlanner, OpenAIBackend, PlanError, Settings, \
     SettingsError, Vocabulary, build_plan_schema, compile_plan, load_settings
 from action_server.llm.backend import Completion
+from action_server.llm.claude_code_backend import ClaudeCodeBackend
 from action_server.llm.planner import create_backend
 from action_server.llm.knowledge import KnowledgeError, render_prompt
 from action_server.llm.schema import ACTIONS
@@ -363,6 +364,88 @@ class TestClaudeBackend(unittest.TestCase):
         self.assertNotIn("secret", str(context.exception))
 
 
+class StubRun(object):
+    """Stands in for subprocess.run; remembers the command and prints the given answer of the Claude Code CLI"""
+
+    def __init__(self, answer=None, returncode=0, stderr=""):
+        self.answer = answer if answer is not None else {
+            "type": "result", "subtype": "success", "is_error": False, "stop_reason": "end_turn",
+            "result": '{"status":"ok"}', "structured_output": {"status": "ok"},
+            "usage": {"input_tokens": 2, "cache_creation_input_tokens": 800, "cache_read_input_tokens": 0,
+                      "output_tokens": 5}}
+        self.returncode = returncode
+        self.stderr = stderr
+        self.command = None
+        self.kwargs = None
+
+    def __call__(self, command, **kwargs):
+        self.command = command
+        self.kwargs = kwargs
+        stdout = self.answer if isinstance(self.answer, str) else json.dumps(self.answer)
+        return SimpleNamespace(returncode=self.returncode, stdout=stdout, stderr=self.stderr)
+
+    def option(self, name):
+        return self.command[self.command.index(name) + 1]
+
+
+class TestClaudeCodeBackend(unittest.TestCase):
+    SCHEMA = TestBackend.SCHEMA
+    MESSAGES = TestBackend.MESSAGES
+
+    def _settings(self, **overrides):
+        settings = Settings(provider="claude_code", model="haiku", api_key=None, timeout=60.0)
+        for name, value in overrides.items():
+            setattr(settings, name, value)
+        return settings
+
+    def test_asks_for_structured_output_without_tools(self):
+        run = StubRun()
+        completion = ClaudeCodeBackend(self._settings(), run).complete("instructions", self.MESSAGES, self.SCHEMA)
+
+        self.assertEqual({"status": "ok"}, json.loads(completion.text))
+        self.assertEqual((802, 5), (completion.prompt_tokens, completion.completion_tokens))
+        self.assertEqual(["claude", "-p"], run.command[:2])
+        self.assertEqual(self.SCHEMA, json.loads(run.option("--json-schema")))
+        self.assertEqual(("instructions", "haiku", "", "", "json"),
+                         (run.option("--system-prompt"), run.option("--model"), run.option("--tools"),
+                          run.option("--setting-sources"), run.option("--output-format")))
+        self.assertEqual(self.MESSAGES[0]["content"], run.kwargs["input"])
+        self.assertEqual(60.0, run.kwargs["timeout"])
+
+    def test_a_corrected_plan_writes_out_the_conversation(self):
+        run = StubRun()
+        messages = self.MESSAGES + [{"role": "assistant", "content": "{}"},
+                                    {"role": "user", "content": "That plan cannot be executed"}]
+        ClaudeCodeBackend(self._settings(), run).complete("instructions", messages, self.SCHEMA)
+        self.assertEqual("User: {}\n\nYou: {{}}\n\nUser: That plan cannot be executed".format(
+            self.MESSAGES[0]["content"]), run.kwargs["input"])
+
+    def test_json_object_puts_the_schema_in_the_instructions(self):
+        run = StubRun(dict(StubRun().answer, structured_output=None))
+        completion = ClaudeCodeBackend(self._settings(response_format="json_object", model=None), run).complete(
+            "instructions", self.MESSAGES, self.SCHEMA)
+        self.assertEqual('{"status":"ok"}', completion.text)
+        self.assertNotIn("--json-schema", run.command)
+        self.assertNotIn("--model", run.command)
+        self.assertIn(json.dumps(self.SCHEMA), run.option("--system-prompt"))
+
+    def test_failures_are_backend_errors(self):
+        for reason, run in [
+                ("not logged in", StubRun({"is_error": True, "subtype": "success",
+                                           "result": "Not logged in · Please run /login"}, returncode=1)),
+                ("no JSON", StubRun("error: unknown option", returncode=1)),
+                ("no answer", StubRun({"is_error": False, "result": ""}))]:
+            with self.assertRaises(BackendError, msg=reason):
+                ClaudeCodeBackend(self._settings(), run).complete("instructions", self.MESSAGES, self.SCHEMA)
+
+    def test_missing_cli_names_the_setting(self):
+        def run(command, **kwargs):
+            raise OSError("No such file or directory")
+        with self.assertRaises(BackendError) as context:
+            ClaudeCodeBackend(self._settings(), run).ping()
+        self.assertIn("CLAUDE_CODE_PATH", str(context.exception))
+
+
 class TestSettings(unittest.TestCase):
     def _env_file(self, text):
         handle, path = tempfile.mkstemp(suffix=".env")
@@ -413,6 +496,11 @@ class TestSettings(unittest.TestCase):
         self.assertIsInstance(create_backend(Settings("foundry", "m", "k", base_url="https://x/anthropic")),
                               ClaudeBackend)
         self.assertIsInstance(create_backend(Settings("openai", "m", "k")), OpenAIBackend)
+        self.assertIsInstance(create_backend(Settings("claude_code", None, None)), ClaudeCodeBackend)
+
+    def test_claude_code_needs_no_key_nor_model(self):
+        settings = load_settings(self._env_file("LLM_PROVIDER=claude_code\n"), environ={})
+        self.assertEqual((None, None, "claude"), (settings.model, settings.api_key, settings.claude_code_path))
 
     def test_missing_key_names_the_setting_and_the_file(self):
         path = self._env_file("LLM_MODEL=some-model\nOPENAI_API_KEY=\n")

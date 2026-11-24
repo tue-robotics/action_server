@@ -15,12 +15,14 @@ ENV_FILE_VARIABLE = "ACTION_SERVER_LLM_ENV_FILE"
 _REPOSITORY = Path(__file__).resolve().parents[4]
 DEFAULT_ENV_FILE = _REPOSITORY / ".env" / "llm.env"
 
-#: openai and azure are called with the OpenAI SDK, anthropic and foundry (Claude models) with the Messages API
-PROVIDERS = ("openai", "azure", "anthropic", "foundry")
+#: openai and azure are called with the OpenAI SDK, anthropic and foundry (Claude models) with the Messages API,
+#: claude_code with the Claude Code CLI and its login (for development)
+PROVIDERS = ("openai", "azure", "anthropic", "foundry", "claude_code")
 CLAUDE_PROVIDERS = ("anthropic", "foundry")
 RESPONSE_FORMATS = ("json_schema", "json_object")
 
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+CLAUDE_CODE_PATH = "claude"
 
 
 class SettingsError(Exception):
@@ -29,7 +31,8 @@ class SettingsError(Exception):
 
 class Settings(object):
     def __init__(self, provider, model, api_key, base_url=None, azure_endpoint=None, api_version=None,
-                 timeout=20.0, temperature=None, effort=None, response_format="json_schema", knowledge_file=None):
+                 timeout=20.0, temperature=None, effort=None, response_format="json_schema", knowledge_file=None,
+                 claude_code_path=CLAUDE_CODE_PATH):
         self.provider = provider
         self.model = model
         self.api_key = api_key
@@ -41,10 +44,16 @@ class Settings(object):
         self.effort = effort
         self.response_format = response_format
         self.knowledge_file = knowledge_file
+        self.claude_code_path = claude_code_path
 
     def describe(self):
         """One line for logs. Never contains the key."""
-        where = self.azure_endpoint if self.provider == "azure" else (self.base_url or "api.openai.com")
+        if self.provider == "azure":
+            where = self.azure_endpoint
+        elif self.provider == "claude_code":
+            where = self.claude_code_path
+        else:
+            where = self.base_url or "api.openai.com"
         if self.effort:
             where += " effort=" + self.effort
         return "provider={} model={} endpoint={} response_format={}".format(
@@ -137,7 +146,8 @@ def load_settings(env_file=None, environ=None):
             ", ".join(RESPONSE_FORMATS), response_format))
 
     settings = Settings(provider=provider,
-                        model=require("LLM_MODEL"),
+                        # Claude Code has a default model; the services need one
+                        model=get("LLM_MODEL") if provider == "claude_code" else require("LLM_MODEL"),
                         api_key=None,
                         timeout=number("LLM_TIMEOUT", 20.0),
                         temperature=number("LLM_TEMPERATURE", None),
@@ -162,6 +172,9 @@ def load_settings(env_file=None, environ=None):
         else:
             raise SettingsError("Set ANTHROPIC_FOUNDRY_RESOURCE or ANTHROPIC_FOUNDRY_BASE_URL in {} or in the "
                                 "environment.".format(env_file))
+    elif provider == "claude_code":
+        # No key: Claude Code uses its own login
+        settings.claude_code_path = get("CLAUDE_CODE_PATH") or CLAUDE_CODE_PATH
     else:
         settings.api_key = require("OPENAI_API_KEY")
         settings.base_url = get("OPENAI_BASE_URL")

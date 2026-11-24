@@ -7,6 +7,7 @@ import rospy
 
 from .backend import OpenAIBackend
 from .claude_backend import ClaudeBackend
+from .claude_code_backend import ClaudeCodeBackend
 from .knowledge import describe_vocabulary, find_knowledge_file, load_vocabulary, render_prompt
 from .schema import PlanError, SAY_KEYWORDS, STATUS_OK, build_plan_schema, compile_plan, describe_actions
 from .settings import CLAUDE_PROVIDERS, load_settings
@@ -17,6 +18,8 @@ def create_backend(settings):
     :param settings: Settings
     :return: the backend for the provider in the settings
     """
+    if settings.provider == "claude_code":
+        return ClaudeCodeBackend(settings)
     if settings.provider in CLAUDE_PROVIDERS:
         return ClaudeBackend(settings)
     return OpenAIBackend(settings)

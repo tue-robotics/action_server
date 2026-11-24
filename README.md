@@ -164,7 +164,9 @@ with the command, `planner.plan(command, follow_ups=[(question, answer)])`, and 
 
 The `openai` and `azure` providers need the OpenAI SDK, `pip install openai` (2.2.0 is the newest release for the
 Python 3.8 of ROS Noetic). The Claude providers only need `requests`: the Anthropic SDK has no release for Python 3.8
-with the Foundry client or structured output. Check the settings without a robot:
+with the Foundry client or structured output. For development without access to those services, `claude_code` runs
+the Claude Code CLI with its own login (`claude`, then `/login`); it needs no key, and each request takes a few seconds
+more. Check the settings without a robot:
 
 ```bash
 rosrun action_server llm_smoke_test.py --ping          # one tiny request: are the key, the address and the model right?
