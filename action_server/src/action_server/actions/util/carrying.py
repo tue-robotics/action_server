@@ -61,7 +61,16 @@ def object_to_fetch(semantics, context):
     return wanted
 
 
-def _place_key(location):
+def _place_identity(location):
+    """
+    What makes two location dicts the same place for reached(): the id, the type, and for a person the id of where
+    they are. Other fields (a designator, an area, 'navigated-to') are left out, so they do not make two dicts of the
+    same place differ.
+
+    Examples: {'id': 'cabinet', 'type': 'furniture', 'designator': <...>} -> ('cabinet', 'furniture', None);
+    {'type': 'person', 'id': 'anna', 'location': {'id': 'kitchen'}} -> ('anna', 'person', 'kitchen'), which is another
+    place than Anna in the bedroom.
+    """
     nested = location.get("location")
     return (location.get("id"), location.get("type"), nested.get("id") if isinstance(nested, dict) else None)
 
@@ -83,4 +92,4 @@ def reached(context, target):
         return False
     if target.get("type") == REFERENCE:
         return True
-    return bool(location.get("navigated-to")) and _place_key(location) == _place_key(target)
+    return bool(location.get("navigated-to")) and _place_identity(location) == _place_identity(target)

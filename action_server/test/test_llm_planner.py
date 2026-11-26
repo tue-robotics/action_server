@@ -533,11 +533,13 @@ def attributes(**given):
 
 
 class TestPersonAttributes(unittest.TestCase):
-    def test_the_same_values_as_robot_smach_states(self):
+    def test_the_schema_offers_the_attributes_of_robot_smach_states(self):
         """The planner offers exactly the attributes that FindPeople can check (or knows it cannot)"""
         from robot_smach_states.util.entity_descriptions import PERSON_ATTRIBUTES
-        from action_server.llm.schema import PERSON_ATTRIBUTE_VALUES
-        self.assertEqual(PERSON_ATTRIBUTES, PERSON_ATTRIBUTE_VALUES)
+        offered = build_plan_schema(VOCABULARY)["$defs"]["person_attributes"]["properties"]
+        self.assertEqual(set(PERSON_ATTRIBUTES), set(offered))
+        for name, values in PERSON_ATTRIBUTES.items():
+            self.assertEqual(set(values), set(offered[name]["anyOf"][0]["enum"]), name)
 
     def test_find_a_described_person(self):
         self.assertEqual([{"action": "find", "object": {"type": "person", "attributes": {"gesture": "waving"}},

@@ -12,6 +12,7 @@ name an action, object, place or person that the robot does not know. compile_pl
 turns the frames into the recipe, and is the one place that knows how the action server
 wants an entity described ({"type": "person", "id": "operator"}, {"type": "reference"}, ...).
 """
+from robot_smach_states.util.entity_descriptions import PERSON_ATTRIBUTES as _PERSON_ATTRIBUTE_VALUES
 
 OBJECT = "object"
 PERSON = "person"
@@ -20,16 +21,13 @@ DESTINATION = "destination"
 SENTENCE = "sentence"
 ROLES = (OBJECT, PERSON, SOURCE, DESTINATION, SENTENCE)
 
-#: How the person of a step looks or what they do, for a person without a known name ("the waving person")
+#: The name of the role (a key of a step) that holds how the person of a step looks or what they do, for a person
+#: without a known name ("the waving person"). Like OBJECT and PERSON above, this is only a key, not the values.
 PERSON_ATTRIBUTES = "person_attributes"
-#: The attributes and their values, from the rulebook. Must equal PERSON_ATTRIBUTES of
-#: robot_smach_states.util.entity_descriptions, which checks them against what perception sees (a test checks this).
-PERSON_ATTRIBUTE_VALUES = {
-    "gesture": ("waving", "raising_left_arm", "raising_right_arm", "pointing_left", "pointing_right"),
-    "pose": ("sitting", "standing", "lying"),
-    "clothing_color": ("black", "blue", "gray", "orange", "red", "white", "yellow"),
-    "garment": ("blouse", "coat", "jacket", "shirt", "sweater", "t_shirt"),
-}
+#: The attributes and their allowed values (from the rulebook), e.g. {'gesture': ('waving', ...), 'pose': (...)}.
+#: There is one list, in robot_smach_states, which also checks them against what perception sees; the schema offers
+#: the model exactly those values.
+PERSON_ATTRIBUTE_VALUES = _PERSON_ATTRIBUTE_VALUES
 
 #: The object handled by the previous step ("it")
 PREVIOUS_OBJECT = "it"

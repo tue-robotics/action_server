@@ -10,6 +10,10 @@ The TaskManager sets up a state machine according to a task recipe and executes 
 
 #: How often one action may ask for a prior action before configuring gives up. A normal task needs a few (place asks
 #: for a pick-up, which asks for a find); more means the actions keep asking each other, which would never end.
+#: Example that hung the action server before: "find a drink, then hand it over". Hand-over asked for a pick-up of the
+#: drink because it did not count the found drink as held; the pick-up said it was already held and gave back the same
+#: context; hand-over asked again, forever. The rules now agree (actions/util/carrying.py); this limit turns any such
+#: disagreement left into " I could not work out how to do that. " instead of a frozen robot.
 MAX_PRIOR_ACTIONS = 10
 
 
