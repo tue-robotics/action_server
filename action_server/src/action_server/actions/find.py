@@ -38,14 +38,21 @@ class Find(Action):
         self._robot.head.cancel_goal()
         self._robot.base.force_drive(0, 0, math.copysign(1, th) * vth, abs(th / vth))
 
+        # Only AMIGO has a rightArm with this pointing trajectory; HERO turns towards the person and says so. Before,
+        # this raised AttributeError on HERO, so finding a person never succeeded there.
+        right_arm = getattr(self._robot, "rightArm", None)
+        if right_arm is None:
+            self._robot.speech.speak("You're right there!")
+            return
+
         self._robot.speech.speak("I will point at you now.")
 
         self._robot.head.look_at_ground_in_front_of_robot(distance=100)
-        self._robot.rightArm._send_joint_trajectory([[-0.2, -0.5, 0.2, 2.0, 0, 0.1, 0.0]])
+        right_arm._send_joint_trajectory([[-0.2, -0.5, 0.2, 2.0, 0, 0.1, 0.0]])
 
         self._robot.speech.speak("You're right there!")
 
-        self._robot.rightArm.send_joint_goal('reset')
+        right_arm.send_joint_goal('reset')
 
     class Semantics:
         def __init__(self):
