@@ -3,6 +3,7 @@ import rospy
 from robot_skills.arm.arms import GripperTypes
 from robot_smach_states.manipulation import Grab
 from robot_smach_states.util.designators import UnoccupiedArmDesignator
+from robot_smach_states.util.entity_descriptions import description_satisfies
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
 
@@ -65,21 +66,15 @@ class PickUp(Action):
         semantics = PickUp._parse_semantics(config.semantics)
         context = PickUp._parse_context(config.context)
 
-        # Check if a previous action had us find the object already...
+        # Check if a previous action had us find the object already: a find of {'type': 'coke'} provides what a
+        # pick-up of {'type': 'coke'} or {'category': 'drink'} asks for; a find of {'category': 'drink'} provides a
+        # drink, but not necessarily a coke (see robot_smach_states.util.entity_descriptions.description_satisfies)
         object_found = False
         if context.object:  # we got some object from a previous action
-            if semantics.object.type:  # we got some sort of type, could still be a reference...
-                if semantics.object.type != 'reference':  # an object type was specified in the task
-                    if semantics.object.type == context.object.type:  # then they need to be the same
-                        object_found = True
-                else:  # the object was a reference, then we don't care what the type of context object is
-                    object_found = True
-            elif semantics.object.category:  # no type, but a category was specified
-                # Then the context object must be one of that category
-                if self._knowledge.get_object_category(context.object.type) == semantics.object.category:
-                    object_found = True
-                if context.object.category == semantics.object.category:
-                    object_found = True
+            if semantics.object.type == 'reference':  # "it": whatever the previous action found
+                object_found = True
+            else:
+                object_found = description_satisfies(context.object, semantics.object, self._knowledge)
 
         if not object_found:
             self._config_result.required_context = {

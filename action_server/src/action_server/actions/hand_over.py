@@ -2,6 +2,7 @@ import rospy
 
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
+from .util.carrying import holds_wanted_object, object_to_fetch, reached, REFERENCE
 
 
 class HandOver(Action):
@@ -64,41 +65,27 @@ class HandOver(Action):
         self.semantics = self._parse_semantics(config.semantics)
         self.context = self._parse_context(config.context)
 
-        # Express the initial conditions in rules based on input
-        # We assume we already got the object if previous action passed an arm, an object and this object has the
-        # required type, or the required type is a reference.
-        got_object = (
-            self.context.arm_designator is not None and (self.context.object.type == self.semantics.object.type or
-                                                         self.semantics.object.type == 'reference'))
+        # We already got the object if a previous action passed an arm and an object that fits what this step asks
+        # for: a pick-up of {'type': 'coke'} provides {'category': 'drink'}, a pick-up of {'category': 'drink'} does
+        # not provide {'type': 'coke'} or {'category': 'food'}, and "it" is whatever was picked up.
+        got_object = holds_wanted_object(self.context, self.semantics.object, self._knowledge)
         # If precondition not met, request prior action from the task manager
         if not got_object:
             # Request pick_up action
             self._config_result.required_context = {'action': 'pick-up'}
-            if 'object' in config.semantics and 'type' in config.semantics['object']:
-                if config.semantics['object']['type'] != 'reference':
-                    self._config_result.required_context['object'] = config.semantics['object']
-                elif 'object' in config.context and 'type' in config.context['object']:
-                    self._config_result.required_context['object'] = {'type': config.context['object']['type']}
+            object_to_pick_up = object_to_fetch(config.semantics, config.context)
+            if object_to_pick_up:
+                self._config_result.required_context['object'] = object_to_pick_up
 
             if 'source-location' in config.semantics:
                 self._config_result.required_context['source-location'] = config.semantics['source-location']
             if 'location' in config.context and 'id' in config.context['location']:
                 self._config_result.required_context['source-location'] = config.context['location']['id']
-
-            # If necessary request an object from the given category
-            # ToDo this needs the grammar to make a difference between CATEGORY and NAMED_OBJECT
-            if 'category' in config.semantics:
-                del config.semantics['category']
-                self._config_result.required_context['object'] = config.semantics['object']
             return
 
         # Now we can assume we picked up the item!
         # We should have navigated to the place where we should hand over
-        at_destination = (self.context.location is not None and
-                          (self.context.location == self.semantics.target_location or
-                           self.semantics.target_location.type == 'reference'))
-
-        if not at_destination:
+        if not reached(config.context, config.semantics['target-location']):
             # Request navigation action
             self._config_result.required_context = {'action': 'navigate-to',
                                                     'target-location': config.semantics['target-location']}
@@ -109,9 +96,20 @@ class HandOver(Action):
 
         self._config_result.succeeded = True
 
+    def _object_name(self):
+        """What to call the object: its type, else its category ("drink"), else the object of "it" """
+        for description in (self.semantics.object, self.context.object):
+            if description is None:
+                continue
+            if description.type and description.type != REFERENCE:
+                return description.type
+            if description.category:
+                return description.category
+        return "object"
+
     def _handover(self):
         # TODO: Move this code to the handover smach state
-        self._robot.speech.speak("I will hand over the {} now".format(self.semantics.object.type))
+        self._robot.speech.speak("I will hand over the {} now".format(self._object_name()))
         arm = self.context.arm_designator.resolve()
         arm.send_joint_goal('handover_to_human')
         arm.wait_for_motion_done()
@@ -141,11 +139,11 @@ class HandOver(Action):
 
         self._execute_result.succeeded = True
         if self.semantics.source_location:
-            self._execute_result.message += " I brought a {} from {} to {}. ".format(self.semantics.object.type,
+            self._execute_result.message += " I brought a {} from {} to {}. ".format(self._object_name(),
                                                                                      self.semantics.source_location.id,
                                                                                      self.semantics.target_location.id)
         else:
-            self._execute_result.message += " I brought a {} to {}. ".format(self.semantics.object.type,
+            self._execute_result.message += " I brought a {} to {}. ".format(self._object_name(),
                                                                              self.semantics.target_location.id)
 
     def _cancel(self):

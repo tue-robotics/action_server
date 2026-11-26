@@ -8,6 +8,7 @@ from robot_smach_states.manipulation import Place as PlaceSmachState
 from robot_smach_states.util.designators import ArmDesignator
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
+from .util.carrying import holds_wanted_object, object_to_fetch, reached, REFERENCE
 
 
 class Place(Action):
@@ -78,17 +79,17 @@ class Place(Action):
         self.semantics = self._parse_semantics(config.semantics)
         self.context = self._parse_context(config.context)
 
-        # Express the initial conditions in rules based on input
-        # We assume we already got the object if previous action passed an arm, an object and this object has the
-        # required type, or the required type is a reference.
-        got_object_in_task = (
-            self.context.arm_designator is not None and (self.context.object.type == self.semantics.object.type or
-                                                         self.semantics.object.type == 'reference'))
+        # We already got the object if a previous action passed an arm and an object that fits what this step asks
+        # for (see hand_over.py), or if an arm holds an object of the requested type.
+        got_object_in_task = holds_wanted_object(self.context, self.semantics.object, self._knowledge)
 
         object_in_gripper = False
-        if not got_object_in_task:
+        wanted_type = self.semantics.object.type if self.semantics.object else None
+        # Only a real type can be looked up in the arms: a category or "it" would ask for an arm holding None, which
+        # matches an empty arm, and then the object would never be fetched
+        if not got_object_in_task and wanted_type and wanted_type != REFERENCE:
             arm_des = ArmDesignator(self._robot, {"required_trajectories": ["prepare_place"],
-                                                  "required_objects": [self.semantics.object.type],
+                                                  "required_objects": [wanted_type],
                                                   "required_gripper_types": [GripperTypes.GRASPING]})
             if arm_des.resolve() is not None:
                 object_in_gripper = True
@@ -100,11 +101,9 @@ class Place(Action):
         if not got_object:
             # Request pick_up action
             self._config_result.required_context = {'action': 'pick-up'}
-            if 'object' in config.semantics and 'type' in config.semantics['object']:
-                if config.semantics['object']['type'] != 'reference':
-                    self._config_result.required_context['object'] = config.semantics['object']
-                elif 'object' in config.context and 'type' in config.context['object']:
-                    self._config_result.required_context['object'] = {'type': config.context['object']['type']}
+            object_to_pick_up = object_to_fetch(config.semantics, config.context)
+            if object_to_pick_up:
+                self._config_result.required_context['object'] = object_to_pick_up
             if 'source-location' in config.semantics:
                 self._config_result.required_context['source-location'] = config.semantics['source-location']
             if 'location' in config.context and 'id' in config.context['location']:
@@ -112,12 +111,8 @@ class Place(Action):
             return
         # Now we can assume we picked up the item!
 
-        # We should have navigated to the place where we should hand over
-        at_destination = (self.context.location is not None and
-                          (self.context.location == self.semantics.target_location or
-                           self.semantics.target_location.type == 'reference'))
-
-        if not at_destination:
+        # We should have navigated to the place where we should place it
+        if not reached(config.context, config.semantics['target-location']):
             # Request navigation action
             self._config_result.required_context = {'action': 'navigate-to',
                                                     'target-location': config.semantics['target-location']}

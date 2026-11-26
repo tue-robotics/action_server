@@ -143,8 +143,11 @@ class NavigateTo(Action):
                                                                     entity_designator: "near"},
                                                                 entity_lookat_designator=entity_designator)
 
-        self._config_result.context['location'] = config.semantics['target-location']
+        # The location HERO will be at, marked so that a following hand-over or place there does not drive again (see
+        # util/carrying.py, reached). A copy: the target-location dict belongs to the action that asked for this drive.
+        self._config_result.context['location'] = dict(config.semantics['target-location'])
         self._config_result.context['location']['designator'] = entity_designator
+        self._config_result.context['location']['navigated-to'] = True
         self._config_result.succeeded = True
         return
 

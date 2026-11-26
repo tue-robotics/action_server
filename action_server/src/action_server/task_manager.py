@@ -8,6 +8,11 @@ The TaskManager sets up a state machine according to a task recipe and executes 
 """
 
 
+#: How often one action may ask for a prior action before configuring gives up. A normal task needs a few (place asks
+#: for a pick-up, which asks for a find); more means the actions keep asking each other, which would never end.
+MAX_PRIOR_ACTIONS = 10
+
+
 class TaskManager(object):
     def __init__(self, robot):
         self._task_string = None
@@ -37,8 +42,17 @@ class TaskManager(object):
         configuration_result = ConfigurationResult()
 
         # Try configuring the action until all of its preconditions are met
+        prior_actions = 0
         while not preconditions_met:
             configuration_result = action.configure(self._robot, configuration_data)
+
+            if configuration_result.required_context and prior_actions >= MAX_PRIOR_ACTIONS:
+                rospy.logerr("{} still asks for a prior action after {}: {}".format(
+                    action.get_name(), MAX_PRIOR_ACTIONS, configuration_result.required_context))
+                configuration_result = ConfigurationResult()
+                configuration_result.message = " I could not work out how to do that. "
+                break
+            prior_actions += 1
 
             # If context is required, we will need to configure an action prior to the current one
             if configuration_result.required_context:

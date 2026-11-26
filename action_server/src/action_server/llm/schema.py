@@ -179,8 +179,9 @@ ACTIONS = [
 # knowledge, and the actions that are no commands of a user (arm-goal, gripper-goal, reset-wm, ...).
 _ACTIONS_BY_NAME = {spec.name: spec for spec in ACTIONS}
 
-#: Only find can look for "a drink"; the other actions of the action server need the type of the object
-ACTIONS_THAT_TAKE_A_CATEGORY = ("find",)
+#: The actions that can be asked for "a drink": HERO picks a drink when it sees what is there. Count-and-tell counts
+#: objects of one type, and inspect and the others take no object.
+ACTIONS_THAT_TAKE_A_CATEGORY = ("find", "pick-up", "place", "hand-over")
 
 
 def describe_actions():

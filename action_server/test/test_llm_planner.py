@@ -120,6 +120,19 @@ class TestCompile(unittest.TestCase):
                                  step("find", person="anna", source="kitchen"),
                                  step("find", object="drink", source="dinner_table")))
 
+    def test_fetch_a_category(self):
+        """"Bring me a drink": HERO picks a drink when it sees what is there, the planner does not choose one"""
+        self.assertEqual([{"action": "pick-up", "object": {"category": "drink"},
+                           "source-location": {"id": "dinner_table"}},
+                          {"action": "place", "object": {"category": "food"}, "source-location": {"id": "cabinet"},
+                           "target-location": {"id": "dinner_table"}},
+                          {"action": "hand-over", "object": {"category": "drink"},
+                           "target-location": {"type": "person", "id": "operator"},
+                           "source-location": {"id": "dinner_table"}}],
+                         actions(step("pick-up", object="drink", source="dinner_table"),
+                                 step("place", object="food", source="cabinet", destination="dinner_table"),
+                                 step("hand-over", object="drink", person="operator", source="dinner_table")))
+
     def test_say_keeps_the_recipe_parseable(self):
         self.assertEqual([{"action": "say", "sentence": "joke"}, {"action": "say", "sentence": "its a nice day"}],
                          actions(step("say", sentence="joke"), step("say", sentence="it's a \"nice\"\nday")))
@@ -146,7 +159,8 @@ class TestCompile(unittest.TestCase):
             "unknown person": step("follow", person="bob"),
             "navigate-to without target": step("navigate-to"),
             "say without sentence": step("say"),
-            "category where an object is needed": step("hand-over", object="drink", person="operator"),
+            "category where an object type is needed": step("count-and-tell", object="drink",
+                                                            source="dinner_table"),
         }
         for reason, bad_step in rejected.items():
             with self.assertRaises(PlanError, msg=reason):

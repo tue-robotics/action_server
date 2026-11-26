@@ -180,38 +180,61 @@ class TestObjects(RecipeTestCase):
         self.assertChain([{"action": "inspect", "entity": at("dinner_table")}], ["Inspect"])
 
 
-class TestKnownBugs(RecipeTestCase):
-    """Known bugs of today's actions; each test states the wanted behaviour"""
+class TestCategories(RecipeTestCase):
+    """An object asked for by category ("a drink"): HERO fetches one, and knows what it holds"""
 
-    @unittest.expectedFailure
     def test_hand_over_a_category_fetches_it(self):
-        # Today: hand-over drops the category when it asks for a pick-up, and asks "What would you like me to pick up?"
         self.assertChain([{"action": "hand-over", "object": DRINK, "source-location": at("dinner_table"),
                            "target-location": OPERATOR}],
                          ["Find", "PickUp", "NavigateTo", "HandOver"])
 
-    @unittest.expectedFailure
     def test_place_a_category_fetches_it(self):
-        # Today: NavigateTo > Place, without fetching, because "an arm holding None" matches an empty arm
+        # Before, an arm "holding None" matched an empty arm, so place skipped the fetch
         self.assertChain([{"action": "place", "object": DRINK, "source-location": at("dinner_table"),
                            "target-location": at("cabinet")}],
                          ["Find", "PickUp", "NavigateTo", "Place"])
 
-    @unittest.expectedFailure
     def test_hand_over_what_was_found_by_category(self):
-        # Today: the task manager loops forever, because pick-up and hand-over disagree on "already holding it"
+        # Before, pick-up and hand-over disagreed on "already holding it" and asked each other forever
         self.assertChain([{"action": "find", "object": DRINK, "source-location": at("dinner_table")},
                           {"action": "hand-over", "object": IT, "target-location": OPERATOR}],
                          ["Find", "Find", "PickUp", "NavigateTo", "HandOver"])
 
-    @unittest.expectedFailure
-    def test_holding_a_drink_is_not_holding_food(self):
-        # Today: "None == None" makes the held drink count as the requested food
-        result = configure([{"action": "pick-up", "object": DRINK, "source-location": at("dinner_table")},
-                            {"action": "hand-over", "object": FOOD, "target-location": OPERATOR}])
+    def test_a_held_coke_is_a_drink(self):
+        self.assertChain([{"action": "pick-up", "object": COKE, "source-location": at("dinner_table")},
+                          {"action": "hand-over", "object": DRINK, "target-location": OPERATOR}],
+                         ["Find", "PickUp", "NavigateTo", "HandOver"])
+
+    def test_a_held_drink_is_not_food(self):
+        # Before, "None == None" made the held drink count as the requested food; now the food must be fetched, and
+        # the step does not say where from
+        self.assertAsks([{"action": "pick-up", "object": DRINK, "source-location": at("dinner_table")},
+                         {"action": "hand-over", "object": FOOD, "target-location": OPERATOR}],
+                        "[1].source-location")
+
+    def test_a_held_drink_is_not_necessarily_a_coke(self):
+        self.assertAsks([{"action": "pick-up", "object": DRINK, "source-location": at("dinner_table")},
+                         {"action": "hand-over", "object": COKE, "target-location": OPERATOR}],
+                        "[1].source-location")
+
+    def test_an_object_without_type_or_category_fails_instead_of_hanging(self):
+        result = configure([{"action": "pick-up", "object": {}, "source-location": at("dinner_table")}])
         self.assertNotEqual(HANG, result)
-        self.assertFalse(result["succeeded"] and result["chain"].count("PickUp") == 1,
-                         "the held drink was accepted as food: {}".format(result))
+        self.assertFalse(result["succeeded"])
+        self.assertEqual("", result["missing_field"])
+
+
+class TestKnownBugs(RecipeTestCase):
+    """Known bugs of today's actions; each test states the wanted behaviour"""
+
+    @unittest.expectedFailure
+    def test_an_explicit_drive_keeps_the_held_object(self):
+        # Today: a step only inherits the context of the step before it, so after a navigate-to step HERO forgets what
+        # it holds and asks "What would you like me to pick up?"
+        self.assertChain([{"action": "pick-up", "object": COKE, "source-location": at("dinner_table")},
+                          {"action": "navigate-to", "target-location": at("cabinet")},
+                          {"action": "place", "object": IT, "target-location": at("cabinet")}],
+                         ["Find", "PickUp", "NavigateTo", "Place"])
 
 
 class TestPeopleAndPlaces(RecipeTestCase):
@@ -325,6 +348,18 @@ class TestPlannerRecipes(RecipeTestCase):
         recipe = self.compile({"action": "find", "object": "drink", "source": "dinner_table"})
         self.assertEqual(DRINK, recipe[0]["object"])
         self.assertChain(recipe, ["Find"])
+
+    def test_bring_me_a_drink(self):
+        recipe = self.compile({"action": "hand-over", "object": "drink", "person": "operator",
+                               "source": "dinner_table"})
+        self.assertEqual(DRINK, recipe[0]["object"])
+        self.assertChain(recipe, ["Find", "PickUp", "NavigateTo", "HandOver"])
+
+    def test_put_some_food_on_the_cabinet(self):
+        recipe = self.compile({"action": "place", "object": "food", "source": "dinner_table",
+                               "destination": "cabinet"})
+        self.assertEqual(FOOD, recipe[0]["object"])
+        self.assertChain(recipe, ["Find", "PickUp", "NavigateTo", "Place"])
 
     def test_pick_up_and_place_it(self):
         recipe = self.compile({"action": "pick-up", "object": "apple", "source": "dinner_table"},
