@@ -6,6 +6,7 @@ from ed.entity import Entity
 from robot_smach_states.human_interaction import FindPersonInRoom
 from robot_smach_states.navigation import Find as StatesFind, NavigateToWaypoint
 from robot_smach_states.util.designators import EdEntityDesignator, VariableDesignator
+from robot_smach_states.util.entity_descriptions import UNCHECKABLE_PERSON_ATTRIBUTES
 from .action import Action, ConfigurationData
 from .entity_description import resolve_entity_description
 
@@ -124,23 +125,27 @@ class Find(Action):
             if self._semantics.source_location.id not in self._knowledge.location_rooms:
                 self._semantics.source_location.id = self._knowledge.get_room(self._semantics.source_location.id)
 
-            # person in room
+            # person in room: by name, by attributes ("the waving person": the nearest one who fits), or the closest
+            attributes = None if self._semantics.object.id else self._semantics.object.attributes
             if not self._semantics.object.id:
                 self._semantics.object.id = 'someone'
                 discard_other_labels = False
             else:
                 discard_other_labels = True
+            self._unchecked_attributes = [a for a in (attributes or {}) if a in UNCHECKABLE_PERSON_ATTRIBUTES]
             self._found_entity_designator = VariableDesignator(resolve_type=Entity)
             self._find_state_machines = [
                 FindPersonInRoom(robot, self._semantics.source_location.id, self._semantics.object.id,
-                                 discard_other_labels, self._found_entity_designator.writeable)]
+                                 discard_other_labels, self._found_entity_designator.writeable,
+                                 attributes=attributes)]
             self._config_result.context['location'] = {
                 'designator': EdEntityDesignator(self._robot, uuid=self._semantics.source_location.id)
             }
             if self._semantics.source_location.id:
                 self._config_result.context['location']['id'] = self._semantics.source_location.id
 
-            self._found_entity_designator = EdEntityDesignator(self._robot, uuid=self._semantics.object.id)
+            # The person that was found, for the next steps (navigate-to, guide, hand-over). Before, this was
+            # EdEntityDesignator(uuid=<id>), which never resolves for 'someone', so HERO could not go to the person.
             self._config_result.context['object']['designator'] = self._found_entity_designator
             self._config_result.succeeded = True
 
@@ -201,7 +206,18 @@ class Find(Action):
             self._config_result.context['location']['id'] = self._semantics.source_location.id
         self._config_result.succeeded = True
 
+    def _found_name(self):
+        """What HERO found: the type of the found entity ("apple"), else the description ("a food")"""
+        found = self._found_entity_designator.resolve() if self._found_entity_designator else None
+        if found is not None and getattr(found, "etype", None):
+            return found.etype
+        return self._semantics.object.type if self._semantics.object.type else self._semantics.object.category
+
     def _start(self):
+        unchecked = getattr(self, "_unchecked_attributes", [])
+        if unchecked:
+            self._robot.speech.speak("I cannot see the {} of people yet, so I will not look at that.".format(
+                " or ".join(a.replace("_", " ") for a in unchecked)))
         for fsm in self._find_state_machines:
             res = fsm.execute()
 
@@ -226,12 +242,8 @@ class Find(Action):
                     self._navigation_state_machine.execute()
                     self._robot.speech.speak("Hi there!")
                 else:
-                    self._robot.speech.speak("Hey, I found a {}!".format(self._semantics.object.type if
-                                                                         self._semantics.object.type else
-                                                                         self._semantics.object.category))
-                    self._execute_result.message = " I found a {} ".format(self._semantics.object.type if
-                                                                           self._semantics.object.type else
-                                                                           self._semantics.object.category)
+                    self._robot.speech.speak("Hey, I found a {}!".format(self._found_name()))
+                    self._execute_result.message = " I found a {} ".format(self._found_name())
                 self._execute_result.succeeded = True
                 return
             elif res == 'not_found':

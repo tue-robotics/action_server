@@ -87,15 +87,21 @@ class Follow(Action):
         else:
             if not semantics.target.id == "operator" and not semantics.location_from:
                 self._config_result.missing_field = "location-from"
-                self._config_result.message = " Where can I find {}? ".format(semantics.target.id)
+                self._config_result.message = " Where can I find {}? ".format(semantics.target.id or "that person")
                 return
 
             if semantics.location_from and not context.location:
                 self._origin = resolve_entity_description(config.semantics["location-from"])
+                # Find the person first, by name or by attributes ("the waving person"); find drives to the person,
+                # so the person stands in front of HERO when following starts
+                person = {'type': 'person'}
+                if semantics.target.id:
+                    person['id'] = semantics.target.id
+                if semantics.target.attributes:
+                    person['attributes'] = semantics.target.attributes
                 self._config_result.required_context = {'action': 'find',
                                                         'source-location': {'id': self._origin.id},
-                                                        'object': {'type': 'person',
-                                                                   'id': semantics.target.id}}
+                                                        'object': person}
                 return
 
         if semantics.target.id == "operator":

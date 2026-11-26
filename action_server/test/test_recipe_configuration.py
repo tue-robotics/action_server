@@ -53,6 +53,16 @@ def _robot():
     return _ROBOT
 
 
+def _person_search(action):
+    """For a Find of a person: (the attributes it looks for, the state that searches), e.g.
+    ({'gesture': 'waving'}, 'FindFirstPerson'); None for other actions"""
+    semantics = getattr(action, "_semantics", None)
+    if action.get_name() != "Find" or semantics is None or semantics.object.type != "person":
+        return None
+    machine = action._find_state_machines[0]
+    return semantics.object.attributes, type(machine.get_children()["FIND_PERSON"]).__name__
+
+
 def _configure_in_child(robot, recipe, queue):
     task_manager = TaskManager(robot=robot)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
@@ -60,7 +70,9 @@ def _configure_in_child(robot, recipe, queue):
             result = task_manager.set_up_state_machine(recipe=copy.deepcopy(recipe))
             queue.put({"succeeded": result.succeeded, "missing_field": result.missing_field,
                        "message": result.message.strip(),
-                       "chain": [action.get_name() for action in task_manager._action_sequence]})
+                       "chain": [action.get_name() for action in task_manager._action_sequence],
+                       "person_searches": [_person_search(action) for action in task_manager._action_sequence
+                                           if _person_search(action)]})
         except Exception as e:  # a crash is a result too
             queue.put({"succeeded": False, "missing_field": "", "message": "crashed: {}: {}".format(
                 type(e).__name__, e), "chain": []})
@@ -273,6 +285,51 @@ class TestPeopleAndPlaces(RecipeTestCase):
 
     def test_say(self):
         self.assertChain([{"action": "say", "sentence": "hello"}], ["Say"])
+
+
+class TestDescribedPeople(RecipeTestCase):
+    """A person described instead of named ("the waving person"): the attributes reach the search of Find"""
+    WAVING = {"type": "person", "attributes": {"gesture": "waving"}}
+
+    def assertSearch(self, recipe, chain, searches):
+        result = configure(recipe)
+        self.assertNotEqual(HANG, result, "configuring {} did not finish".format(recipe))
+        self.assertTrue(result["succeeded"], "{} did not configure: {}".format(recipe, result))
+        self.assertEqual(chain, result["chain"])
+        self.assertEqual(searches, [tuple(s) for s in result["person_searches"]])
+
+    def test_find_a_described_person(self):
+        self.assertSearch([{"action": "find", "object": self.WAVING, "source-location": room("kitchen")}],
+                          ["Find"], [({"gesture": "waving"}, "FindFirstPerson")])
+
+    def test_a_named_person_is_found_by_name(self):
+        self.assertSearch([{"action": "find", "object": person("anna"), "source-location": room("kitchen")}],
+                          ["Find"], [(None, "FindPerson")])
+
+    def test_someone_is_the_closest_person_as_before(self):
+        self.assertSearch([{"action": "find", "object": {"type": "person"}, "source-location": room("kitchen")}],
+                          ["Find"], [(None, "FindPerson")])
+
+    def test_guide_a_described_person(self):
+        self.assertSearch([{"action": "guide", "object": self.WAVING, "source-location": room("kitchen"),
+                            "target-location": room("living_room")}],
+                          ["Find", "Guide"], [({"gesture": "waving"}, "FindFirstPerson")])
+
+    def test_follow_a_described_person(self):
+        self.assertSearch([{"action": "follow", "target": self.WAVING, "location-from": room("kitchen")}],
+                          ["Find", "Follow"], [({"gesture": "waving"}, "FindFirstPerson")])
+
+    def test_hand_over_to_a_described_person(self):
+        target = dict(self.WAVING, location=room("living_room"))
+        self.assertSearch([{"action": "hand-over", "object": COKE, "source-location": at("dinner_table"),
+                            "target-location": target}],
+                          ["Find", "PickUp", "Find", "NavigateTo", "HandOver"],
+                          [({"gesture": "waving"}, "FindFirstPerson")])
+
+    def test_navigate_to_a_described_person(self):
+        target = dict(self.WAVING, location=room("living_room"))
+        self.assertSearch([{"action": "navigate-to", "target-location": target}],
+                          ["Find", "NavigateTo"], [({"gesture": "waving"}, "FindFirstPerson")])
 
 
 class TestGrammarRecipes(RecipeTestCase):

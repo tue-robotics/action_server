@@ -524,5 +524,69 @@ class TestSettings(unittest.TestCase):
         self.assertIn(path, str(context.exception))
 
 
+
+def attributes(**given):
+    """person_attributes as the model writes them: every attribute present, null when not mentioned"""
+    full = {"gesture": None, "pose": None, "clothing_color": None, "garment": None}
+    full.update(given)
+    return full
+
+
+class TestPersonAttributes(unittest.TestCase):
+    def test_the_same_values_as_robot_smach_states(self):
+        """The planner offers exactly the attributes that FindPeople can check (or knows it cannot)"""
+        from robot_smach_states.util.entity_descriptions import PERSON_ATTRIBUTES
+        from action_server.llm.schema import PERSON_ATTRIBUTE_VALUES
+        self.assertEqual(PERSON_ATTRIBUTES, PERSON_ATTRIBUTE_VALUES)
+
+    def test_find_a_described_person(self):
+        self.assertEqual([{"action": "find", "object": {"type": "person", "attributes": {"gesture": "waving"}},
+                           "source-location": {"id": "kitchen", "type": "room"}}],
+                         actions(step("find", person="someone", source="kitchen",
+                                      person_attributes=attributes(gesture="waving"))))
+
+    def test_guide_follow_and_hand_over_to_a_described_person(self):
+        described = {"type": "person", "attributes": {"pose": "sitting", "clothing_color": "red"}}
+        given = attributes(pose="sitting", clothing_color="red")
+        self.assertEqual(described, actions(step("guide", person="someone", source="kitchen",
+                                                 destination="living_room", person_attributes=given))[0]["object"])
+        self.assertEqual(described, actions(step("follow", person="someone", source="kitchen",
+                                                 person_attributes=given))[0]["target"])
+        self.assertEqual(dict(described, location={"id": "living_room", "type": "room"}),
+                         actions(step("hand-over", object="coke", person="someone", source="dinner_table",
+                                      destination="living_room", person_attributes=given))[0]["target-location"])
+
+    def test_no_attributes_leaves_the_person_as_before(self):
+        self.assertEqual({"type": "person"},
+                         actions(step("find", person="someone", source="kitchen",
+                                      person_attributes=attributes()))[0]["object"])
+        self.assertEqual({"type": "person"},
+                         actions(step("find", person="someone", source="kitchen",
+                                      person_attributes=None))[0]["object"])
+
+    def test_the_operator_needs_no_description(self):
+        self.assertEqual({"type": "person", "id": "operator"},
+                         actions(step("follow", person="operator",
+                                      person_attributes=attributes(gesture="waving")))[0]["target"])
+
+    def test_rejects_wrong_attributes(self):
+        rejected = {
+            "unknown value": step("find", person="someone", source="kitchen",
+                                  person_attributes=attributes(gesture="dancing")),
+            "unknown attribute": step("find", person="someone", source="kitchen",
+                                      person_attributes={"hair": "long"}),
+            "attributes without a person": step("find", object="coke", source="kitchen",
+                                                person_attributes=attributes(pose="sitting")),
+        }
+        for reason, bad_step in rejected.items():
+            with self.assertRaises(PlanError, msg=reason):
+                compile_plan(plan(bad_step), VOCABULARY)
+
+    def test_the_prompt_lists_the_attributes(self):
+        from action_server.llm.schema import describe_person_attributes
+        text = describe_person_attributes()
+        self.assertIn("- `gesture`: waving, raising_left_arm", text)
+        self.assertIn("- `garment`:", text)
+
 if __name__ == "__main__":
     unittest.main()

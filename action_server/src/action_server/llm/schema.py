@@ -20,6 +20,17 @@ DESTINATION = "destination"
 SENTENCE = "sentence"
 ROLES = (OBJECT, PERSON, SOURCE, DESTINATION, SENTENCE)
 
+#: How the person of a step looks or what they do, for a person without a known name ("the waving person")
+PERSON_ATTRIBUTES = "person_attributes"
+#: The attributes and their values, from the rulebook. Must equal PERSON_ATTRIBUTES of
+#: robot_smach_states.util.entity_descriptions, which checks them against what perception sees (a test checks this).
+PERSON_ATTRIBUTE_VALUES = {
+    "gesture": ("waving", "raising_left_arm", "raising_right_arm", "pointing_left", "pointing_right"),
+    "pose": ("sitting", "standing", "lying"),
+    "clothing_color": ("black", "blue", "gray", "orange", "red", "white", "yellow"),
+    "garment": ("blouse", "coat", "jacket", "shirt", "sweater", "t_shirt"),
+}
+
 #: The object handled by the previous step ("it")
 PREVIOUS_OBJECT = "it"
 #: The person who gives the command ("me")
@@ -55,7 +66,12 @@ def _object(name, vocabulary):
     return {"type": name}
 
 
-def _person(name, vocabulary, location=None):
+def _person(name, vocabulary, location=None, attributes=None):
+    """
+    The description of a person, e.g. "the waving person in the kitchen":
+    _person("someone", v, "kitchen", {"gesture": "waving"}) ->
+    {"type": "person", "location": {"id": "kitchen", "type": "room"}, "attributes": {"gesture": "waving"}}
+    """
     if name == OPERATOR:
         # navigate-to only recognises the operator by this id; it then returns to where the task was given
         return {"type": "person", "id": OPERATOR}
@@ -64,6 +80,8 @@ def _person(name, vocabulary, location=None):
         person["id"] = name
     if location:
         person["location"] = _location(location, vocabulary)
+    if attributes:
+        person["attributes"] = dict(attributes)
     return person
 
 
@@ -77,12 +95,16 @@ def _with_locations(recipe, step, vocabulary, **fields):
 
 def _navigate_to(step, v):
     if step[PERSON]:
-        return {"target-location": _person(step[PERSON], v, location=step[DESTINATION])}
+        return {"target-location": _person(step[PERSON], v, location=step[DESTINATION],
+                                           attributes=step[PERSON_ATTRIBUTES])}
     return {"target-location": _location(step[DESTINATION], v)}
 
 
 def _find(step, v):
-    target = _person(step[PERSON], v) if step[PERSON] else _object(step[OBJECT], v)
+    if step[PERSON]:
+        target = _person(step[PERSON], v, attributes=step[PERSON_ATTRIBUTES])
+    else:
+        target = _object(step[OBJECT], v)
     return _with_locations({"object": target}, step, v, source="source-location")
 
 
@@ -97,7 +119,8 @@ def _place(step, v):
 
 def _hand_over(step, v):
     recipe = {"object": _object(step[OBJECT] or PREVIOUS_OBJECT, v),
-              "target-location": _person(step[PERSON], v, location=step[DESTINATION])}
+              "target-location": _person(step[PERSON], v, location=step[DESTINATION],
+                                         attributes=step[PERSON_ATTRIBUTES])}
     return _with_locations(recipe, step, v, source="source-location")
 
 
@@ -108,12 +131,12 @@ def _say(step, v):
 
 
 def _follow(step, v):
-    recipe = {"target": _person(step[PERSON], v)}
+    recipe = {"target": _person(step[PERSON], v, attributes=step[PERSON_ATTRIBUTES])}
     return _with_locations(recipe, step, v, source="location-from", destination="location-to")
 
 
 def _guide(step, v):
-    recipe = {"object": _person(step[PERSON], v)}
+    recipe = {"object": _person(step[PERSON], v, attributes=step[PERSON_ATTRIBUTES])}
     return _with_locations(recipe, step, v, source="source-location", destination="target-location")
 
 
@@ -184,6 +207,13 @@ _ACTIONS_BY_NAME = {spec.name: spec for spec in ACTIONS}
 ACTIONS_THAT_TAKE_A_CATEGORY = ("find", "pick-up", "place", "hand-over")
 
 
+def describe_person_attributes():
+    """
+    :return: the person attributes and their values, as text for the model, e.g. "- gesture: waving, ..."
+    """
+    return "\n".join("- `{}`: {}".format(name, ", ".join(values)) for name, values in PERSON_ATTRIBUTE_VALUES.items())
+
+
 def describe_actions():
     """
     :return: the actions and how each uses the roles, as text for the model
@@ -223,7 +253,11 @@ def build_plan_schema(vocabulary):
         SOURCE: nullable("location"),
         DESTINATION: nullable("location"),
         SENTENCE: {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        PERSON_ATTRIBUTES: {"anyOf": [{"$ref": "#/$defs/person_attributes"}, {"type": "null"}]},
     })
+    person_attributes = strict_object({
+        name: {"anyOf": [{"type": "string", "enum": list(values)}, {"type": "null"}]}
+        for name, values in PERSON_ATTRIBUTE_VALUES.items()})
 
     schema = strict_object({
         "understanding": {"type": "string",
@@ -238,7 +272,8 @@ def build_plan_schema(vocabulary):
     schema["$defs"] = {"step": step,
                        "object": {"type": "string", "enum": choices[OBJECT]},
                        "person": {"type": "string", "enum": choices[PERSON]},
-                       "location": {"type": "string", "enum": choices[SOURCE]}}
+                       "location": {"type": "string", "enum": choices[SOURCE]},
+                       "person_attributes": person_attributes}
     return schema
 
 
@@ -270,7 +305,34 @@ def _check_step(index, step, choices, vocabulary):
         if not any(checked[role] for role in group):
             raise PlanError("step {} ({}) needs {}".format(index, spec.name, " or ".join(group)))
 
+    checked[PERSON_ATTRIBUTES] = _check_person_attributes(index, spec, step.get(PERSON_ATTRIBUTES), checked[PERSON])
     return spec, checked
+
+
+def _check_person_attributes(index, spec, attributes, person):
+    """
+    :return: the attributes that are given, e.g. {"gesture": "waving"}; None when there are none, or when the person
+        is the operator (HERO knows who that is)
+    :raises PlanError: for an unknown attribute or value, or attributes without a person
+    """
+    if not attributes:
+        return None
+    if not isinstance(attributes, dict):
+        raise PlanError("step {} ({}) has person_attributes that are not an object".format(index, spec.name))
+    given = {name: value for name, value in attributes.items() if value is not None}
+    for name, value in given.items():
+        if name not in PERSON_ATTRIBUTE_VALUES:
+            raise PlanError("step {} ({}) has unknown person attribute '{}'; choose from: {}".format(
+                index, spec.name, name, ", ".join(PERSON_ATTRIBUTE_VALUES)))
+        if value not in PERSON_ATTRIBUTE_VALUES[name]:
+            raise PlanError("step {} ({}) has unknown {} '{}'; choose from: {}".format(
+                index, spec.name, name, value, ", ".join(PERSON_ATTRIBUTE_VALUES[name])))
+    if given and not person:
+        raise PlanError("step {} ({}) has person_attributes but no person; use person=someone".format(
+            index, spec.name))
+    if not given or person == OPERATOR:
+        return None
+    return given
 
 
 def compile_plan(plan, vocabulary):

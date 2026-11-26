@@ -97,7 +97,11 @@ class HandOver(Action):
         self._config_result.succeeded = True
 
     def _object_name(self):
-        """What to call the object: its type, else its category ("drink"), else the object of "it" """
+        """What to call the object: the type of the held entity ("apple"), else the type or the category ("drink")
+        of the description, else of the object of "it" """
+        held_name = getattr(self, "_held_name", None)
+        if held_name:
+            return held_name
         for description in (self.semantics.object, self.context.object):
             if description is None:
                 continue
@@ -109,8 +113,10 @@ class HandOver(Action):
 
     def _handover(self):
         # TODO: Move this code to the handover smach state
-        self._robot.speech.speak("I will hand over the {} now".format(self._object_name()))
         arm = self.context.arm_designator.resolve()
+        # Remember what the arm holds, before the hand-over empties it
+        self._held_name = getattr(getattr(arm, "occupied_by", None), "etype", None) if arm else None
+        self._robot.speech.speak("I will hand over the {} now".format(self._object_name()))
         arm.send_joint_goal('handover_to_human')
         arm.wait_for_motion_done()
 

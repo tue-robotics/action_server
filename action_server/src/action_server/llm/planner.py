@@ -9,7 +9,8 @@ from .backend import OpenAIBackend
 from .claude_backend import ClaudeBackend
 from .claude_code_backend import ClaudeCodeBackend
 from .knowledge import describe_vocabulary, find_knowledge_file, load_vocabulary, render_prompt
-from .schema import PlanError, SAY_KEYWORDS, STATUS_OK, build_plan_schema, compile_plan, describe_actions
+from .schema import PlanError, SAY_KEYWORDS, STATUS_OK, build_plan_schema, compile_plan, describe_actions, \
+    describe_person_attributes
 from .settings import CLAUDE_PROVIDERS, load_settings
 
 
@@ -83,6 +84,7 @@ class LLMPlanner(object):
         values = describe_vocabulary(vocabulary)
         values["actions"] = describe_actions()
         values["say_keywords"] = ", ".join(SAY_KEYWORDS)
+        values["person_attributes"] = describe_person_attributes()
         self.system_prompt = render_prompt(instructions, values)
 
     @classmethod
