@@ -326,6 +326,15 @@ class TestDescribedPeople(RecipeTestCase):
                           ["Find", "PickUp", "Find", "NavigateTo", "HandOver"],
                           [({"gesture": "waving"}, "FindFirstPerson")])
 
+    def test_tell_the_name_of_a_described_person(self):
+        self.assertSearch([{"action": "tell-name-of-person", "location": room("kitchen"),
+                            "person": {"type": "person", "attributes": {"gesture": "pointing_left"}}}],
+                          ["Find", "TellNameOfPerson"], [({"gesture": "pointing_left"}, "FindFirstPerson")])
+
+    def test_tell_the_name_of_the_closest_person_as_before(self):
+        self.assertSearch([{"action": "tell-name-of-person", "location": room("kitchen")}],
+                          ["Find", "TellNameOfPerson"], [(None, "FindPerson")])
+
     def test_navigate_to_a_described_person(self):
         target = dict(self.WAVING, location=room("living_room"))
         self.assertSearch([{"action": "navigate-to", "target-location": target}],

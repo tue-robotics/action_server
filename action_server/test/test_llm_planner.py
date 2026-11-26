@@ -556,6 +556,16 @@ class TestPersonAttributes(unittest.TestCase):
                          actions(step("hand-over", object="coke", person="someone", source="dinner_table",
                                       destination="living_room", person_attributes=given))[0]["target-location"])
 
+    def test_tell_the_name_of_a_described_person(self):
+        self.assertEqual([{"action": "tell-name-of-person",
+                           "person": {"type": "person", "attributes": {"gesture": "pointing_left"}},
+                           "location": {"id": "kitchen", "type": "room"}}],
+                         actions(step("tell-name-of-person", person="someone", source="kitchen",
+                                      person_attributes=attributes(gesture="pointing_left"))))
+        # Without a description: the closest person at the place, as before
+        self.assertEqual([{"action": "tell-name-of-person", "location": {"id": "kitchen", "type": "room"}}],
+                         actions(step("tell-name-of-person", source="kitchen")))
+
     def test_no_attributes_leaves_the_person_as_before(self):
         self.assertEqual({"type": "person"},
                          actions(step("find", person="someone", source="kitchen",

@@ -10,7 +10,9 @@ class TellNameOfPerson(Action):
     """ The TellNameOfPerson class implements the action to ask someones name and report it to the operator.
 
     Parameters to pass to the configure() method are:
-     - `sentence` (required): The sentence to speak. May be a keyword to tell something more intelligent.
+     - `location`: where the person is; HERO first finds the person there
+     - `person` (optional): the description of the person, e.g. {'type': 'person', 'attributes': {'gesture':
+       'pointing_left'}}; without it, the closest person at the location
     """
 
     def __init__(self):
@@ -57,11 +59,13 @@ class TellNameOfPerson(Action):
         semantics = TellNameOfPerson._parse_semantics(config.semantics)
         context = TellNameOfPerson._parse_context(config.context)
 
-        # If a person is specified in the task description, we need to go and find that person first
+        # If a person is specified in the task description, we need to go and find that person first: the person
+        # described by 'person' ("the person pointing to the left": {'type': 'person', 'attributes': {...}}), or else
+        # the closest person at the location
         if semantics.location and not context.object:
             self._config_result.required_context = {
                 'action': 'find',
-                'object': {'type': 'person'},
+                'object': dict(config.semantics.get('person') or {'type': 'person'}),
                 'source-location': config.semantics['location'],
             }
             return

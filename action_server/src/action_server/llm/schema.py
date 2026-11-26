@@ -145,7 +145,10 @@ def _count_and_tell(step, v):
 
 
 def _tell_name_of_person(step, v):
-    return _with_locations({}, step, v, source="location")
+    recipe = {}
+    if step[PERSON] and step[PERSON] != OPERATOR:  # "the name of the person pointing to the left"
+        recipe["person"] = _person(step[PERSON], v, attributes=step[PERSON_ATTRIBUTES])
+    return _with_locations(recipe, step, v, source="location")
 
 
 def _inspect(step, v):
@@ -192,7 +195,8 @@ ACTIONS = [
     ActionSpec("count-and-tell", "object; source = furniture to count on",
                "Count the objects of one kind on a piece of furniture and say the number.",
                [(OBJECT,), (SOURCE,)], _count_and_tell),
-    ActionSpec("tell-name-of-person", "source = where the person is",
+    ActionSpec("tell-name-of-person", "source = where the person is; person = someone, with person_attributes when "
+                                      "the person is described",
                "Ask the name of the person at a place and report it.",
                [], _tell_name_of_person),
     ActionSpec("inspect", "source = furniture to inspect", "Look at a piece of furniture to see what is on it.",
